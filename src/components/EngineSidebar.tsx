@@ -1,8 +1,9 @@
 /**
- * Engine-driven left sidebar: Layers and Pages over the live engine
+ * Engine-driven left sidebar: Layers, Pages, and Assets over the live engine
  * snapshot. Layer rows support select, expand, rename, visibility/lock, and
  * drag reorder/reparent; page rows support select, add, rename, duplicate,
- * and delete. The Assets tab is honestly disabled until components migrate.
+ * delete, and move-selection-here; the Assets tab lists engine shared styles
+ * and components with create/apply/insert actions.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -21,6 +22,8 @@ import {
   Lock,
   LockOpen,
   Minus,
+  MoveRight,
+  Plus,
   Square,
   Trash2,
   Type,
@@ -59,7 +62,7 @@ type DropPos = { targetId: number; pos: 'before' | 'after' | 'inside' } | null;
 
 export function EngineSidebar() {
   const ed = useEngine();
-  const [tab, setTab] = useState<'layers' | 'pages'>('layers');
+  const [tab, setTab] = useState<'layers' | 'pages' | 'assets'>('layers');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
@@ -218,7 +221,7 @@ export function EngineSidebar() {
         <button role="tab" aria-selected={tab === 'pages'} className={`sidebar-tab${tab === 'pages' ? ' active' : ''}`} onClick={() => setTab('pages')}>
           Pages
         </button>
-        <button role="tab" aria-selected={false} className="sidebar-tab" disabled title="Components migrate in a later milestone">
+        <button role="tab" aria-selected={tab === 'assets'} className={`sidebar-tab${tab === 'assets' ? ' active' : ''}`} onClick={() => setTab('assets')}>
           Assets
         </button>
       </div>
@@ -352,6 +355,17 @@ export function EngineSidebar() {
                 )}
                 <span className="dim small">{p.children}</span>
                 <span className="layer-actions">
+                  <button
+                    className="mini-btn"
+                    title={p.current ? 'Selection is already on this page' : 'Move selection to this page'}
+                    disabled={p.current || ed.snapshot.selection.length === 0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ed.moveSelectionToPage(p.id);
+                    }}
+                  >
+                    <MoveRight size={12} />
+                  </button>
                   <button className="mini-btn" title="Duplicate page" onClick={(e) => { e.stopPropagation(); ed.duplicatePage(p.id); }}>
                     <Copy size={12} />
                   </button>
@@ -372,6 +386,126 @@ export function EngineSidebar() {
           </div>
         </div>
       )}
+
+      {tab === 'assets' && <AssetsPanel />}
+    </div>
+  );
+}
+
+function AssetsPanel() {
+  const ed = useEngine();
+  const [styles, setStyles] = useState<Array<{ id: string; name: string }>>([]);
+  const [components, setComponents] = useState<Array<{ id: number; name: string; type: string; instances: number }>>([]);
+  const [styleName, setStyleName] = useState('');
+  const [styleType, setStyleType] = useState<'paint' | 'text' | 'effect' | 'grid'>('paint');
+  const hasSel = ed.snapshot.selection.length > 0;
+
+  // The style/component registries live in the engine, outside the rendered
+  // snapshot; re-read them whenever the snapshot (or tab) changes.
+  useEffect(() => {
+    if (ed.status !== 'ready') {
+      setStyles([]);
+      setComponents([]);
+      return;
+    }
+    setStyles(ed.queryStyles());
+    setComponents(ed.queryComponents());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ed.status, ed.snapshot]);
+
+  const createStyle = () => {
+    const name = styleName.trim();
+    if (name === '' || !hasSel) return;
+    ed.createStyleFromSelection(styleType, name);
+    setStyleName('');
+  };
+
+  return (
+    <div className="sidebar-body">
+      <div className="row-between">
+        <span className="prop-label">Styles</span>
+      </div>
+      {styles.length === 0 && <p className="dim small">No shared styles yet.</p>}
+      <div className="page-list">
+        {styles.map((s) => (
+          <div key={s.id} className="page-row">
+            <span className="layer-name">{s.name}</span>
+            <span className="layer-actions">
+              <button
+                className="mini-btn"
+                title="Apply to selection fill"
+                disabled={!hasSel}
+                onClick={() => ed.applyStyleToSelection(s.id, 'fill')}
+              >
+                <Plus size={12} />
+              </button>
+              <button
+                className="mini-btn danger-hover"
+                title="Delete style"
+                onClick={() => ed.deleteStyleById(s.id)}
+              >
+                <Trash2 size={12} />
+              </button>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="row-between">
+        <input
+          className="text-input"
+          placeholder="New style name"
+          value={styleName}
+          onChange={(e) => setStyleName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') createStyle();
+          }}
+          aria-label="New style name"
+        />
+      </div>
+      <div className="row-between">
+        <select
+          className="text-input"
+          value={styleType}
+          onChange={(e) => setStyleType(e.target.value as 'paint' | 'text' | 'effect' | 'grid')}
+          aria-label="Style type"
+        >
+          <option value="paint">Paint</option>
+          <option value="text">Text</option>
+          <option value="effect">Effect</option>
+          <option value="grid">Grid</option>
+        </select>
+        <button className="btn secondary" disabled={!hasSel || styleName.trim() === ''} onClick={createStyle} title="Create style from selection">
+          Create
+        </button>
+      </div>
+
+      <div className="row-between">
+        <span className="prop-label">Components</span>
+        <button className="btn secondary" disabled={!hasSel} onClick={ed.createComponentFromSelection} title="Create component from selection">
+          <Plus size={13} /> New
+        </button>
+      </div>
+      {components.length === 0 && <p className="dim small">No components yet.</p>}
+      <div className="page-list">
+        {components.map((c) => (
+          <div key={c.id} className="page-row">
+            <span className="layer-icon">
+              <TypeIcon type={c.type} />
+            </span>
+            <span className="layer-name">{c.name}</span>
+            <span className="dim small">{c.instances}</span>
+            <span className="layer-actions">
+              <button
+                className="mini-btn"
+                title="Insert instance at viewport center"
+                onClick={() => ed.createInstanceAtCenter(c.id)}
+              >
+                <Plus size={12} />
+              </button>
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

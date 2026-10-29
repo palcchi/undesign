@@ -68,9 +68,35 @@ interface EngineContextValue {
   marqueeSelect: (x: number, y: number, w: number, h: number, additive?: boolean) => void;
   selectedNodes: EngineNode[];
   // Editing.
-  createShape: (kind: 'rectangle' | 'ellipse' | 'line', opts: { x: number; y: number; w: number; h: number; parent?: number }) => number | null;
+  createShape: (kind: 'rectangle' | 'ellipse' | 'line' | 'polygon' | 'star' | 'arrow', opts: { x: number; y: number; w: number; h: number; parent?: number }) => number | null;
   createFrame: (opts: { x: number; y: number; w: number; h: number; parent?: number }) => number | null;
   createText: (opts: { x: number; y: number; parent?: number }) => number | null;
+  insertShapeAtCenter: (kind: 'polygon' | 'star' | 'arrow') => void;
+  frameSelected: (name?: string) => void;
+  removeFrameSelected: () => void;
+  swapOrientationSelected: () => void;
+  maskSelected: () => void;
+  releaseMaskSelected: () => void;
+  booleanSelected: (op: 'union' | 'subtract' | 'intersect' | 'exclude') => void;
+  flattenSelected: () => void;
+  rasterizeSelected: () => void;
+  layoutAddSelected: (direction?: 'horizontal' | 'vertical' | 'grid') => void;
+  layoutRemoveSelected: () => void;
+  textToggleSelected: (which: 'bold' | 'italic' | 'underline' | 'strikethrough') => void;
+  textAlignSelected: (which: 'left' | 'center' | 'right' | 'justify') => void;
+  textSizeSelected: (dir: 'up' | 'down') => void;
+  moveSelectionToPage: (page: number) => void;
+  placeImageAtCenter: (dataUrl: string, name?: string) => void;
+  createComponentFromSelection: () => void;
+  detachSelectedInstances: () => void;
+  resetSelectedInstances: () => void;
+  createInstanceAtCenter: (component: number) => void;
+  createStyleFromSelection: (type: 'paint' | 'text' | 'effect' | 'grid', name: string) => void;
+  applyStyleToSelection: (style: string, target?: 'fill' | 'stroke') => void;
+  detachStyleFromSelection: (which: 'fill' | 'stroke' | 'effect' | 'grid' | 'text') => void;
+  deleteStyleById: (style: string) => void;
+  queryStyles: (type?: string) => Array<{ id: string; name: string }>;
+  queryComponents: () => Array<{ id: number; name: string; type: string; page: number; instances: number }>;
   moveSelected: (dx: number, dy: number) => void;
   resizeSelected: (w: number, h: number, anchor: string) => void;
   setNodeProps: (id: number, props: Record<string, unknown>) => void;
@@ -378,16 +404,16 @@ export function EngineProvider({ children }: { children: ReactNode }) {
 
   // ---- editing ----
   const createShape = useCallback(
-    (kind: 'rectangle' | 'ellipse' | 'line', opts: { x: number; y: number; w: number; h: number; parent?: number }) => {
+    (kind: 'rectangle' | 'ellipse' | 'line' | 'polygon' | 'star' | 'arrow', opts: { x: number; y: number; w: number; h: number; parent?: number }) => {
       const api = adapterRef.current;
       if (!api) return null;
       let id: number | null = null;
       mutate((a) => {
-        if (kind === 'line') {
+        if (kind === 'line' || kind === 'arrow') {
           const len = Math.hypot(opts.w, opts.h);
-          if (len < 1) throw new Error('line is too short');
+          if (len < 1) throw new Error(`${kind} is too short`);
           const deg = (Math.atan2(opts.h, opts.w) * 180) / Math.PI;
-          id = a.createShape('line', { x: opts.x + opts.w / 2 - len / 2, y: opts.y + opts.h / 2, width: len, parent: opts.parent, props: { rotation: deg } });
+          id = a.createShape(kind, { x: opts.x + opts.w / 2 - len / 2, y: opts.y + opts.h / 2, width: len, parent: opts.parent, props: { rotation: deg } });
         } else {
           id = a.createShape(kind, { x: opts.x, y: opts.y, width: Math.max(1, opts.w), height: Math.max(1, opts.h), parent: opts.parent });
         }
@@ -515,6 +541,189 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     },
     [mutate, snapshot.selection],
   );
+  const frameSelected = useCallback(
+    (name?: string) => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => {
+        const id = a.frameSelection(snapshot.selection, name);
+        a.setSelection([id]);
+      }, 'Frame selection failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const removeFrameSelected = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.removeFrame(snapshot.selection), 'Remove frame failed');
+  }, [mutate, snapshot.selection]);
+  const swapOrientationSelected = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.swapOrientation(snapshot.selection), 'Swap orientation failed');
+  }, [mutate, snapshot.selection]);
+  const maskSelected = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => {
+      const id = a.mask(snapshot.selection);
+      if (id !== null) a.setSelection([id]);
+    }, 'Mask failed');
+  }, [mutate, snapshot.selection]);
+  const releaseMaskSelected = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.releaseMask(snapshot.selection), 'Release mask failed');
+  }, [mutate, snapshot.selection]);
+  const booleanSelected = useCallback(
+    (op: 'union' | 'subtract' | 'intersect' | 'exclude') => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.booleanCombine(snapshot.selection, op), 'Boolean operation failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const flattenSelected = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.flattenBoolean(snapshot.selection), 'Flatten failed');
+  }, [mutate, snapshot.selection]);
+  const rasterizeSelected = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.rasterize(snapshot.selection, 2), 'Rasterize failed');
+  }, [mutate, snapshot.selection]);
+  const layoutAddSelected = useCallback(
+    (direction?: 'horizontal' | 'vertical' | 'grid') => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.layoutAdd(snapshot.selection, direction), 'Add auto-layout failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const layoutRemoveSelected = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.layoutRemove(snapshot.selection), 'Remove auto-layout failed');
+  }, [mutate, snapshot.selection]);
+  const textToggleSelected = useCallback(
+    (which: 'bold' | 'italic' | 'underline' | 'strikethrough') => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.textToggle(snapshot.selection, which), 'Text style failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const textAlignSelected = useCallback(
+    (which: 'left' | 'center' | 'right' | 'justify') => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.textAlignCmd(snapshot.selection, which), 'Text alignment failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const textSizeSelected = useCallback(
+    (dir: 'up' | 'down') => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.textSizeStep(snapshot.selection, dir), 'Font size failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const moveSelectionToPage = useCallback(
+    (page: number) => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.moveToPage(snapshot.selection, page), 'Move to page failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const insertShapeAtCenter = useCallback(
+    (kind: 'polygon' | 'star' | 'arrow') => {
+      mutate((a) => {
+        const c = screenToPage(snapshot.viewBox, viewport, viewport.w / 2, viewport.h / 2);
+        if (kind === 'arrow') {
+          a.createShape('arrow', { x: c.x - 40, y: c.y, width: 80 });
+        } else {
+          a.createShape(kind, { x: c.x - 40, y: c.y - 40, width: 80, height: 80 });
+        }
+      }, 'Insert shape failed');
+    },
+    [mutate, snapshot.viewBox, viewport],
+  );
+  const placeImageAtCenter = useCallback(
+    (dataUrl: string, name?: string) => {
+      mutate((a) => {
+        const c = screenToPage(snapshot.viewBox, viewport, viewport.w / 2, viewport.h / 2);
+        const r = a.placeImage({ data: dataUrl, x: Math.round(c.x), y: Math.round(c.y), name });
+        a.setSelection([r.id]);
+      }, 'Place image failed');
+    },
+    [mutate, snapshot.viewBox, viewport],
+  );
+  const createComponentFromSelection = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => {
+      const id = a.createComponent(snapshot.selection);
+      a.setSelection([id]);
+    }, 'Create component failed');
+  }, [mutate, snapshot.selection]);
+  const detachSelectedInstances = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.detachInstance(snapshot.selection), 'Detach instance failed');
+  }, [mutate, snapshot.selection]);
+  const resetSelectedInstances = useCallback(() => {
+    if (snapshot.selection.length === 0) return;
+    mutate((a) => a.resetInstance(snapshot.selection), 'Reset instance failed');
+  }, [mutate, snapshot.selection]);
+  const createInstanceAtCenter = useCallback(
+    (component: number) => {
+      mutate((a) => {
+        const c = screenToPage(snapshot.viewBox, viewport, viewport.w / 2, viewport.h / 2);
+        const id = a.createInstance({ component, x: Math.round(c.x), y: Math.round(c.y) });
+        a.setSelection([id]);
+      }, 'Insert instance failed');
+    },
+    [mutate, snapshot.viewBox, viewport],
+  );
+  const createStyleFromSelection = useCallback(
+    (type: 'paint' | 'text' | 'effect' | 'grid', name: string) => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => {
+        a.createStyle({ type, name, from: snapshot.selection[0] });
+      }, 'Create style failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const applyStyleToSelection = useCallback(
+    (style: string, target?: 'fill' | 'stroke') => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.applyStyle({ ids: snapshot.selection, style, target }), 'Apply style failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const detachStyleFromSelection = useCallback(
+    (which: 'fill' | 'stroke' | 'effect' | 'grid' | 'text') => {
+      if (snapshot.selection.length === 0) return;
+      mutate((a) => a.detachStyle({ ids: snapshot.selection, which }), 'Detach style failed');
+    },
+    [mutate, snapshot.selection],
+  );
+  const deleteStyleById = useCallback(
+    (style: string) => {
+      mutate((a) => a.deleteStyle(style), 'Delete style failed');
+    },
+    [mutate],
+  );
+  const queryStyles = useCallback(
+    (type?: string): Array<{ id: string; name: string }> => {
+      const api = adapterRef.current;
+      if (!api) return [];
+      try {
+        return api.listStyles(type);
+      } catch (e) {
+        setNotice(`List styles failed: ${e instanceof Error ? e.message : String(e)}`);
+        return [];
+      }
+    },
+    [setNotice],
+  );
+  const queryComponents = useCallback((): Array<{ id: number; name: string; type: string; page: number; instances: number }> => {
+    const api = adapterRef.current;
+    if (!api) return [];
+    try {
+      return api.listComponents();
+    } catch (e) {
+      setNotice(`List components failed: ${e instanceof Error ? e.message : String(e)}`);
+      return [];
+    }
+  }, [setNotice]);
   const toggleVisible = useCallback(
     (id: number) => {
       const n = snapshot.byId.get(id);
@@ -679,6 +888,32 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     createShape,
     createFrame,
     createText,
+    insertShapeAtCenter,
+    frameSelected,
+    removeFrameSelected,
+    swapOrientationSelected,
+    maskSelected,
+    releaseMaskSelected,
+    booleanSelected,
+    flattenSelected,
+    rasterizeSelected,
+    layoutAddSelected,
+    layoutRemoveSelected,
+    textToggleSelected,
+    textAlignSelected,
+    textSizeSelected,
+    moveSelectionToPage,
+    placeImageAtCenter,
+    createComponentFromSelection,
+    detachSelectedInstances,
+    resetSelectedInstances,
+    createInstanceAtCenter,
+    createStyleFromSelection,
+    applyStyleToSelection,
+    detachStyleFromSelection,
+    deleteStyleById,
+    queryStyles,
+    queryComponents,
     moveSelected,
     resizeSelected,
     setNodeProps,

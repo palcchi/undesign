@@ -13,10 +13,14 @@ import {
   AlignEndVertical,
   AlignStartHorizontal,
   AlignStartVertical,
+  Bold,
   Eye,
   EyeOff,
+  Italic,
   Lock,
   LockOpen,
+  Strikethrough,
+  Underline,
 } from 'lucide-react';
 import { useEngine } from '../engine/store';
 import type { EngineNode } from '../engine/adapter';
@@ -203,6 +207,23 @@ export function EngineInspector() {
             <button className="btn secondary" title="Group selection" onClick={ed.groupSelected}>
               Group
             </button>
+            <button className="btn secondary" title="Frame selection" onClick={() => ed.frameSelected()}>
+              Frame
+            </button>
+          </div>
+          <div className="lab-buttons">
+            <button className="btn secondary" title="Boolean union" onClick={() => ed.booleanSelected('union')}>
+              Union
+            </button>
+            <button className="btn secondary" title="Boolean subtract" onClick={() => ed.booleanSelected('subtract')}>
+              Subtract
+            </button>
+            <button className="btn secondary" title="Boolean intersect" onClick={() => ed.booleanSelected('intersect')}>
+              Intersect
+            </button>
+            <button className="btn secondary" title="Boolean exclude" onClick={() => ed.booleanSelected('exclude')}>
+              Exclude
+            </button>
           </div>
         </div>
       </div>
@@ -311,6 +332,26 @@ export function EngineInspector() {
         <div className="prop-section">
           <div className="prop-title">Text</div>
           <TextContentArea id={n.id} value={n.characters ?? ''} onCommit={(v) => ed.setNodeText(n.id, v)} />
+          <div className="lab-buttons">
+            <button className="btn secondary" title="Toggle bold" onClick={() => ed.textToggleSelected('bold')}>
+              <Bold size={14} />
+            </button>
+            <button className="btn secondary" title="Toggle italic" onClick={() => ed.textToggleSelected('italic')}>
+              <Italic size={14} />
+            </button>
+            <button className="btn secondary" title="Toggle underline" onClick={() => ed.textToggleSelected('underline')}>
+              <Underline size={14} />
+            </button>
+            <button className="btn secondary" title="Toggle strikethrough" onClick={() => ed.textToggleSelected('strikethrough')}>
+              <Strikethrough size={14} />
+            </button>
+            <button className="btn secondary" title="Decrease font size" onClick={() => ed.textSizeSelected('down')}>
+              A−
+            </button>
+            <button className="btn secondary" title="Increase font size" onClick={() => ed.textSizeSelected('up')}>
+              A+
+            </button>
+          </div>
           <div className="prop-grid-2">
             <NumField label="Size" value={n.fontSize ?? 16} min={1} onCommit={(v) => ed.setNodeProps(n.id, { fontSize: v })} />
             <label className="prop-field">
@@ -341,7 +382,10 @@ function typeLabel(type: string): string {
     ELLIPSE: 'Ellipse',
     TEXT: 'Text',
     LINE: 'Line',
+    POLYGON: 'Polygon',
+    STAR: 'Star',
     VECTOR: 'Vector',
+    BOOLEAN_OPERATION: 'Boolean',
     COMPONENT: 'Component',
     COMPONENT_SET: 'Component set',
     INSTANCE: 'Instance',

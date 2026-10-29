@@ -98,18 +98,80 @@ function cornersFor(o: DesignObject): Record<string, unknown> {
   return {};
 }
 
-/** Warn about (and skip) semantic layers the converter flattens in Phase 2. */
+/** Warn about (and skip) semantic layers the converter still flattens. */
 function styleWarnings(o: DesignObject, warn: (w: ConvertWarning) => void): void {
   if (o.fillStyleId) warn({ scope: o.id, property: 'fillStyleId', detail: 'color style link dropped; resolved fill value kept' });
   if (o.textStyleId) warn({ scope: o.id, property: 'textStyleId', detail: 'text style link dropped; resolved type values kept' });
   if (o.effectStyleId) warn({ scope: o.id, property: 'effectStyleId', detail: 'effect style link dropped' });
-  if (o.shadow) warn({ scope: o.id, property: 'shadow', detail: 'drop shadow not migrated in Phase 2' });
-  if (o.layout) warn({ scope: o.id, property: 'layout', detail: 'auto-layout container not migrated in Phase 2' });
-  if (o.sizing) warn({ scope: o.id, property: 'sizing', detail: 'child sizing not migrated in Phase 2' });
-  if (o.constraints) warn({ scope: o.id, property: 'constraints', detail: 'constraints not migrated in Phase 2' });
-  if (o.componentId && (o.sourceId === null || o.sourceId === undefined)) {
-    warn({ scope: o.id, property: 'componentId', detail: 'instance flattened to plain layers in Phase 2' });
+  if (o.shadow) warn({ scope: o.id, property: 'shadow', detail: 'drop shadow not migrated' });
+  // The engine only allows auto-layout on frames; anywhere else the layout
+  // block is recorded and skipped instead of failing the import.
+  if (o.layout && o.type !== 'frame') {
+    warn({ scope: o.id, property: 'layout', detail: `auto-layout on a ${o.type} skipped (the engine needs a frame)` });
   }
+  if (o.componentId && (o.sourceId === null || o.sourceId === undefined)) {
+    warn({ scope: o.id, property: 'componentId', detail: 'instance flattened to plain layers' });
+  }
+}
+
+const MAIN_ALIGN: Record<string, string> = { start: 'min', center: 'center', end: 'max', 'space-between': 'spaceBetween' };
+const CROSS_ALIGN: Record<string, string> = { start: 'min', center: 'center', end: 'max' };
+const CONSTRAINT_H: Record<string, string> = { left: 'left', center: 'center', right: 'right', stretch: 'leftRight', scale: 'scale' };
+const CONSTRAINT_V: Record<string, string> = { top: 'top', middle: 'center', bottom: 'bottom', stretch: 'topBottom', scale: 'scale' };
+
+/**
+ * UND auto-layout, child sizing, and constraints map onto engine `node.set`
+ * keys (`layout`, `gap`, `padding*`, `mainAlign`, `crossAlign`, `sizingH/V`,
+ * `min/maxWidth/Height`, `absolute`, `constraints`), so they migrate instead
+ * of warning — except where the engine refuses them: `fill` needs an
+ * auto-layout parent and `hug` needs layout (or text) on the node itself.
+ * Refused modes come back in `sizingSkipped` for an explicit warning; the
+ * import never fails on them.
+ */
+function layoutPropsFor(
+  o: DesignObject,
+  parentHasLayout: boolean,
+): { props: Record<string, unknown>; sizingSkipped: string[] } {
+  const props: Record<string, unknown> = {};
+  const sizingSkipped: string[] = [];
+  const selfLayouts = (o.type === 'frame' && o.layout !== null) || o.type === 'text';
+  if (o.type === 'frame' && o.layout) {
+    props.layout = o.layout.direction;
+    props.gap = o.layout.gap;
+    props.paddingTop = o.layout.paddingTop;
+    props.paddingRight = o.layout.paddingRight;
+    props.paddingBottom = o.layout.paddingBottom;
+    props.paddingLeft = o.layout.paddingLeft;
+    props.mainAlign = MAIN_ALIGN[o.layout.alignMain] ?? 'min';
+    props.crossAlign = CROSS_ALIGN[o.layout.alignCross] ?? 'min';
+  }
+  if (o.sizing) {
+    const modes: Array<[string, 'h' | 'v']> = [['sizingH', 'h'], ['sizingV', 'v']];
+    for (const [key, axis] of modes) {
+      const mode = axis === 'h' ? o.sizing.h : o.sizing.v;
+      if (mode === 'fill' && !parentHasLayout) {
+        sizingSkipped.push(`${axis}=fill without an auto-layout parent`);
+        continue;
+      }
+      if (mode === 'hug' && !selfLayouts) {
+        sizingSkipped.push(`${axis}=hug on a non-layout ${o.type}`);
+        continue;
+      }
+      props[key] = mode;
+    }
+    if (o.sizing.minW !== null) props.minWidth = o.sizing.minW;
+    if (o.sizing.maxW !== null) props.maxWidth = o.sizing.maxW;
+    if (o.sizing.minH !== null) props.minHeight = o.sizing.minH;
+    if (o.sizing.maxH !== null) props.maxHeight = o.sizing.maxH;
+    if (o.sizing.absolute) props.absolute = true;
+  }
+  if (o.constraints) {
+    props.constraints = {
+      horizontal: CONSTRAINT_H[o.constraints.horizontal] ?? 'left',
+      vertical: CONSTRAINT_V[o.constraints.vertical] ?? 'top',
+    };
+  }
+  return { props, sizingSkipped };
 }
 
 export function convertUndesignToEngine(doc: UndesignDoc, api: ConvertApi): ConvertResult {
@@ -234,6 +296,13 @@ export function convertUndesignToEngine(doc: UndesignDoc, api: ConvertApi): Conv
           skipped += 1;
           warn({ scope: o.id, property: 'type', detail: `unsupported object type ${(o as DesignObject).type}; skipped` });
           continue;
+      }
+      const undParent = o.parentId !== null && o.parentId !== undefined ? page.objects.find((p) => p.id === o.parentId) : undefined;
+      const parentHasLayout = undParent !== undefined && undParent.type === 'frame' && undParent.layout !== null;
+      const laid = layoutPropsFor(o, parentHasLayout);
+      Object.assign(props, laid.props);
+      for (const skipped of laid.sizingSkipped) {
+        warn({ scope: o.id, property: 'sizing', detail: `child sizing ${skipped}; kept fixed` });
       }
       const id = resultId(api.execute(cmd, params), cmd);
       engineIds.set(o.id, id);

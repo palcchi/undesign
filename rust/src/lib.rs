@@ -575,6 +575,170 @@ mod tests {
     }
 
     #[test]
+    fn extended_bridge_commands_run_against_the_real_engine() {
+        // Every command the TypeScript adapter gained in the source-reuse
+        // pass, driven with the exact param shapes the adapter sends.
+        let mut engine = Engine::new();
+        let ex = |engine: &mut Engine, cmd: &str, params: &str| {
+            engine.execute(cmd, params).unwrap_or_else(|e| panic!("{cmd} {params}: {e}"))
+        };
+        let id_of = |out: &str| {
+            serde_json::from_str::<serde_json::Value>(out).unwrap()["id"]
+                .as_u64()
+                .unwrap()
+        };
+        // Polygon / star / arrow creation.
+        let poly = id_of(&ex(&mut engine, "shape.polygon", r#"{"x":0,"y":0,"width":80,"height":80,"props":{"pointCount":6}}"#));
+        let star = id_of(&ex(&mut engine, "shape.star", r#"{"x":100,"y":0,"width":80,"height":80,"props":{"pointCount":5,"innerRadius":0.5}}"#));
+        let arrow = id_of(&ex(&mut engine, "shape.arrow", r#"{"x":200,"y":0,"width":80}"#));
+        for id in [poly, star, arrow] {
+            assert!(engine.session.doc().unwrap().node(NodeId(id)).is_some());
+        }
+        // Booleans wrap dedicated pairs (flatten dissolves the union group,
+        // so these layers are not reused below).
+        let b: Vec<u64> = (0..8).map(|i| rect(&mut engine, 300.0 + i as f64 * 110.0, 0.0)).collect();
+        let bgroup = id_of(&ex(&mut engine, "bool.union", &format!(r#"{{"ids":[{},{}]}}"#, b[0], b[1])));
+        ex(&mut engine, "bool.flatten", &format!(r#"{{"ids":[{bgroup}]}}"#));
+        ex(&mut engine, "bool.subtract", &format!(r#"{{"ids":[{},{}]}}"#, b[2], b[3]));
+        ex(&mut engine, "bool.intersect", &format!(r#"{{"ids":[{},{}]}}"#, b[4], b[5]));
+        ex(&mut engine, "bool.exclude", &format!(r#"{{"ids":[{},{}]}}"#, b[6], b[7]));
+        // Frames: wrap, swap orientation, presets list, remove.
+        let framed: u64 = serde_json::from_str::<serde_json::Value>(&ex(
+            &mut engine,
+            "object.frameSelection",
+            &format!(r#"{{"ids":[{poly},{star}],"name":"Card"}}"#),
+        ))
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        ex(&mut engine, "frame.swapOrientation", &format!(r#"{{"ids":[{framed}]}}"#));
+        let presets: serde_json::Value =
+            serde_json::from_str(&ex(&mut engine, "frame.presets", "{}")).unwrap();
+        assert!(!presets.as_array().unwrap().is_empty(), "frame presets listed");
+        ex(&mut engine, "object.removeFrame", &format!(r#"{{"ids":[{framed}]}}"#));
+        // Mask on/off over two layers, then release.
+        ex(&mut engine, "object.mask", &format!(r#"{{"ids":[{poly},{star}]}}"#));
+        ex(&mut engine, "object.releaseMask", &format!(r#"{{"ids":[{poly}]}}"#));
+        // Auto-layout add/remove plus the converter's node.set keys.
+        let f: u64 = id_of(&ex(
+            &mut engine,
+            "node.create",
+            r#"{"type":"frame","x":0,"y":200,"width":300,"height":200}"#,
+        ));
+        ex(&mut engine, "layout.add", &format!(r#"{{"ids":[{f}],"direction":"horizontal"}}"#));
+        ex(
+            &mut engine,
+            "node.set",
+            &format!(
+                r#"{{"id":{f},"props":{{"gap":8,"paddingTop":4,"paddingRight":6,"paddingBottom":4,"paddingLeft":6,"mainAlign":"spaceBetween","crossAlign":"center"}}}}"#
+            ),
+        );
+        // Fill needs a layout parent, so the sizing goes on a child of the
+        // layout frame (this mirrors the converter's parent check).
+        let kid: u64 = serde_json::from_str::<serde_json::Value>(&ex(
+            &mut engine,
+            "shape.rectangle",
+            &format!(r#"{{"x":0,"y":0,"width":60,"height":40,"parent":{f}}}"#),
+        ))
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        ex(
+            &mut engine,
+            "node.set",
+            &format!(
+                r#"{{"id":{kid},"props":{{"sizingH":"fill","sizingV":"fixed","minWidth":10,"maxHeight":200,"constraints":{{"horizontal":"leftRight","vertical":"center"}}}}}}"#
+            ),
+        );
+        ex(&mut engine, "layout.remove", &format!(r#"{{"ids":[{f}]}}"#));
+        // Shared styles: create from a node, apply, list, detach, delete.
+        let style: String = serde_json::from_str::<serde_json::Value>(&ex(
+            &mut engine,
+            "style.create",
+            &format!(r#"{{"type":"paint","name":"Brand/Primary","from":{poly}}}"#),
+        ))
+        .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        ex(
+            &mut engine,
+            "style.apply",
+            &format!(r#"{{"ids":[{star}],"style":"{style}","target":"fill"}}"#),
+        );
+        let styles: serde_json::Value =
+            serde_json::from_str(&ex(&mut engine, "style.list", r#"{"type":"paint"}"#)).unwrap();
+        assert_eq!(styles.as_array().unwrap().len(), 1);
+        ex(
+            &mut engine,
+            "style.detach",
+            &format!(r#"{{"ids":[{star}],"which":"fill"}}"#),
+        );
+        let colors: serde_json::Value =
+            serde_json::from_str(&ex(&mut engine, "paint.documentColors", "{}")).unwrap();
+        assert!(colors["colors"].is_array(), "document colors listed");
+        ex(&mut engine, "style.delete", &format!(r#"{{"style":"{style}"}}"#));
+        // Prototype flows while the frame is still a plain top-level frame.
+        ex(&mut engine, "proto.flow.add", &format!(r#"{{"start":{f},"name":"Onboarding"}}"#));
+        ex(&mut engine, "proto.flow.rename", &format!(r#"{{"start":{f},"name":"Signup"}}"#));
+        ex(&mut engine, "proto.interaction.clear", &format!(r#"{{"ids":[{f}]}}"#));
+        ex(&mut engine, "proto.flow.remove", &format!(r#"{{"start":{f}}}"#));
+        // Components: create, list, instance, swap, detach, reset.
+        let comp = id_of(&ex(&mut engine, "component.create", &format!(r#"{{"ids":[{f}]}}"#)));
+        let comps: serde_json::Value =
+            serde_json::from_str(&ex(&mut engine, "component.list", "{}")).unwrap();
+        assert_eq!(comps.as_array().unwrap().len(), 1);
+        let inst = id_of(&ex(
+            &mut engine,
+            "instance.create",
+            &format!(r#"{{"component":{comp},"x":10,"y":400}}"#),
+        ));
+        ex(&mut engine, "instance.swap", &format!(r#"{{"ids":[{inst}],"component":{comp}}}"#));
+        ex(&mut engine, "component.resetInstance", &format!(r#"{{"ids":[{inst}]}}"#));
+        ex(&mut engine, "component.detach", &format!(r#"{{"ids":[{inst}]}}"#));
+        let t: u64 = id_of(&ex(&mut engine, "text.create", r#"{"text":"Hi","x":0,"y":500}"#));
+        for cmd in ["text.bold", "text.italic", "text.underline", "text.strikethrough"] {
+            ex(&mut engine, cmd, &format!(r#"{{"ids":[{t}]}}"#));
+        }
+        ex(&mut engine, "text.alignCenter", &format!(r#"{{"ids":[{t}]}}"#));
+        ex(&mut engine, "text.sizeUp", &format!(r#"{{"ids":[{t}]}}"#));
+        ex(&mut engine, "text.case", &format!(r#"{{"ids":[{t}],"case":"upper"}}"#));
+        // Text + frame reads still work after all of the above.
+        let node: serde_json::Value =
+            serde_json::from_str(&engine.describe_node(t).unwrap()).unwrap();
+        assert_eq!(node["type"], "TEXT");
+        // Rasterize one layer (the original is replaced by the image rect)
+        // and move the result to a second page.
+        let rast: u64 = serde_json::from_str::<serde_json::Value>(&ex(
+            &mut engine,
+            "object.rasterize",
+            &format!(r#"{{"ids":[{poly}],"scale":2}}"#),
+        ))
+        .unwrap()["ids"][0]
+            .as_u64()
+            .unwrap();
+        let p2: u64 = serde_json::from_str::<serde_json::Value>(
+            &ex(&mut engine, "page.add", r#"{"name":"Second"}"#),
+        )
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        ex(&mut engine, "object.moveToPage", &format!(r#"{{"ids":[{rast}],"page":{p2}}}"#));
+        // Image placement from base64 bytes (a 1x1 PNG data URL, as the
+        // File menu sends it).
+        let png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        let img: serde_json::Value = serde_json::from_str(&ex(
+            &mut engine,
+            "file.placeImage",
+            &format!(r#"{{"data":"data:image/png;base64,{png_b64}","x":10,"y":10,"name":"dot.png"}}"#),
+        ))
+        .unwrap();
+        assert!(img["id"].is_u64(), "placed image has an id, got {img}");
+        assert_eq!(img["width"], 1.0);
+        assert!(engine.undo_depth().0 > 20, "the whole script is undoable");
+    }
+
+    #[test]
     fn save_load_round_trip_preserves_the_document() {
         let mut engine = Engine::new();
         let id = rect(&mut engine, 10.0, 20.0);
