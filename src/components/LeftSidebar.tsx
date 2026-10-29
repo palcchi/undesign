@@ -48,14 +48,29 @@ function TypeIcon({ type, size = 13 }: { type: DesignObject['type']; size?: numb
 
 export function LeftSidebar() {
   const [tab, setTab] = useState<Tab>('layers');
+  const tabs: Tab[] = ['layers', 'assets', 'pages'];
+  const moveTab = (e: React.KeyboardEvent, current: Tab) => {
+    const at = tabs.indexOf(current);
+    let next: number | null = null;
+    if (e.key === 'ArrowRight') next = (at + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft') next = (at - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = tabs.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    setTab(tabs[next]);
+    const bar = (e.target as HTMLElement).closest('.sidebar-tabs');
+    bar?.querySelectorAll<HTMLButtonElement>('.sidebar-tab')[next]?.focus();
+  };
   return (
     <div className="sidebar left">
-      <div className="sidebar-tabs" role="tablist">
+      <div className="sidebar-tabs" role="tablist" aria-label="Sidebar panels">
         <button
           className={`sidebar-tab${tab === 'layers' ? ' active' : ''}`}
           role="tab"
           aria-selected={tab === 'layers'}
           onClick={() => setTab('layers')}
+          onKeyDown={(e) => moveTab(e, 'layers')}
         >
           <Layers size={14} />
           <span>Layers</span>
@@ -65,6 +80,7 @@ export function LeftSidebar() {
           role="tab"
           aria-selected={tab === 'assets'}
           onClick={() => setTab('assets')}
+          onKeyDown={(e) => moveTab(e, 'assets')}
         >
           <Component size={14} />
           <span>Assets</span>
@@ -74,6 +90,7 @@ export function LeftSidebar() {
           role="tab"
           aria-selected={tab === 'pages'}
           onClick={() => setTab('pages')}
+          onKeyDown={(e) => moveTab(e, 'pages')}
         >
           <Files size={14} />
           <span>Pages</span>
@@ -239,6 +256,8 @@ function LayersPanel() {
       <div
         ref={listRef}
         className="layers-list"
+        role="list"
+        aria-label="Layers"
         onContextMenu={(e) => {
           if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('layers-list')) {
             e.preventDefault();
@@ -280,6 +299,9 @@ function LayersPanel() {
           return (
             <div
               key={obj.id}
+              role="listitem"
+              tabIndex={0}
+              aria-label={`Layer ${obj.name}`}
               className={`layer-row${selected ? ' selected' : ''}${dropPos === 'before' ? ' drop-before' : ''}${dropPos === 'after' ? ' drop-after' : ''}${dropPos === 'inside' ? ' drop-inside' : ''}${!obj.visible ? ' hidden-obj' : ''}`}
               style={{ paddingLeft: 6 + depth * 16 }}
               draggable={editingId !== obj.id}
@@ -311,6 +333,14 @@ function LayersPanel() {
                 e.stopPropagation();
                 select([obj.id], e.shiftKey || e.metaKey || e.ctrlKey);
               }}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  select([obj.id], e.shiftKey || e.metaKey || e.ctrlKey);
+                }
+              }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setEditingId(obj.id);
@@ -318,15 +348,20 @@ function LayersPanel() {
               }}
               onContextMenu={(e) => openRowMenu(e, obj.id)}
             >
-              <span
+              <button
+                type="button"
                 className={`collapse-btn${hasKids ? '' : ' invisible'}`}
+                tabIndex={hasKids ? 0 : -1}
+                aria-hidden={!hasKids}
+                aria-label={isCollapsed ? `Expand ${obj.name}` : `Collapse ${obj.name}`}
+                aria-expanded={hasKids ? !isCollapsed : undefined}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleCollapse(obj.id);
                 }}
               >
                 {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-              </span>
+              </button>
               <span className="layer-type">
                 {obj.componentId ? <Component size={13} /> : <TypeIcon type={obj.type} />}
               </span>
@@ -351,6 +386,8 @@ function LayersPanel() {
                 <button
                   className={`mini-btn${obj.locked ? ' on' : ''}`}
                   title={obj.locked ? 'Unlock' : 'Lock'}
+                  aria-label={`${obj.locked ? 'Unlock' : 'Lock'} ${obj.name}`}
+                  aria-pressed={obj.locked}
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleLock(obj.id);
@@ -361,6 +398,8 @@ function LayersPanel() {
                 <button
                   className="mini-btn"
                   title={obj.visible ? 'Hide' : 'Show'}
+                  aria-label={`${obj.visible ? 'Hide' : 'Show'} ${obj.name}`}
+                  aria-pressed={!obj.visible}
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleVisibility(obj.id);
@@ -409,12 +448,23 @@ function PagesPanel() {
         <Plus size={14} />
         <span>Add page</span>
       </button>
-      <div className="pages-list">
+      <div className="pages-list" role="list" aria-label="Pages">
         {doc.pages.map((p, i) => (
           <div
             key={p.id}
+            role="listitem"
+            tabIndex={0}
+            aria-label={`Page ${p.name}`}
             className={`page-row${p.id === doc.activePageId ? ' active' : ''}`}
             onClick={() => selectPage(p.id)}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                selectPage(p.id);
+              }
+            }}
             onDoubleClick={() => {
               setEditingId(p.id);
               setDraft(p.name);
@@ -450,6 +500,7 @@ function PagesPanel() {
               <button
                 className="mini-btn danger-hover"
                 title="Delete page"
+                aria-label={`Delete ${p.name}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   deletePage(p.id);

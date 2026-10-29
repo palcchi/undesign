@@ -6,6 +6,8 @@ import {
   Hand,
   Minus,
   MousePointer2,
+  PanelLeft,
+  PanelRight,
   Play,
   Redo2,
   Share2,
@@ -113,8 +115,18 @@ export function TopToolbar({
         setZoomMenu(false);
       }
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenMenu(null);
+        setZoomMenu(false);
+      }
+    };
     window.addEventListener('pointerdown', onDown);
-    return () => window.removeEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [openMenu, zoomMenu]);
 
   const showToast = (msg: string) => setToast(msg);
@@ -246,6 +258,7 @@ export function TopToolbar({
                     ) : (
                       <button
                         key={i}
+                        role="menuitem"
                         className="menu-item"
                         disabled={item.disabled}
                         onClick={() => {
@@ -290,6 +303,27 @@ export function TopToolbar({
       </div>
 
       <div className="topbar-center">
+        <div className="tool-group" role="toolbar" aria-label="Sidebars">
+          <button
+            className={`icon-btn${leftVisible ? ' active' : ''}`}
+            data-tip="Toggle left sidebar"
+            onClick={onToggleLeft}
+            aria-label="Toggle left sidebar"
+            aria-pressed={leftVisible}
+          >
+            <PanelLeft size={16} />
+          </button>
+          <button
+            className={`icon-btn${rightVisible ? ' active' : ''}`}
+            data-tip="Toggle right sidebar"
+            onClick={onToggleRight}
+            aria-label="Toggle right sidebar"
+            aria-pressed={rightVisible}
+          >
+            <PanelRight size={16} />
+          </button>
+        </div>
+        <div className="tool-sep" />
         <div className="tool-group" role="toolbar" aria-label="History">
           <button className="icon-btn" data-tip="Undo (Ctrl+Z)" onClick={undo} disabled={!canUndo} aria-label="Undo">
             <Undo2 size={16} />
@@ -333,6 +367,7 @@ export function TopToolbar({
                 {[25, 50, 100, 200, 400].map((z) => (
                   <button
                     key={z}
+                    role="menuitem"
                     className="menu-item"
                     onClick={() => {
                       zoomTo(z / 100);
@@ -344,6 +379,7 @@ export function TopToolbar({
                 ))}
                 <div className="menu-divider" />
                 <button
+                  role="menuitem"
                   className="menu-item"
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('undesign:fit'));
@@ -354,6 +390,7 @@ export function TopToolbar({
                   <span className="menu-shortcut">Shift+1</span>
                 </button>
                 <button
+                  role="menuitem"
                   className="menu-item"
                   disabled={selectedIds.length === 0}
                   onClick={() => {
@@ -365,6 +402,7 @@ export function TopToolbar({
                   <span className="menu-shortcut">Shift+2</span>
                 </button>
                 <button
+                  role="menuitem"
                   className="menu-item"
                   onClick={() => {
                     zoomReset();
@@ -384,19 +422,19 @@ export function TopToolbar({
       </div>
 
       <div className="topbar-right">
-        <button className="btn ghost" data-tip="Present this page fullscreen (Esc to exit)" onClick={onPreview}>
+        <button className="btn ghost" data-tip="Present this page fullscreen (Esc to exit)" onClick={onPreview} aria-label="Preview">
           <Play size={14} />
           <span>Preview</span>
         </button>
-        <button className="btn ghost" data-tip="Generate editable objects from a text brief" onClick={() => setDialog('ai')}>
+        <button className="btn ghost" data-tip="Generate editable objects from a text brief" onClick={() => setDialog('ai')} aria-label="AI assistant">
           <Sparkles size={14} />
           <span>AI</span>
         </button>
-        <button className="btn secondary" data-tip="Share via link or portable JSON" onClick={() => setDialog('share')}>
+        <button className="btn secondary" data-tip="Share via link or portable JSON" onClick={() => setDialog('share')} aria-label="Share">
           <Share2 size={14} />
           <span>Share</span>
         </button>
-        <button className="btn primary" data-tip="Export page or selection (Ctrl+E)" onClick={() => setDialog('export')}>
+        <button className="btn primary" data-tip="Export page or selection (Ctrl+E)" onClick={() => setDialog('export')} aria-label="Export">
           <Download size={14} />
           <span>Export</span>
         </button>
@@ -462,7 +500,7 @@ export function TopToolbar({
           </div>
         </Modal>
       )}
-      {toast && <div className="toast">{toast}</div>}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }
