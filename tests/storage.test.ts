@@ -4,6 +4,9 @@
  * Run with `npm test` (bundled by the project's esbuild, executed by node).
  */
 import { validateDoc } from '../src/storage';
+import { regenInstances } from '../src/library';
+import { layoutFrames } from '../src/layout';
+import { propagateEffectStyles, propagateStyles, propagateTextStyles } from '../src/system';
 
 let failures = 0;
 
@@ -234,6 +237,49 @@ test('self-parent and cyclic references detach; objects are kept', () => {
     }
   }
   assert(byId.get('kid')!.parentId === 'a', 'healthy child link untouched');
+});
+
+test('original-schema documents migrate forward without losing data', () => {
+  // Shaped like the earliest saved format: only the original object fields,
+  // none of the style/component/layout collections.
+  const raw = rawDoc([
+    rawObj({ id: 'f', type: 'frame', name: 'Card', x: 10, y: 20, w: 300, h: 200, fill: '#FFFFFF' }),
+    rawObj({ id: 't', type: 'text', name: 'Title', parentId: 'f', x: 16, y: 12, text: 'Hello', fontSize: 24, fontWeight: 700 }),
+    rawObj({ id: 'r', type: 'rectangle', name: 'Chip', parentId: 'f', x: 16, y: 60, w: 80, h: 32, fill: '#FF4D00', cornerRadius: 8 }),
+  ]);
+  const doc = validateDoc(raw);
+  assert(doc !== null, 'legacy doc valid');
+  const d = doc!;
+  assert(d.components.length === 0, 'components default to []');
+  assert((d.variantSets ?? []).length === 0, 'variant sets default to []');
+  assert(d.colorStyles.length === 0, 'color styles default to []');
+  assert((d.textStyles ?? []).length === 0, 'text styles default to []');
+  assert((d.effectStyles ?? []).length === 0, 'effect styles default to []');
+  for (const o of d.pages[0].objects) {
+    assert(
+      o.fillStyleId === null && o.textStyleId === null && o.shadow === null &&
+      o.effectStyleId === null && o.layout === null && o.sizing === null &&
+      o.componentId === null && o.sourceId === null && o.componentSnapshot === null &&
+      o.variant === null && o.exposedValues === null,
+      `new fields default on ${o.id}`,
+    );
+  }
+  // Representable attributes survive untouched.
+  const byId = new Map(d.pages[0].objects.map((o) => [o.id, o]));
+  assert(byId.get('f')!.w === 300 && byId.get('f')!.fill === '#FFFFFF', 'frame geometry and fill kept');
+  assert(byId.get('t')!.text === 'Hello' && byId.get('t')!.fontWeight === 700, 'text content and type kept');
+  assert(byId.get('t')!.parentId === 'f' && byId.get('r')!.parentId === 'f', 'hierarchy kept');
+  assert(byId.get('r')!.cornerRadius === 8, 'corner radius kept');
+  // A migrated doc is already settled: every pipeline pass is a no-op.
+  assert(regenInstances(d) === d, 'no instances to regen');
+  assert(layoutFrames(d) === d, 'no layout frames to solve');
+  assert(propagateStyles(d, d) === d, 'no color styles to propagate');
+  assert(propagateTextStyles(d, d) === d, 'no text styles to propagate');
+  assert(propagateEffectStyles(d, d) === d, 'no effect styles to propagate');
+  // And it reserializes into a doc that validates identically.
+  const again = validateDoc(JSON.parse(JSON.stringify(d)) as unknown);
+  assert(again !== null, 'reserialized doc valid');
+  assert(JSON.stringify(again) === JSON.stringify(d), 'migration round-trips byte-stable');
 });
 
 if (failures > 0) {

@@ -67,6 +67,8 @@ function KeyboardShortcuts({ previewOpen, closePreview }: { previewOpen: boolean
           return;
         }
         if (typing || modalOpen) return; // inputs and modals handle their own Escape
+        // Dropdown and context menus close themselves; keep the selection.
+        if (document.querySelector('.menu-drop, .ctx-menu') !== null) return;
         ed.clearSelection();
         return;
       }

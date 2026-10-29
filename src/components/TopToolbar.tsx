@@ -107,14 +107,24 @@ export function TopToolbar({
 
   useEffect(() => {
     if (!openMenu && !zoomMenu) return;
+    const close = () => {
+      setOpenMenu(null);
+      setZoomMenu(false);
+    };
     const onDown = (e: PointerEvent) => {
-      if (barRef.current && !barRef.current.contains(e.target as Node)) {
-        setOpenMenu(null);
-        setZoomMenu(false);
-      }
+      if (barRef.current && !barRef.current.contains(e.target as Node)) close();
+    };
+    // Escape dismisses the dropdown; the App-level handler keeps the
+    // selection when a menu is open, so this only closes the menu.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
     };
     window.addEventListener('pointerdown', onDown);
-    return () => window.removeEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [openMenu, zoomMenu]);
 
   const showToast = (msg: string) => setToast(msg);
