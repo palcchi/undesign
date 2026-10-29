@@ -4,6 +4,7 @@
  */
 import {
   centeredOrigin,
+  deepestFrameAt,
   placeRootsAtCenter,
   rootsOf,
   viewportCenterWorld,
@@ -187,6 +188,32 @@ test('inserted placement survives an undo/redo round-trip identically', () => {
   assertEq(undone.present.pages[0].objects, [], 'undo removes the group');
   const redone = redoHistory(undone);
   assertEq(redone.present.pages[0].objects, placed, 'redo restores position + structure');
+});
+
+/* ---------- draw auto-parent frame lookup ---------- */
+
+test('deepestFrameAt prefers the nested frame regardless of array order', () => {
+  const outer = mkObj({ id: 'outer', type: 'frame', x: 0, y: 0, w: 400, h: 400 });
+  const inner = mkObj({ id: 'inner', type: 'frame', parentId: 'outer', x: 50, y: 50, w: 100, h: 100 });
+  assert(deepestFrameAt([outer, inner], 80, 80)?.id === 'inner', 'natural order');
+  assert(deepestFrameAt([inner, outer], 80, 80)?.id === 'inner', 'child-first order');
+  assert(deepestFrameAt([outer, inner], 10, 10)?.id === 'outer', 'outside the nested frame');
+});
+
+test('deepestFrameAt skips hidden/locked/non-frames and misses outside', () => {
+  const rect = mkObj({ id: 'rect', x: 0, y: 0, w: 400, h: 400 });
+  const hidden = mkObj({ id: 'hidden', type: 'frame', x: 0, y: 0, w: 400, h: 400, visible: false });
+  const locked = mkObj({ id: 'locked', type: 'frame', x: 0, y: 0, w: 400, h: 400, locked: true });
+  const frame = mkObj({ id: 'frame', type: 'frame', x: 0, y: 0, w: 400, h: 400 });
+  assert(deepestFrameAt([rect, hidden, locked], 80, 80) === null, 'no eligible frame');
+  assert(deepestFrameAt([rect, hidden, locked, frame], 80, 80)?.id === 'frame', 'eligible frame wins');
+  assert(deepestFrameAt([frame], 9999, 9999) === null, 'outside misses');
+});
+
+test('deepestFrameAt keeps later-wins for same-depth overlaps', () => {
+  const a = mkObj({ id: 'a', type: 'frame', x: 0, y: 0, w: 400, h: 400 });
+  const b = mkObj({ id: 'b', type: 'frame', x: 0, y: 0, w: 400, h: 400 });
+  assert(deepestFrameAt([a, b], 80, 80)?.id === 'b', 'topmost (later) wins ties');
 });
 
 if (failures > 0) {

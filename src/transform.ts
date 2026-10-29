@@ -243,7 +243,7 @@ export function worldRotation(m: Matrix): number {
   return (Math.atan2(m.b, m.a) * 180) / Math.PI;
 }
 
-/** Wrap degrees to (-180, 180]. */
+/** Wrap degrees to [-180, 180). */
 export function normalizeDegrees(d: number): number {
   return ((((d + 180) % 360) + 360) % 360) - 180;
 }

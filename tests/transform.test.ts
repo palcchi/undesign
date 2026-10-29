@@ -289,7 +289,7 @@ test('worldRotation reads nested rotation additively', () => {
   assertNear(worldRotation(pageMatrixOf([f, c], c)), 75, 'nested sum', 1e-6);
 });
 
-test('normalizeDegrees wraps to (-180, 180]', () => {
+test('normalizeDegrees wraps to [-180, 180)', () => {
   assertNear(normalizeDegrees(370), 10, 'overflow');
   assertNear(normalizeDegrees(-190), 170, 'underflow');
   assertNear(normalizeDegrees(180), -180, 'boundary');

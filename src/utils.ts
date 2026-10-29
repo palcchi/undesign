@@ -11,6 +11,7 @@ import {
   normalizeDegrees,
   objectCorners,
   pageMatrixOf,
+  pointInObject,
   quadsOverlap,
   rotateMatrix,
   transformedBounds,
@@ -47,13 +48,19 @@ export function childrenOf(objects: DesignObject[], parentId: string | null): De
   return objects.filter((o) => o.parentId === parentId);
 }
 
-/** All descendant ids of an object (frames can nest). */
+/** All descendant ids of an object (frames can nest). Cycle-safe. */
 export function descendantIds(objects: DesignObject[], id: string): string[] {
-  const direct = objects.filter((o) => o.parentId === id);
   const out: string[] = [];
-  for (const child of direct) {
-    out.push(child.id, ...descendantIds(objects, child.id));
-  }
+  const seen = new Set<string>([id]);
+  const visit = (pid: string): void => {
+    for (const o of objects) {
+      if (o.parentId !== pid || seen.has(o.id)) continue;
+      seen.add(o.id);
+      out.push(o.id);
+      visit(o.id);
+    }
+  };
+  visit(id);
   return out;
 }
 
@@ -136,6 +143,52 @@ export function moveLineEnd(
   return canonicalLine(p0.x, p0.y, p1.x, p1.y);
 }
 
+/**
+ * New parent-relative origin after a resize to w/h via a compass handle.
+ * The opposite corner/edge (the anchor) stays fixed in parent space: exact
+ * for rotated objects, where a plain local shift would drift as the
+ * center-based rotation frame moves. Identical to the legacy shift when
+ * rotation is 0.
+ */
+export function resizeOrigin(
+  orig: { x: number; y: number; w: number; h: number; rotation: number },
+  handle: string,
+  w: number,
+  h: number,
+): { x: number; y: number } {
+  const axOld = handle.includes('e') ? 0 : handle.includes('w') ? orig.w : orig.w / 2;
+  const ayOld = handle.includes('s') ? 0 : handle.includes('n') ? orig.h : orig.h / 2;
+  const axNew = handle.includes('e') ? 0 : handle.includes('w') ? w : w / 2;
+  const ayNew = handle.includes('s') ? 0 : handle.includes('n') ? h : h / 2;
+  const anchor = applyMatrix(
+    rotateMatrix(orig.rotation, orig.w / 2, orig.h / 2),
+    axOld,
+    ayOld,
+  );
+  const shifted = applyMatrix(rotateMatrix(orig.rotation, w / 2, h / 2), axNew, ayNew);
+  return { x: orig.x + anchor.x - shifted.x, y: orig.y + anchor.y - shifted.y };
+}
+
+/** Deepest visible, unlocked frame containing a page-space point (draw auto-parent). */
+export function deepestFrameAt(
+  objects: DesignObject[],
+  wx: number,
+  wy: number,
+): DesignObject | null {
+  let best: DesignObject | null = null;
+  let bestDepth = -1;
+  for (const o of objects) {
+    if (o.type !== 'frame' || !o.visible || o.locked) continue;
+    if (!pointInObject(objects, o, wx, wy)) continue;
+    const depth = ancestorChain(objects, o).length;
+    if (depth >= bestDepth) {
+      best = o;
+      bestDepth = depth;
+    }
+  }
+  return best;
+}
+
 /** Ids of selectable objects intersecting a marquee rect (page-space corners). */
 export function marqueeHits(
   objects: DesignObject[],
@@ -160,7 +213,7 @@ export function marqueeHits(
     .map((o) => o.id);
 }
 
-/** Axis-aligned bounds of visible objects in page space (rotation ignored). */
+/** Axis-aligned bounds of visible objects in page space (rotation-aware). */
 export function pageBounds(
   objects: DesignObject[],
 ): { x: number; y: number; w: number; h: number } | null {

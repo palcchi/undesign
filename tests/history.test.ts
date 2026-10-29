@@ -7,6 +7,7 @@ import {
   abortTransientEntry,
   beginTransientEntry,
   commitDoc,
+  endTransientEntry,
   redoHistory,
   setPresent,
   undoHistory,
@@ -275,6 +276,52 @@ test('redo during a transient session discards the session', () => {
   h = redoHistory(abortTransientEntry(h));
   assert(h.present.name === 'A', `session draft discarded (got ${h.present.name})`);
   assert(h.future.length === 0, 'redo stays empty: the session cleared it at begin');
+});
+
+/* ---------- untouched transient sessions leave no entry ---------- */
+
+test('endTransientEntry pops an untouched session', () => {
+  const h0 = state('a');
+  const begun = beginTransientEntry(h0);
+  assert(begun.past.length === 1, 'begin pushes a snapshot');
+  const ended = endTransientEntry(begun);
+  assert(ended.past.length === 0, 'snapshot popped, no phantom entry');
+  assert(ended.present === h0.present, 'present kept by reference');
+});
+
+test('endTransientEntry keeps a session that ran ticks', () => {
+  const h0 = state('a');
+  const begun = beginTransientEntry(h0);
+  const ticked = setPresent(begun, doc('b'));
+  const ended = endTransientEntry(ticked);
+  assert(ended.past.length === 1, 'single entry kept');
+  assert(undoHistory(ended).present === h0.present, 'undo restores pre-session state');
+});
+
+test('endTransientEntry with empty past is a no-op', () => {
+  const h0 = state('a');
+  assert(endTransientEntry(h0) === h0, 'same state object returned');
+});
+
+/* ---------- no-op commits leave history untouched ---------- */
+
+test('commit with a value-identical doc is a no-op', () => {
+  const h0 = state('a');
+  const clone = JSON.parse(JSON.stringify(h0.present)) as UndesignDoc;
+  assert(clone !== h0.present, 'clone is a distinct reference');
+  const h1 = commitDoc(h0, clone);
+  assert(h1 === h0, 'same state object returned');
+  assert(h1.past.length === 0, 'no phantom entry');
+});
+
+test('commit with a nested change still pushes exactly one entry', () => {
+  const d = docWith([textObj('a', 'A')]);
+  const h0: HistoryState = { past: [], present: d, future: [] };
+  const next = docWith([{ ...textObj('a', 'A'), x: 7 }]);
+  const h1 = commitDoc(h0, next);
+  assert(h1.past.length === 1, 'one entry pushed');
+  assert(h1.past[0] === d, 'snapshot is the previous present');
+  assert(undoHistory(h1).present === d, 'undo restores original');
 });
 
 if (failures > 0) {
