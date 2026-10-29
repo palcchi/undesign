@@ -76,6 +76,7 @@ import {
   abortTransientEntry,
   beginTransientEntry,
   commitDoc,
+  endTransientEntry,
   redoHistory,
   setPresent,
   undoHistory,
@@ -137,6 +138,30 @@ export function patchDocObjects(
       return next;
     }),
   }));
+}
+
+/**
+ * Pure deletion plan: expansion children locked inside a component instance
+ * can never be deleted directly (detach first); everything else takes its
+ * whole subtree with it. Unknown ids are harmless no-ops downstream.
+ */
+export function planObjectDeletion(
+  objects: DesignObject[],
+  ids: string[],
+): { allowed: string[]; locked: string[]; doomed: Set<string> } {
+  const byId = new Map(objects.map((o) => [o.id, o]));
+  const locked = ids.filter((id) => {
+    const o = byId.get(id);
+    return o !== undefined && isExpansion(o);
+  });
+  const lockedSet = new Set(locked);
+  const allowed = ids.filter((id) => !lockedSet.has(id));
+  const doomed = new Set<string>();
+  for (const id of allowed) {
+    doomed.add(id);
+    for (const child of descendantIds(objects, id)) doomed.add(child);
+  }
+  return { allowed, locked, doomed };
 }
 
 /** Clone root objects plus descendants, remapping ids. Keeps parent when requested. */
@@ -359,7 +384,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   );
 
   const endTransient = useCallback(() => {
+    if (!transientRef.current) return;
     transientRef.current = false;
+    // Untouched sessions (no tick since begin) pop their begin snapshot so
+    // a click without a drag never leaves a phantom undo step.
+    setHistory(endTransientEntry);
   }, []);
 
   const abortTransient = useCallback(() => {
@@ -494,6 +523,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         .filter((c) => single || c.pageId === id)
         .map((c) => c.id);
       applyDoc((d) => {
+        if (!d.pages.some((p) => p.id === id)) return d;
         let next: UndesignDoc;
         if (d.pages.length === 1) {
           const fresh = createBlankDoc();
@@ -681,12 +711,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     (ids: string[]) => {
       if (ids.length === 0) return;
       const pg = getPage(history.present);
-      const byId = new Map(pg.objects.map((o) => [o.id, o]));
-      const locked = ids.filter((id) => {
-        const o = byId.get(id);
-        return o !== undefined && isExpansion(o);
-      });
-      const allowed = ids.filter((id) => !locked.includes(id));
+      const { allowed, locked, doomed } = planObjectDeletion(pg.objects, ids);
       if (locked.length > 0) {
         setNotice(
           allowed.length === 0
@@ -695,20 +720,12 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         );
       }
       if (allowed.length === 0) return;
-      const doomed = new Set<string>();
-      for (const id of allowed) {
-        doomed.add(id);
-        for (const child of descendantIds(pg.objects, id)) doomed.add(child);
-      }
       const gone = pg.objects.filter((o) => doomed.has(o.id) && o.imageId).map((o) => o.imageId as string);
       const survivors = pg.objects.filter((o) => !doomed.has(o.id));
       applyDoc((d) => {
         const dp = getPage(d);
-        const ddoomed = new Set<string>();
-        for (const id of ids) {
-          ddoomed.add(id);
-          for (const child of descendantIds(dp.objects, id)) ddoomed.add(child);
-        }
+        // Replan from the allowed ids only: locked expansions stay untouched.
+        const { doomed: ddoomed } = planObjectDeletion(dp.objects, allowed);
         const cut = withActivePage(d, (p) => ({
           ...p,
           objects: p.objects.filter((o) => !ddoomed.has(o.id)),

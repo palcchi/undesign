@@ -183,6 +183,59 @@ test('constraints and color styles round-trip; dangling refs detach', () => {
   assert(again!.pages[0].objects[0].fillStyleId === 's1', 'refs survive JSON');
 });
 
+test('line dimensions round-trip; other types still clamp to >= 1', () => {
+  const doc = validateDoc(
+    rawDoc([
+      rawObj({ id: 'h', type: 'line', w: 100, h: 0 }),
+      rawObj({ id: 'v', type: 'line', w: 0, h: 100 }),
+      rawObj({ id: 'd', type: 'line', w: 100, h: -50 }),
+      rawObj({ id: 'p', type: 'line', w: 0, h: 0 }),
+      rawObj({ id: 'r', type: 'rectangle', w: 0, h: -5 }),
+    ]),
+  );
+  assert(doc !== null, 'doc valid');
+  const byId = new Map(doc!.pages[0].objects.map((o) => [o.id, o]));
+  assert(byId.get('h')!.h === 0, 'horizontal h=0 kept');
+  assert(byId.get('v')!.w === 0, 'vertical w=0 kept');
+  assert(byId.get('d')!.h === -50, 'upward diagonal h<0 kept');
+  assert(byId.get('p')!.w === 0 && byId.get('p')!.h === 0, 'collapsed point kept');
+  assert(byId.get('r')!.w === 1 && byId.get('r')!.h === 1, 'rectangle clamps to >= 1');
+  const again = validateDoc(JSON.parse(JSON.stringify(doc)) as unknown);
+  assert(again !== null, 'reserialized doc valid');
+  const re = new Map(again!.pages[0].objects.map((o) => [o.id, o]));
+  assert(re.get('h')!.h === 0 && re.get('v')!.w === 0 && re.get('d')!.h === -50, 'lines survive JSON');
+});
+
+test('self-parent and cyclic references detach; objects are kept', () => {
+  const doc = validateDoc(
+    rawDoc([
+      rawObj({ id: 'self', type: 'frame', parentId: 'self' }),
+      rawObj({ id: 'a', type: 'frame', parentId: 'b' }),
+      rawObj({ id: 'b', type: 'frame', parentId: 'a' }),
+      rawObj({ id: 'c1', type: 'frame', parentId: 'c3' }),
+      rawObj({ id: 'c2', type: 'frame', parentId: 'c1' }),
+      rawObj({ id: 'c3', type: 'frame', parentId: 'c2' }),
+      rawObj({ id: 'kid', parentId: 'a' }),
+    ]),
+  );
+  assert(doc !== null, 'doc valid');
+  const objs = doc!.pages[0].objects;
+  assert(objs.length === 7, `no valid object dropped (got ${objs.length})`);
+  const byId = new Map(objs.map((o) => [o.id, o]));
+  assert(byId.get('self')!.parentId === null, 'self-parent detached');
+  // Every chain must terminate at a root now.
+  for (const o of objs) {
+    const seen = new Set<string>();
+    let cur: string | null = o.id;
+    while (cur !== null) {
+      assert(!seen.has(cur), `chain of ${o.id} is acyclic`);
+      seen.add(cur);
+      cur = byId.get(cur)!.parentId;
+    }
+  }
+  assert(byId.get('kid')!.parentId === 'a', 'healthy child link untouched');
+});
+
 if (failures > 0) {
   console.log(`${failures} test(s) failed`);
   throw new Error(`${failures} test(s) failed`);

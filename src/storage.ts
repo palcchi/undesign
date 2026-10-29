@@ -90,6 +90,9 @@ function sanitizeObject(raw: unknown): DesignObject | null {
   if (!isObject(raw)) return null;
   if (typeof raw.id !== 'string' || !TYPES.has(raw.type as string)) return null;
   const align = raw.textAlign === 'center' || raw.textAlign === 'right' ? raw.textAlign : 'left';
+  // Lines legitimately carry zero/negative dims (horizontal, vertical,
+  // upward diagonals, collapsed points); every other type needs >= 1.
+  const isLine = raw.type === 'line';
   return {
     id: raw.id,
     type: raw.type as DesignObject['type'],
@@ -97,8 +100,8 @@ function sanitizeObject(raw: unknown): DesignObject | null {
     parentId: typeof raw.parentId === 'string' ? raw.parentId : null,
     x: num(raw.x, 0),
     y: num(raw.y, 0),
-    w: Math.max(1, num(raw.w, 100)),
-    h: Math.max(1, num(raw.h, 100)),
+    w: isLine ? Math.max(0, num(raw.w, 100)) : Math.max(1, num(raw.w, 100)),
+    h: isLine ? num(raw.h, 0) : Math.max(1, num(raw.h, 100)),
     rotation: num(raw.rotation, 0),
     visible: bool(raw.visible, true),
     locked: bool(raw.locked, false),
@@ -141,6 +144,18 @@ function sanitizePage(raw: unknown): DocPage | null {
   const ids = new Set(objects.map((o) => o.id));
   for (const o of objects) {
     if (o.parentId && !ids.has(o.parentId)) o.parentId = null;
+  }
+  // Break self-parent and cyclic references (objects are kept; only the bad
+  // links are detached to the page root so traversal can never loop).
+  const byId = new Map(objects.map((o) => [o.id, o]));
+  for (const o of objects) {
+    const path = new Set<string>([o.id]);
+    let p = o.parentId ? byId.get(o.parentId) : undefined;
+    while (p && !path.has(p.id)) {
+      path.add(p.id);
+      p = p.parentId ? byId.get(p.parentId) : undefined;
+    }
+    if (p) o.parentId = null;
   }
   return { id: raw.id, name: str(raw.name, 'Page'), objects };
 }

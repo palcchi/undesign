@@ -8,6 +8,7 @@ import {
   canonicalLine,
   childrenOf,
   clamp,
+  deepestFrameAt,
   descendantIds,
   effectiveGradient,
   gradientVector,
@@ -16,6 +17,7 @@ import {
   marqueeHits,
   moveLineEnd,
   resolveRadii,
+  resizeOrigin,
   rootsOf,
   roundedRectPath,
   screenToWorld,
@@ -31,7 +33,6 @@ import {
   objectCorners,
   pageMatrixOf,
   parentLocalPoint,
-  pointInObject,
   transformedBounds,
   translateLocalByPageDelta,
 } from '../transform';
@@ -231,15 +232,8 @@ export function CanvasView() {
     return { x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0) };
   };
 
-  const frameAtPoint = (wx: number, wy: number): DesignObject | null => {
-    const objs = pageRef.current.objects;
-    for (let i = objs.length - 1; i >= 0; i--) {
-      const o = objs[i];
-      if (o.type !== 'frame' || !o.visible || o.locked) continue;
-      if (pointInObject(objs, o, wx, wy)) return o;
-    }
-    return null;
-  };
+  const frameAtPoint = (wx: number, wy: number): DesignObject | null =>
+    deepestFrameAt(pageRef.current.objects, wx, wy);
 
   /* ---------- background pointer down ---------- */
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
@@ -503,23 +497,12 @@ export function CanvasView() {
           const cur = applyMatrix(drag.inv, world.x, world.y);
           const dxL = cur.x - drag.startLX;
           const dyL = cur.y - drag.startLY;
-          const rad = (drag.orig.rotation * Math.PI) / 180;
-          const cos = Math.cos(rad);
-          const sin = Math.sin(rad);
           const hnd = drag.handle;
-          let { x, y, w, h } = drag.orig;
-          let ldx = 0;
-          let ldy = 0;
+          let { w, h } = drag.orig;
           if (hnd.includes('e')) w = drag.orig.w + dxL;
           if (hnd.includes('s')) h = drag.orig.h + dyL;
-          if (hnd.includes('w')) {
-            w = drag.orig.w - dxL;
-            ldx = dxL;
-          }
-          if (hnd.includes('n')) {
-            h = drag.orig.h - dyL;
-            ldy = dyL;
-          }
+          if (hnd.includes('w')) w = drag.orig.w - dxL;
+          if (hnd.includes('n')) h = drag.orig.h - dyL;
           const target = pageRef.current.objects.find((o) => o.id === drag.id);
           const isLine = target?.type === 'line';
           // Shift locks image proportions (photos should not stretch by accident).
@@ -538,13 +521,10 @@ export function CanvasView() {
           }
           w = Math.max(isLine && !hnd.includes('w') && !hnd.includes('e') ? drag.orig.w : 1, w);
           h = isLine ? Math.max(0, h) : Math.max(1, h);
-          // Clamp origin shift when clamped.
-          if (hnd.includes('w')) ldx = drag.orig.w - w;
-          if (hnd.includes('n')) ldy = drag.orig.h - h;
-          x = drag.orig.x + ldx * cos - ldy * sin;
-          y = drag.orig.y + ldx * sin + ldy * cos;
-          const nx = Math.round(x);
-          const ny = Math.round(y);
+          // Anchor the opposite edge/corner in parent space (exact when rotated).
+          const origin = resizeOrigin(drag.orig, hnd, w, h);
+          const nx = Math.round(origin.x);
+          const ny = Math.round(origin.y);
           const nw = Math.round(w);
           const nh = Math.round(h);
           ed.transientUpdate((d) => ({
