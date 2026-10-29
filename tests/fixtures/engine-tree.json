@@ -1,0 +1,132 @@
+{
+  "docName": "Captured",
+  "pages": [
+    {
+      "children": 1,
+      "current": true,
+      "divider": false,
+      "id": 1,
+      "name": "Home"
+    }
+  ],
+  "trees": {
+    "1": {
+      "background": "#F5F5F5",
+      "children": [
+        {
+          "absoluteBounds": {
+            "height": 200,
+            "width": 300,
+            "x": 10,
+            "y": 20
+          },
+          "children": [
+            {
+              "absoluteBounds": {
+                "height": 67.71,
+                "width": 85.28,
+                "x": 23.36,
+                "y": 14.14
+              },
+              "constraints": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "cornerRadius": 8,
+              "fills": [
+                {
+                  "color": "#00FF00",
+                  "type": "solid"
+                }
+              ],
+              "height": 32,
+              "id": 3,
+              "name": "Chip",
+              "rotation": 30,
+              "type": "RECTANGLE",
+              "width": 80,
+              "x": 13.36,
+              "y": 34.14
+            },
+            {
+              "absoluteBounds": {
+                "height": 24,
+                "width": 1,
+                "x": 26,
+                "y": 130
+              },
+              "characters": "Hello!",
+              "constraints": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "fills": [
+                {
+                  "color": "#000000",
+                  "type": "solid"
+                }
+              ],
+              "fontFamily": "Inter",
+              "fontSize": 20,
+              "fontStyle": "Regular",
+              "height": 24,
+              "id": 4,
+              "letterSpacing": "0%",
+              "lineHeight": "Auto",
+              "name": "Hello",
+              "overrides": [
+                "characters"
+              ],
+              "sizing": {
+                "horizontal": "hug",
+                "vertical": "hug"
+              },
+              "textAlign": "center",
+              "textAutoResize": "widthAndHeight",
+              "type": "TEXT",
+              "width": 1,
+              "x": 16,
+              "y": 110
+            },
+            {
+              "absoluteBounds": {
+                "height": 50,
+                "width": 50,
+                "x": 10,
+                "y": 20
+              },
+              "constraints": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "height": 50,
+              "id": 5,
+              "name": "Slice",
+              "type": "SLICE",
+              "width": 50,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "clip": true,
+          "fills": [
+            {
+              "color": "#FFFFFF",
+              "type": "solid"
+            }
+          ],
+          "height": 200,
+          "id": 2,
+          "name": "Card",
+          "type": "FRAME",
+          "width": 300,
+          "x": 10,
+          "y": 20
+        }
+      ],
+      "id": 1,
+      "name": "Home",
+      "type": "PAGE"
+    }
+  }
+}

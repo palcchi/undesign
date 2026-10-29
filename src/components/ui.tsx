@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useEditor } from '../store';
 
 /* ---------- Modal dialog ---------- */
 
@@ -134,21 +133,4 @@ export function useEnterEscape(onCommit: () => void, onCancel: () => void) {
       }
     },
   };
-}
-
-/**
- * Ends the transient session when a native color picker closes (it fires
- * 'change' once on close; per-tick input arrives via React onChange).
- */
-export function useNativePickerEnd(ref: React.RefObject<HTMLInputElement>) {
-  const { endTransient } = useEditor();
-  const endRef = useRef(endTransient);
-  endRef.current = endTransient;
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onNativeChange = () => endRef.current();
-    el.addEventListener('change', onNativeChange);
-    return () => el.removeEventListener('change', onNativeChange);
-  }, [ref]);
 }

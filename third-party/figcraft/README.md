@@ -9,7 +9,7 @@
 ## What is reused
 
 The `undesign-wasm` crate (`rust/`) depends on the upstream
-`figcraft-engine`, `figcraft-doc`, and `figcraft-svg` crates **unmodified**
+`figcraft-engine`, `figcraft-doc`, `figcraft-svg`, and `figcraft-geom` crates **unmodified**
 via pinned Cargo git dependencies (see `rust/Cargo.toml` and `rust/Cargo.lock`).
 No upstream source files are vendored or patched; all integration code in
 `rust/src/` is original Undesign work.

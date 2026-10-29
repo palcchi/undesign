@@ -13,7 +13,7 @@ import {
   undoHistory,
 } from '../src/history';
 import type { HistoryState } from '../src/history';
-import { patchDocObjects } from '../src/store';
+import { patchDocObjects } from '../src/docpatch';
 import type { DesignObject, UndesignDoc } from '../src/types';
 
 let failures = 0;

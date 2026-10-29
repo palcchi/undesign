@@ -104,24 +104,32 @@ billing, and deployment. Sharing works through portable JSON
 ## WASM engine (FigCraft integration)
 
 Undesign embeds the FigCraft editor engine, compiled to WebAssembly, behind a
-documented JSON boundary. The **Engine** button in the top toolbar opens the
-Engine Lab: a live FigCraft session rendering real SVG, with working create,
-move, undo/redo, selection, and save/load controls.
+documented JSON boundary. The **main editor** runs on the engine: canvas,
+selection, layers, properties, persistence, and export all operate on one
+engine-owned document through the typed `EngineAdapter`
+(`src/engine/adapter.ts`). The **Engine** button in the top toolbar opens the
+Engine Lab, kept as a diagnostic view over a separate engine session.
 
 - Upstream: [brydanforge/figcraft](https://github.com/brydanforge/figcraft),
   revision `92682728e9d6a3a97ea25a99395be7a34a8db993`
 - License: MIT OR Apache-2.0 (texts and NOTICE in `third-party/figcraft/`);
   © 2026 ArtCraft Team and the FigCraft contributors
-- Reuse: the `figcraft-engine`, `figcraft-doc`, and `figcraft-svg` crates,
-  **unmodified**, via pinned Cargo git dependencies (`rust/Cargo.toml`,
-  `rust/Cargo.lock`). No upstream files are vendored or patched; the bridge
-  in `rust/src/`, the loader in `src/wasm/`, and the lab UI are original
-  Undesign code.
+- Reuse: the `figcraft-engine`, `figcraft-doc`, `figcraft-svg`, and
+  `figcraft-geom` crates, **unmodified**, via pinned Cargo git dependencies
+  (`rust/Cargo.toml`, `rust/Cargo.lock`). No upstream files are vendored or
+  patched; the bridge in `rust/src/`, the loader in `src/wasm/`, the adapter
+  and converter in `src/engine/`, and the editor UI are original Undesign
+  code.
 - Boundary: the engine owns its document exclusively. The React app crosses
-  into it only through `execute` / `undo` / `redo` / selection / SVG export /
-  save+load (see `rust/src/lib.rs`). There is one engine document per lab
-  session — no silent divergence with the TypeScript document model, which
-  remains the editor's main store while migration proceeds incrementally.
+  into it only through `execute` / `undo` / `redo` / selection / tree
+  describe / hit-test / SVG export / save+load (see `rust/src/lib.rs`). There
+  is no second editable TypeScript document model.
+- Migration: legacy JSON documents convert explicitly via
+  `src/engine/convert.ts` (UND→FC) and read back via
+  `src/engine/readback.ts` (FC→UND); unsupported properties (components,
+  variants, styles, auto-layout, images, shadows) produce recorded warnings
+  and safe placeholders, never silent data loss. Rotation is clockwise in
+  UND/SVG and counter-clockwise in the engine; the boundary negates it.
 - Brand and separately licensed material (ArtCraft trademarks, OFL fonts) are
   not reused.
 

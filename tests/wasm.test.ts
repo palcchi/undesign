@@ -62,6 +62,18 @@ function fakeGlue(over: { init?: () => Promise<void>; make?: () => unknown } = {
     docInfo(): string {
       return '{"name":"Untitled","nodes":2,"pages":1}';
     }
+    describePage(): string {
+      calls.push('describePage');
+      return '{"id":1,"name":"Page 1","type":"PAGE","children":[]}';
+    }
+    describeNode(id: number): string {
+      calls.push(`describeNode:${id}`);
+      return `{"id":${id},"name":"n","type":"RECTANGLE"}`;
+    }
+    hitTest(x: number, y: number): string {
+      calls.push(`hitTest:${x},${y}`);
+      return '{"id":7}';
+    }
     exportPageSvg(): string {
       return '<svg></svg>';
     }
@@ -129,8 +141,11 @@ await atest('a working module yields a callable engine handle', async () => {
   assert(engine.exportPageSvg() === '<svg></svg>', 'svg');
   assert(engine.save() === '{"doc":true}', 'save');
   engine.load('{}');
+  assert(JSON.parse(engine.describePage(8)).type === 'PAGE', 'describePage');
+  assert(JSON.parse(engine.describeNode(7)).id === 7, 'describeNode');
   assert(
-    calls.join('|') === 'execute:shape.rectangle:{"x":1}|undo|redo|select:[7]|load:2',
+    calls.join('|') ===
+      'execute:shape.rectangle:{"x":1}|undo|redo|select:[7]|load:2|describePage|describeNode:7',
     `calls recorded in order, got ${calls.join('|')}`,
   );
 });

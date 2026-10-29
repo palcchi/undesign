@@ -1425,6 +1425,7 @@ version = "0.1.0"
 dependencies = [
  "figcraft-doc",
  "figcraft-engine",
+ "figcraft-geom",
  "figcraft-svg",
  "serde",
  "serde_json",
