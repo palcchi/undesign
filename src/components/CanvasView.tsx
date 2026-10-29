@@ -4,9 +4,13 @@ import { useEditor } from '../store';
 import type { DesignObject } from '../types';
 import {
   absolutePosition,
+  canonicalLine,
   childrenOf,
   clamp,
+  marqueeHits,
+  moveLineEnd,
   screenToWorld,
+  vectorBounds,
   worldToScreen,
 } from '../utils';
 import { ContextMenu, useContextMenu } from './ui';
@@ -92,10 +96,29 @@ export function CanvasView() {
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
+  /* ---------- report canvas size for anchored zoom ---------- */
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const report = () => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        editorRef.current.setCanvasSize(el.clientWidth, el.clientHeight);
+      }
+    };
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   /* ---------- space key for temporary pan ---------- */
   useEffect(() => {
     const isTyping = (t: EventTarget | null) =>
-      t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable);
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLButtonElement ||
+      t instanceof HTMLSelectElement ||
+      (t instanceof HTMLElement && t.isContentEditable);
     const onDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat && !isTyping(e.target)) {
         e.preventDefault();
@@ -163,7 +186,8 @@ export function CanvasView() {
     const parentAbs = parent ? absolutePosition(pageRef.current.objects, parent) : { x: 0, y: 0 };
     const local = { x: Math.round(world.x - parentAbs.x), y: Math.round(world.y - parentAbs.y) };
     ed.beginTransient();
-    const id = ed.addObject(t, { x: local.x, y: local.y, w: 2, h: t === 'line' ? 0 : 2, parentId: parent?.id ?? null });
+    // Non-committing insert: the whole draw (insert + drag sizing) is one step.
+    const id = ed.addObject(t, { x: local.x, y: local.y, w: 2, h: t === 'line' ? 0 : 2, parentId: parent?.id ?? null }, false);
     dragRef.current = { kind: 'draw', startWX: world.x, startWY: world.y, id, parentId: parent?.id ?? null, moved: false };
     (e.target as Element).setPointerCapture?.(e.pointerId);
   };
@@ -176,8 +200,9 @@ export function CanvasView() {
     const ed = editorRef.current;
     const t = toolRef.current;
     if (t !== 'select' || spaceDown) {
-      // In draw modes, clicks pass through to background drawing.
-      if (t !== 'select') onBackgroundPointerDown(e);
+      // Draw tools paint through objects; space/hand pans from anywhere,
+      // including drags that start on top of an object.
+      onBackgroundPointerDown(e);
       return;
     }
     const obj = pageRef.current.objects.find((o) => o.id === id);
@@ -263,7 +288,14 @@ export function CanvasView() {
                 objects: p.objects.map((o) => {
                   if (o.id !== drag.id) return o;
                   if (o.type === 'line') {
-                    return { ...o, x: Math.round(x1), y: Math.round(y1), w: Math.round(x2 - x1), h: Math.round(y2 - y1) };
+                    const g = canonicalLine(x1, y1, x2, y2);
+                    return {
+                      ...o,
+                      x: Math.round(g.x),
+                      y: Math.round(g.y),
+                      w: Math.round(g.w),
+                      h: Math.round(g.h),
+                    };
                   }
                   return {
                     ...o,
@@ -356,29 +388,18 @@ export function CanvasView() {
         }
         case 'line-end': {
           const world = screenToWorld(sx, sy, v);
-          const dx = world.x - drag.startWX;
-          const dy = world.y - drag.startWY;
-          let { x, y, w, h } = drag.orig;
-          if (drag.end === 0) {
-            x = drag.orig.x + dx;
-            y = drag.orig.y + dy;
-            w = drag.orig.w - dx;
-            h = drag.orig.h - dy;
-          } else {
-            w = drag.orig.w + dx;
-            h = drag.orig.h + dy;
-          }
-          if (w < 0) {
-            x += w;
-            w = -w;
-          }
+          const g = moveLineEnd(drag.orig, drag.end, world.x - drag.startWX, world.y - drag.startWY);
+          const x = Math.round(g.x);
+          const y = Math.round(g.y);
+          const w = Math.round(g.w);
+          const h = Math.round(g.h);
           ed.transientUpdate((d) => ({
             ...d,
             pages: d.pages.map((p) =>
               p.id !== d.activePageId ? p : {
                 ...p,
                 objects: p.objects.map((o) =>
-                  o.id === drag.id ? { ...o, x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) } : o,
+                  o.id === drag.id ? { ...o, x, y, w, h } : o,
                 ),
               },
             ),
@@ -436,11 +457,7 @@ export function CanvasView() {
           const r1 = screenToWorld(Math.min(drag.startSX, drag.curSX), Math.min(drag.startSY, drag.curSY), v);
           const r2 = screenToWorld(Math.max(drag.startSX, drag.curSX), Math.max(drag.startSY, drag.curSY), v);
           const pg = pageRef.current;
-          const hits = pg.objects.filter((o) => {
-            if (!o.visible || o.locked) return false;
-            const p = absolutePosition(pg.objects, o);
-            return p.x < r2.x && p.x + o.w > r1.x && p.y < r2.y && p.y + o.h > r1.y;
-          }).map((o) => o.id);
+          const hits = marqueeHits(pg.objects, r1, r2);
           if (e.shiftKey) {
             const merged = new Set([...selectedIdsRef.current, ...hits]);
             ed.select([...merged]);
@@ -633,13 +650,13 @@ export function CanvasView() {
         {selected.map((obj) => {
           if (!obj.visible) return null;
           const p = absolutePosition(page.objects, obj);
-          const w = obj.w;
-          const h = obj.type === 'line' ? Math.max(obj.h, 0) : obj.h;
+          const g = vectorBounds(obj.w, obj.h);
           const color = obj.locked ? '#8A8A8A' : SELECT_BLUE;
+          const hh = obj.type === 'line' && g.h === 0 ? 0.1 : g.h;
           return (
-            <g key={`sel-${obj.id}`} transform={`translate(${p.x} ${p.y})${obj.rotation !== 0 ? ` rotate(${obj.rotation} ${w / 2} ${h / 2})` : ''}`}>
+            <g key={`sel-${obj.id}`} transform={`translate(${p.x + g.x} ${p.y + g.y})${obj.rotation !== 0 ? ` rotate(${obj.rotation} ${g.w / 2} ${g.h / 2})` : ''}`}>
               <rect
-                x={0} y={0} width={w} height={obj.type === 'line' && h === 0 ? 0.1 : h}
+                x={0} y={0} width={g.w} height={hh}
                 fill="none" stroke={color} strokeWidth={1.5 / z}
                 strokeDasharray={obj.locked ? `${4 / z} ${3 / z}` : undefined}
               />
@@ -803,6 +820,7 @@ function TextEditor({
   const [value, setValue] = useState(obj.text);
   const ref = useRef<HTMLTextAreaElement>(null);
   const doneRef = useRef(false);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
     const ta = ref.current;
@@ -815,6 +833,9 @@ function TextEditor({
   const done = () => {
     if (doneRef.current) return;
     doneRef.current = true;
+    // No keystroke: cancel the eagerly opened session instead of leaving a
+    // phantom undo step. With edits, onDone commits the single session entry.
+    if (!dirtyRef.current) editor.abortTransient();
     onDone();
   };
 
@@ -830,6 +851,7 @@ function TextEditor({
       onChange={(e) => {
         const v = e.target.value;
         setValue(v);
+        dirtyRef.current = true;
         const lines = Math.max(1, v.split('\n').length);
         const h = Math.max(obj.fontSize * obj.lineHeight, lines * obj.fontSize * obj.lineHeight);
         editor.transientUpdate((d) => ({

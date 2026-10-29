@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -113,7 +113,7 @@ function PageProperties() {
 
 function SingleProperties({ obj }: { obj: DesignObject }) {
   const editor = useEditor();
-  const { updateObjects, toggleVisibility, toggleLock, renameObject, duplicateSelected, deleteSelected } = editor;
+  const { updateObjects, transientPatchObjects, endTransient, abortTransient, toggleVisibility, toggleLock, renameObject, duplicateSelected, deleteSelected } = editor;
   const ids = [obj.id];
   const [name, setName] = useState(obj.name);
   useEffect(() => setName(obj.name), [obj.id, obj.name]);
@@ -188,7 +188,9 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
               value={obj.fill}
               opacity={obj.fillOpacity}
               onCommit={(fill) => updateObjects(ids, { fill })}
-              onOpacity={(fillOpacity) => updateObjects(ids, { fillOpacity })}
+              onOpacity={(fillOpacity) => transientPatchObjects(ids, { fillOpacity })}
+              onOpacityEnd={endTransient}
+              onOpacityCancel={abortTransient}
             />
           )}
         </div>
@@ -215,7 +217,7 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
 
         <div className="prop-section">
           <div className="prop-title">Layer</div>
-          <OpacityField value={obj.opacity} onCommit={(opacity) => updateObjects(ids, { opacity })} />
+          <OpacityField ids={ids} value={obj.opacity} />
         </div>
 
         <div className="prop-section">
@@ -269,7 +271,7 @@ function exportSelection(objs: DesignObject[], page: DocPage) {
 /* ================= text ================= */
 
 function TextSection({ obj }: { obj: DesignObject }) {
-  const { updateObjects } = useEditor();
+  const { updateObjects, transientPatchObjects, endTransient, abortTransient } = useEditor();
   const ids = [obj.id];
   const aligns: { id: TextAlign; label: string }[] = [
     { id: 'left', label: 'Left' },
@@ -335,7 +337,15 @@ function TextSection({ obj }: { obj: DesignObject }) {
           className="text-input content-area"
           value={obj.text}
           rows={3}
-          onChange={(e) => updateObjects(ids, { text: e.target.value })}
+          onChange={(e) => transientPatchObjects(ids, { text: e.target.value })}
+          onBlur={() => endTransient()}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              abortTransient();
+              (e.target as HTMLTextAreaElement).blur();
+            }
+          }}
           aria-label="Text content"
         />
       </label>
@@ -347,7 +357,7 @@ function TextSection({ obj }: { obj: DesignObject }) {
 
 function MultiProperties({ objs }: { objs: DesignObject[] }) {
   const editor = useEditor();
-  const { align, distribute, updateObjects, duplicateSelected, deleteSelected } = editor;
+  const { align, distribute, duplicateSelected, deleteSelected } = editor;
   const ids = objs.map((o) => o.id);
   const avgOpacity = objs.reduce((s, o) => s + o.opacity, 0) / objs.length;
 
@@ -383,7 +393,7 @@ function MultiProperties({ objs }: { objs: DesignObject[] }) {
         </div>
         <div className="prop-section">
           <div className="prop-title">Layer</div>
-          <OpacityField value={avgOpacity} onCommit={(opacity) => updateObjects(ids, { opacity })} />
+          <OpacityField ids={ids} value={avgOpacity} />
         </div>
         <div className="prop-section">
           <div className="prop-title">Export</div>
@@ -430,6 +440,7 @@ function NumField({
 }) {
   const [text, setText] = useState(String(round1(value)));
   const [focused, setFocused] = useState(false);
+  const cancelledRef = useRef(false);
   useEffect(() => {
     if (!focused) setText(String(round1(value)));
   }, [value, focused]);
@@ -457,7 +468,12 @@ function NumField({
           onFocus={() => setFocused(true)}
           onBlur={() => {
             setFocused(false);
-            commit();
+            if (cancelledRef.current) {
+              cancelledRef.current = false;
+              setText(String(round1(value)));
+            } else {
+              commit();
+            }
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -466,6 +482,8 @@ function NumField({
               const delta = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : step);
               onCommit(round1(value + delta));
             } else if (e.key === 'Escape') {
+              e.stopPropagation();
+              cancelledRef.current = true;
               setText(String(round1(value)));
               (e.target as HTMLInputElement).blur();
             }
@@ -483,14 +501,19 @@ function ColorField({
   opacity,
   onCommit,
   onOpacity,
+  onOpacityEnd,
+  onOpacityCancel,
 }: {
   value: string;
   opacity?: number;
   onCommit: (v: string) => void;
   onOpacity?: (v: number) => void;
+  onOpacityEnd?: () => void;
+  onOpacityCancel?: () => void;
 }) {
   const [hex, setHex] = useState(value);
   const [focused, setFocused] = useState(false);
+  const cancelledRef = useRef(false);
   useEffect(() => {
     if (!focused) setHex(value);
   }, [value, focused]);
@@ -528,11 +551,18 @@ function ColorField({
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);
-          commitHex();
+          if (cancelledRef.current) {
+            cancelledRef.current = false;
+            setHex(value);
+          } else {
+            commitHex();
+          }
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           else if (e.key === 'Escape') {
+            e.stopPropagation();
+            cancelledRef.current = true;
             setHex(value);
             (e.target as HTMLInputElement).blur();
           }
@@ -555,6 +585,15 @@ function ColorField({
             max={100}
             value={Math.round(opacity * 100)}
             onChange={(e) => onOpacity(Number(e.target.value) / 100)}
+            onBlur={() => onOpacityEnd?.()}
+            onPointerUp={() => onOpacityEnd?.()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                onOpacityCancel?.();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
             aria-label="Fill opacity"
           />
           <span>{Math.round(opacity * 100)}%</span>
@@ -564,7 +603,8 @@ function ColorField({
   );
 }
 
-function OpacityField({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+function OpacityField({ ids, value }: { ids: string[]; value: number }) {
+  const { transientPatchObjects, endTransient, abortTransient } = useEditor();
   return (
     <label className="opacity-row">
       <span className="prop-label">Opacity</span>
@@ -573,7 +613,16 @@ function OpacityField({ value, onCommit }: { value: number; onCommit: (v: number
         min={0}
         max={100}
         value={Math.round(value * 100)}
-        onChange={(e) => onCommit(Number(e.target.value) / 100)}
+        onChange={(e) => transientPatchObjects(ids, { opacity: Number(e.target.value) / 100 })}
+        onBlur={() => endTransient()}
+        onPointerUp={() => endTransient()}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            abortTransient();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
         aria-label="Layer opacity"
       />
       <span className="opacity-val">{Math.round(value * 100)}%</span>

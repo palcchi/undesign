@@ -55,7 +55,7 @@ export function TopToolbar({
   const editor = useEditor();
   const {
     doc, selectedIds, tool, setTool, viewport, canUndo, canRedo,
-    undo, redo, zoomIn, zoomOut, zoomReset, zoomFit, newBlankDoc, resetSample,
+    undo, redo, zoomIn, zoomOut, zoomReset, zoomTo, newBlankDoc, resetSample,
     replaceDoc, copySelected, cutSelected, paste, hasClipboard, duplicateSelected,
     deleteSelected, selectAll, reorder, align, distribute, toggleGrid, gridVisible,
   } = editor;
@@ -162,7 +162,7 @@ export function TopToolbar({
       { label: 'Zoom in', shortcut: 'Ctrl++', onSelect: zoomIn },
       { label: 'Zoom out', shortcut: 'Ctrl+−', onSelect: zoomOut },
       { label: 'Reset to 100%', shortcut: 'Ctrl+0', onSelect: zoomReset },
-      { label: 'Fit canvas', shortcut: 'Shift+1', onSelect: () => zoomFit(window.innerWidth - 480, window.innerHeight - 120) },
+      { label: 'Fit canvas', shortcut: 'Shift+1', onSelect: () => window.dispatchEvent(new CustomEvent('undesign:fit')) },
       { divider: true },
       { label: gridVisible ? 'Hide grid' : 'Show grid', shortcut: 'Ctrl+.', onSelect: toggleGrid },
       { label: leftVisible ? 'Hide left sidebar' : 'Show left sidebar', onSelect: onToggleLeft },
@@ -310,7 +310,7 @@ export function TopToolbar({
                     key={z}
                     className="menu-item"
                     onClick={() => {
-                      editor.setViewport({ ...viewport, zoom: z / 100 });
+                      zoomTo(z / 100);
                       setZoomMenu(false);
                     }}
                   >
@@ -321,7 +321,7 @@ export function TopToolbar({
                 <button
                   className="menu-item"
                   onClick={() => {
-                    zoomFit(window.innerWidth - 480, window.innerHeight - 120);
+                    window.dispatchEvent(new CustomEvent('undesign:fit'));
                     setZoomMenu(false);
                   }}
                 >
@@ -540,7 +540,7 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl+] / Ctrl+[', 'Bring forward / send backward'],
   ['Space + drag', 'Pan canvas'],
   ['Double-click text', 'Edit text content'],
-  ['Esc', 'Deselect / close dialog'],
+  ['Esc', 'Deselect / cancel edit / close dialog'],
 ];
 
 function ShortcutsDialog({ onClose }: { onClose: () => void }) {

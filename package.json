@@ -8,7 +8,8 @@
     "dev": "vite --host --port 5173",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host --port 5173",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/run.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.469.0",
