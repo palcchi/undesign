@@ -8,24 +8,37 @@ import {
   AlignStartVertical,
   Ban,
   Circle,
+  Component as ComponentIcon,
   Copy,
   Download,
   Eye,
   EyeOff,
   Frame,
+  Image as ImageIcon,
+  Link2,
   Lock,
   LockOpen,
+  Maximize2,
   Minus,
   MoveHorizontal,
   MoveVertical,
+  Pen,
+  Plus,
+  RotateCcw,
   Square,
   Trash2,
   Type,
+  Unlink,
+  Upload,
+  X,
 } from 'lucide-react';
 import { FONT_STACKS, useEditor } from '../store';
-import type { DesignObject, TextAlign } from '../types';
-import { clamp, downloadFile, isHexColor, normalizeHex, pageToSvg, round1 } from '../utils';
+import type { Constraints, CornerRadii, DesignObject, FillGradient, GradientStop, ObjectPatch, TextAlign } from '../types';
+import { clamp, downloadFile, effectiveGradient, hasIndependentCorners, isHexColor, normalizeHex, resolveHexCommit, resolveNumericCommit, resolveRadii, round1 } from '../utils';
 import type { DocPage } from '../types';
+import { exportPageSvg, fitImageSize } from '../assets';
+import { liveSource } from '../library';
+import { useNativePickerEnd } from './ui';
 
 function TypeIcon({ type }: { type: DesignObject['type'] }) {
   switch (type) {
@@ -39,6 +52,8 @@ function TypeIcon({ type }: { type: DesignObject['type'] }) {
       return <Type size={14} />;
     case 'line':
       return <Minus size={14} />;
+    case 'image':
+      return <ImageIcon size={14} />;
   }
 }
 
@@ -48,7 +63,24 @@ const TYPE_LABEL: Record<DesignObject['type'], string> = {
   ellipse: 'Ellipse',
   text: 'Text',
   line: 'Line',
+  image: 'Image',
 };
+
+const H_CONSTRAINTS = [
+  { v: 'left', label: 'Left' },
+  { v: 'center', label: 'Center' },
+  { v: 'right', label: 'Right' },
+  { v: 'stretch', label: 'Stretch' },
+  { v: 'scale', label: 'Scale' },
+] as const;
+
+const V_CONSTRAINTS = [
+  { v: 'top', label: 'Top' },
+  { v: 'middle', label: 'Middle' },
+  { v: 'bottom', label: 'Bottom' },
+  { v: 'stretch', label: 'Stretch' },
+  { v: 'scale', label: 'Scale' },
+] as const;
 
 export function PropertiesPanel() {
   const { selected } = useEditor();
@@ -60,9 +92,10 @@ export function PropertiesPanel() {
 /* ================= no selection: page ================= */
 
 function PageProperties() {
-  const { page, renamePage, addObject } = useEditor();
+  const { page, renamePage, addObject, importImageFiles } = useEditor();
   const [name, setName] = useState(page.name);
   useEffect(() => setName(page.name), [page.id, page.name]);
+  const imgRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="sidebar right">
@@ -93,6 +126,21 @@ function PageProperties() {
             <button className="btn secondary" onClick={() => addObject('text')}><Type size={14} /><span>Text</span></button>
             <button className="btn secondary" onClick={() => addObject('line')}><Minus size={14} /><span>Line</span></button>
           </div>
+          <button className="btn secondary full import-image-btn" onClick={() => imgRef.current?.click()}>
+            <ImageIcon size={14} />
+            <span>Import image…</span>
+          </button>
+          <input
+            ref={imgRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) importImageFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
           <div className="prop-hint">New objects land at the canvas center. Press F R O T L, then drag to size.</div>
         </div>
         <div className="prop-section">
@@ -113,19 +161,75 @@ function PageProperties() {
 
 function SingleProperties({ obj }: { obj: DesignObject }) {
   const editor = useEditor();
-  const { updateObjects, transientPatchObjects, endTransient, abortTransient, toggleVisibility, toggleLock, renameObject, duplicateSelected, deleteSelected } = editor;
+  const { updateObjects, toggleVisibility, toggleLock, renameObject, duplicateSelected, deleteSelected, detachFillStyle } = editor;
   const ids = [obj.id];
   const [name, setName] = useState(obj.name);
   useEffect(() => setName(obj.name), [obj.id, obj.name]);
+  const instanceDef = obj.componentId
+    ? (editor.doc.components ?? []).find((d) => d.id === obj.componentId) ?? null
+    : null;
+  const childOfDef = (() => {
+    if (!obj.sourceId) return null;
+    const byId = new Map(editor.page.objects.map((o) => [o.id, o]));
+    const seen = new Set<string>();
+    let p = obj.parentId;
+    while (p !== null && !seen.has(p)) {
+      const par = byId.get(p);
+      if (!par) return null;
+      if (par.componentId) {
+        return (editor.doc.components ?? []).find((d) => d.id === par.componentId) ?? { name: 'component' };
+      }
+      seen.add(p);
+      p = par.parentId;
+    }
+    return null;
+  })();
 
-  const showStroke = obj.type !== 'text';
+  const showStroke = obj.type !== 'text' && obj.type !== 'image';
   const showRadius = obj.type === 'frame' || obj.type === 'rectangle';
+  const parentIsFrame =
+    obj.parentId !== null &&
+    editor.page.objects.find((o) => o.id === obj.parentId)?.type === 'frame';
+  const curConstraints: Constraints = obj.constraints ?? { horizontal: 'left', vertical: 'top' };
+  const linkedStyle = obj.fillStyleId
+    ? (editor.doc.colorStyles ?? []).find((s) => s.id === obj.fillStyleId) ?? null
+    : null;
+  const grad = effectiveGradient(obj);
+  const independent = hasIndependentCorners(obj);
+  const radii = resolveRadii(obj);
+
+  const enableGradient = () => {
+    if (grad) return;
+    const first = isHexColor(obj.fill) ? normalizeHex(obj.fill, '#111111') : '#111111';
+    updateObjects(ids, {
+      fillGradient: { angle: 90, stops: [{ offset: 0, color: first }, { offset: 1, color: '#FFFFFF' }] },
+    });
+  };
+  const disableGradient = () => {
+    if (obj.fillGradient === null || obj.fillGradient === undefined) return;
+    updateObjects(ids, { fillGradient: null });
+  };
+  const unlinkCorners = () => {
+    const r = obj.cornerRadius;
+    updateObjects(ids, { cornerRadii: [r, r, r, r] });
+  };
+  const linkCorners = () => {
+    updateObjects(ids, { cornerRadius: radii[0], cornerRadii: null });
+  };
+  const setRadius = (i: number, v: number): ObjectPatch => {
+    const next = [...radii] as CornerRadii;
+    next[i] = Math.max(0, v);
+    return { cornerRadii: next };
+  };
 
   return (
     <div className="sidebar right">
       <div className="props-scroll">
         <div className="prop-head">
-          <span className="prop-type"><TypeIcon type={obj.type} />{TYPE_LABEL[obj.type]}</span>
+          <span className="prop-type">
+            {obj.componentId ? <ComponentIcon size={14} /> : <TypeIcon type={obj.type} />}
+            {TYPE_LABEL[obj.type]}{obj.componentId ? ' (Instance)' : ''}
+          </span>
           <span className="prop-head-actions">
             <button className={`mini-btn${obj.locked ? ' on' : ''}`} title={obj.locked ? 'Unlock' : 'Lock'} onClick={() => toggleLock(obj.id)}>
               {obj.locked ? <Lock size={13} /> : <LockOpen size={13} />}
@@ -151,20 +255,48 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
           </label>
         </div>
 
+        {obj.componentId && (
+          <InstanceSection
+            obj={obj}
+            defName={instanceDef?.name ?? null}
+            sourceLive={instanceDef ? liveSource(editor.doc, instanceDef) !== null : false}
+          />
+        )}
+        {obj.sourceId && childOfDef && (
+          <div className="prop-section">
+            <div className="instance-note">Part of “{childOfDef.name}” — edits become overrides.</div>
+          </div>
+        )}
+
         <div className="prop-section">
           <div className="prop-title">Layout</div>
           <div className="prop-grid-2">
-            <NumField label="X" value={obj.x} onCommit={(v) => updateObjects(ids, { x: v })} />
-            <NumField label="Y" value={obj.y} onCommit={(v) => updateObjects(ids, { y: v })} />
-            <NumField label="W" value={obj.w} min={1} onCommit={(v) => updateObjects(ids, { w: Math.max(1, v) })} />
+            <NumField label="X" value={obj.x} ids={ids} patch={(v) => ({ x: v })} />
+            <NumField label="Y" value={obj.y} ids={ids} patch={(v) => ({ y: v })} />
+            <NumField label="W" value={obj.w} min={1} ids={ids} patch={(v) => ({ w: Math.max(1, v) })} />
             {obj.type === 'line' ? (
-              <NumField label="H" value={obj.h} onCommit={(v) => updateObjects(ids, { h: v })} />
+              <NumField label="H" value={obj.h} ids={ids} patch={(v) => ({ h: v })} />
             ) : (
-              <NumField label="H" value={obj.h} min={1} onCommit={(v) => updateObjects(ids, { h: Math.max(1, v) })} />
+              <NumField label="H" value={obj.h} min={1} ids={ids} patch={(v) => ({ h: Math.max(1, v) })} />
             )}
-            <NumField label="Rotation" value={obj.rotation} suffix="°" onCommit={(v) => updateObjects(ids, { rotation: round1(v) })} />
-            {showRadius && (
-              <NumField label="Radius" value={obj.cornerRadius} min={0} onCommit={(v) => updateObjects(ids, { cornerRadius: Math.max(0, v) })} />
+            <NumField label="Rotation" value={obj.rotation} suffix="°" ids={ids} patch={(v) => ({ rotation: round1(v) })} />
+            {showRadius && !independent && (
+              <div className="radius-row">
+                <NumField label="Radius" value={obj.cornerRadius} min={0} ids={ids} patch={(v) => ({ cornerRadius: Math.max(0, v) })} />
+                <button className="mini-btn" title="Independent corners" onClick={unlinkCorners} aria-label="Independent corners">
+                  <Unlink size={13} />
+                </button>
+              </div>
+            )}
+            {showRadius && independent && (
+              <div className="radii-row">
+                {(['TL', 'TR', 'BR', 'BL'] as const).map((label, i) => (
+                  <NumField key={label} label={label} value={radii[i]} min={0} ids={ids} patch={(v) => setRadius(i, v)} />
+                ))}
+                <button className="mini-btn on" title="Link corners" onClick={linkCorners} aria-label="Link corners" aria-pressed={true}>
+                  <Link2 size={13} />
+                </button>
+              </div>
             )}
           </div>
           {obj.type === 'frame' && (
@@ -177,23 +309,94 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
               <span>Clip children to bounds</span>
             </label>
           )}
+          {parentIsFrame && (
+            <div className="constraint-block">
+              <span className="prop-label">Horizontal</span>
+              <div className="seg tight" role="group" aria-label="Horizontal constraints">
+                {H_CONSTRAINTS.map((o) => (
+                  <button
+                    key={o.v}
+                    className={`seg-btn${curConstraints.horizontal === o.v ? ' active' : ''}`}
+                    onClick={() => updateObjects(ids, { constraints: { ...curConstraints, horizontal: o.v } })}
+                    aria-pressed={curConstraints.horizontal === o.v}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <span className="prop-label">Vertical</span>
+              <div className="seg tight" role="group" aria-label="Vertical constraints">
+                {V_CONSTRAINTS.map((o) => (
+                  <button
+                    key={o.v}
+                    className={`seg-btn${curConstraints.vertical === o.v ? ' active' : ''}`}
+                    onClick={() => updateObjects(ids, { constraints: { ...curConstraints, vertical: o.v } })}
+                    aria-pressed={curConstraints.vertical === o.v}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
+        {obj.type === 'image' ? (
+          <ImageSection obj={obj} />
+        ) : (
         <div className="prop-section">
           <div className="prop-title">{obj.type === 'text' ? 'Color' : 'Fill'}</div>
           {obj.type === 'line' ? (
             <div className="prop-hint">Lines use stroke only.</div>
           ) : (
-            <ColorField
-              value={obj.fill}
-              opacity={obj.fillOpacity}
-              onCommit={(fill) => updateObjects(ids, { fill })}
-              onOpacity={(fillOpacity) => transientPatchObjects(ids, { fillOpacity })}
-              onOpacityEnd={endTransient}
-              onOpacityCancel={abortTransient}
-            />
+            <>
+              <div className="seg panel-seg" role="group" aria-label="Fill type">
+                <button
+                  className={`seg-btn${grad ? '' : ' active'}`}
+                  onClick={disableGradient}
+                  aria-pressed={!grad}
+                >
+                  Solid
+                </button>
+                <button
+                  className={`seg-btn${grad ? ' active' : ''}`}
+                  onClick={enableGradient}
+                  aria-pressed={!!grad}
+                >
+                  Gradient
+                </button>
+              </div>
+              {grad ? (
+                <GradientEditor ids={ids} grad={grad} />
+              ) : (
+                <>
+                  {linkedStyle && (
+                    <div className="style-link">
+                      <Link2 size={13} />
+                      <span>{linkedStyle.name}</span>
+                      <button
+                        className="mini-btn"
+                        title="Detach style (keep color)"
+                        onClick={detachFillStyle}
+                        aria-label="Detach fill style"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  )}
+                  <ColorField
+                    value={obj.fill}
+                    opacity={obj.fillOpacity}
+                    ids={ids}
+                    colorPatch={(fill) => ({ fill, fillStyleId: null })}
+                    opacityPatch={(fillOpacity) => ({ fillOpacity })}
+                  />
+                </>
+              )}
+            </>
           )}
         </div>
+        )}
 
         {showStroke && (
           <div className="prop-section">
@@ -201,19 +404,20 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
             <div className="stroke-row">
               <ColorField
                 value={obj.stroke}
-                onCommit={(stroke) =>
-                  updateObjects(ids, {
-                    stroke,
-                    strokeWidth: stroke && obj.strokeWidth === 0 ? 1 : obj.strokeWidth,
-                  })
-                }
+                ids={ids}
+                colorPatch={(stroke) => ({
+                  stroke,
+                  strokeWidth: stroke && obj.strokeWidth === 0 ? 1 : obj.strokeWidth,
+                })}
               />
-              <NumField label="Width" value={obj.strokeWidth} min={0} onCommit={(v) => updateObjects(ids, { strokeWidth: Math.max(0, v) })} />
+              <NumField label="Width" value={obj.strokeWidth} min={0} ids={ids} patch={(v) => ({ strokeWidth: Math.max(0, v) })} />
             </div>
           </div>
         )}
 
         {obj.type === 'text' && <TextSection obj={obj} />}
+
+        <PrototypeSection obj={obj} />
 
         <div className="prop-section">
           <div className="prop-title">Layer</div>
@@ -245,27 +449,124 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
   );
 }
 
+function PrototypeSection({ obj }: { obj: DesignObject }) {
+  const { doc, setPrototypeLink } = useEditor();
+  const current = (doc.prototypeLinks ?? []).find((l) => l.sourceId === obj.id)?.targetFrameId ?? '';
+  const frames = doc.pages.flatMap((p) =>
+    p.objects.filter((o) => o.type === 'frame' && o.id !== obj.id).map((o) => ({ page: p, frame: o })),
+  );
+  if (frames.length === 0) return null;
+  return (
+    <div className="prop-section">
+      <div className="prop-title">Prototype</div>
+      <label className="prop-field full">
+        <span className="prop-label">On click, go to</span>
+        <select
+          className="text-input"
+          value={current}
+          onChange={(e) => setPrototypeLink(obj.id, e.target.value === '' ? null : e.target.value)}
+          aria-label="Prototype link target"
+        >
+          <option value="">None</option>
+          {frames.map(({ page, frame }) => (
+            <option key={frame.id} value={frame.id}>
+              {doc.pages.length > 1 ? `${page.name} / ${frame.name}` : frame.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="prop-hint">Preview the prototype with Present, then click this object.</div>
+    </div>
+  );
+}
+
 function exportSelection(objs: DesignObject[], page: DocPage) {
-  const ids = new Set(objs.map((o) => o.id));
-  const include = new Set<string>(ids);
-  const queue = [...objs];
-  while (queue.length > 0) {
-    const cur = queue.pop() as DesignObject;
-    for (const child of page.objects.filter((o) => o.parentId === cur.id)) {
-      if (!include.has(child.id)) {
-        include.add(child.id);
-        queue.push(child);
-      }
-    }
-  }
-  const temp: DocPage = {
-    ...page,
-    objects: page.objects
-      .filter((o) => include.has(o.id))
-      .map((o) => (ids.has(o.id) ? { ...o } : o)),
+  downloadFile(
+    'selection.svg',
+    exportPageSvg(page, objs.map((o) => o.id)),
+    'image/svg+xml',
+  );
+}
+
+/* ================= component instance ================= */
+
+function InstanceSection({ obj, defName, sourceLive }: { obj: DesignObject; defName: string | null; sourceLive: boolean }) {
+  const { detachSelectedInstance, resetSelectedInstance, gotoComponentSource } = useEditor();
+  const compId = obj.componentId as string;
+  return (
+    <div className="prop-section">
+      <div className="prop-title">Component</div>
+      <div className="prop-hint">
+        {defName === null ? 'Component deleted — detach to keep editing.' : !sourceLive ? 'Source missing — instance is frozen.' : defName}
+      </div>
+      <button
+        className="btn secondary full"
+        disabled={!sourceLive}
+        onClick={() => gotoComponentSource(compId)}
+      >
+        <Pen size={14} />
+        <span>Go to source</span>
+      </button>
+      <div className="row-2 comp-btn-row">
+        <button className="btn secondary" onClick={resetSelectedInstance} title="Drop all overrides back to the source">
+          <RotateCcw size={14} />
+          <span>Reset</span>
+        </button>
+        <button className="btn secondary" onClick={detachSelectedInstance} title="Turn into plain editable objects">
+          <Unlink size={14} />
+          <span>Detach</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ================= image ================= */
+
+function ImageSection({ obj }: { obj: DesignObject }) {
+  const { updateObjects, replaceImage } = useEditor();
+  const ids = [obj.id];
+  const fileRef = useRef<HTMLInputElement>(null);
+  const hasPixels = obj.naturalW > 0 && obj.naturalH > 0;
+  const resetSize = () => {
+    if (!hasPixels) return;
+    const { w, h } = fitImageSize(obj.naturalW, obj.naturalH);
+    if (obj.w === w && obj.h === h) return;
+    updateObjects(ids, { w, h });
   };
-  const roots = temp.objects.filter((o) => ids.has(o.id)).map((o) => o.id);
-  downloadFile('selection.svg', pageToSvg(temp, roots), 'image/svg+xml');
+  return (
+    <div className="prop-section">
+      <div className="prop-title">Image</div>
+      <div className="prop-hint">{obj.imageName || 'No file attached'}</div>
+      {hasPixels && (
+        <div className="prop-hint">
+          {obj.naturalW} × {obj.naturalH} px
+        </div>
+      )}
+      <div className="row-2">
+        <button className="btn secondary" onClick={() => fileRef.current?.click()}>
+          <Upload size={14} />
+          <span>Replace…</span>
+        </button>
+        <button className="btn secondary" disabled={!hasPixels} onClick={resetSize} title="Reset to the imported pixel size">
+          <Maximize2 size={14} />
+          <span>Natural size</span>
+        </button>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) replaceImage(obj.id, f);
+          e.target.value = '';
+        }}
+      />
+      <div className="prop-hint">Shift + resize keeps proportions.</div>
+    </div>
+  );
 }
 
 /* ================= text ================= */
@@ -297,7 +598,7 @@ function TextSection({ obj }: { obj: DesignObject }) {
         </select>
       </label>
       <div className="prop-grid-2">
-        <NumField label="Size" value={obj.fontSize} min={1} onCommit={(v) => updateObjects(ids, { fontSize: Math.max(1, v) })} />
+        <NumField label="Size" value={obj.fontSize} min={1} ids={ids} patch={(v) => ({ fontSize: Math.max(1, v) })} />
         <label className="prop-field">
           <span className="prop-label">Weight</span>
           <select
@@ -313,7 +614,7 @@ function TextSection({ obj }: { obj: DesignObject }) {
             <option value={800}>Extra bold</option>
           </select>
         </label>
-        <NumField label="Line height" value={obj.lineHeight} min={0.5} step={0.05} onCommit={(v) => updateObjects(ids, { lineHeight: clamp(v, 0.5, 4) })} />
+        <NumField label="Line height" value={obj.lineHeight} min={0.5} step={0.05} ids={ids} patch={(v) => ({ lineHeight: clamp(v, 0.5, 4) })} />
         <div className="prop-field">
           <span className="prop-label">Align</span>
           <div className="seg">
@@ -424,7 +725,8 @@ function MultiProperties({ objs }: { objs: DesignObject[] }) {
 function NumField({
   label,
   value,
-  onCommit,
+  ids,
+  patch,
   min,
   max,
   step = 1,
@@ -432,12 +734,14 @@ function NumField({
 }: {
   label: string;
   value: number;
-  onCommit: (v: number) => void;
+  ids: string[];
+  patch: (v: number) => ObjectPatch;
   min?: number;
   max?: number;
   step?: number;
   suffix?: string;
 }) {
+  const { transientPatchObjects, endTransient, abortTransient } = useEditor();
   const [text, setText] = useState(String(round1(value)));
   const [focused, setFocused] = useState(false);
   const cancelledRef = useRef(false);
@@ -446,13 +750,11 @@ function NumField({
   }, [value, focused]);
 
   const commit = () => {
-    const parsed = Number.parseFloat(text);
-    if (Number.isFinite(parsed)) {
-      let v = parsed;
-      if (min !== undefined) v = Math.max(min, v);
-      if (max !== undefined) v = Math.min(max, v);
-      onCommit(v);
+    const r = resolveNumericCommit(text, value, min, max);
+    if (r.action === 'commit' && r.value !== undefined) {
+      transientPatchObjects(ids, patch(r.value));
     }
+    endTransient();
     setText(String(round1(value)));
   };
 
@@ -480,10 +782,15 @@ function NumField({
             else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
               e.preventDefault();
               const delta = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : step);
-              onCommit(round1(value + delta));
+              const r = resolveNumericCommit(String(round1(value + delta)), value, min, max);
+              if (r.action === 'commit' && r.value !== undefined) {
+                setText(String(r.value));
+                transientPatchObjects(ids, patch(r.value));
+              }
             } else if (e.key === 'Escape') {
               e.stopPropagation();
               cancelledRef.current = true;
+              abortTransient();
               setText(String(round1(value)));
               (e.target as HTMLInputElement).blur();
             }
@@ -499,32 +806,41 @@ function NumField({
 function ColorField({
   value,
   opacity,
-  onCommit,
-  onOpacity,
-  onOpacityEnd,
-  onOpacityCancel,
+  ids,
+  colorPatch,
+  opacityPatch,
 }: {
   value: string;
   opacity?: number;
-  onCommit: (v: string) => void;
-  onOpacity?: (v: number) => void;
-  onOpacityEnd?: () => void;
-  onOpacityCancel?: () => void;
+  ids: string[];
+  colorPatch: (color: string) => ObjectPatch;
+  opacityPatch?: (v: number) => ObjectPatch;
 }) {
+  const { transientPatchObjects, endTransient, abortTransient } = useEditor();
   const [hex, setHex] = useState(value);
   const [focused, setFocused] = useState(false);
   const cancelledRef = useRef(false);
+  const pickerRef = useRef<HTMLInputElement>(null);
+  useNativePickerEnd(pickerRef);
   useEffect(() => {
     if (!focused) setHex(value);
   }, [value, focused]);
 
   const commitHex = () => {
-    if (hex.trim() === '') {
-      onCommit('');
-      return;
+    const r = resolveHexCommit(hex, value);
+    if (r.action === 'commit' && r.value !== undefined) {
+      transientPatchObjects(ids, colorPatch(r.value));
+    } else if (r.action === 'clear') {
+      transientPatchObjects(ids, colorPatch(''));
     }
-    if (isHexColor(hex)) onCommit(normalizeHex(hex, value || '#111111'));
-    else setHex(value);
+    endTransient();
+    setHex(value);
+  };
+
+  const clearColor = () => {
+    if (value === '') return;
+    transientPatchObjects(ids, colorPatch(''));
+    endTransient();
   };
 
   return (
@@ -536,9 +852,13 @@ function ColorField({
           <span className="swatch-input-none"><Ban size={13} /></span>
         )}
         <input
+          ref={pickerRef}
           type="color"
           value={isHexColor(value) ? normalizeHex(value, '#111111') : '#111111'}
-          onChange={(e) => onCommit(normalizeHex(e.target.value, '#111111'))}
+          onChange={(e) =>
+            transientPatchObjects(ids, colorPatch(normalizeHex(e.target.value, '#111111')))
+          }
+          onBlur={() => endTransient()}
           aria-label="Pick color"
         />
       </label>
@@ -572,25 +892,25 @@ function ColorField({
       <button
         className={`mini-btn${value === '' ? ' on' : ''}`}
         title="No fill"
-        onClick={() => onCommit('')}
+        onClick={clearColor}
         aria-pressed={value === ''}
       >
         <Ban size={13} />
       </button>
-      {opacity !== undefined && onOpacity && (
+      {opacity !== undefined && opacityPatch && (
         <label className="opacity-inline" title="Fill opacity">
           <input
             type="range"
             min={0}
             max={100}
             value={Math.round(opacity * 100)}
-            onChange={(e) => onOpacity(Number(e.target.value) / 100)}
-            onBlur={() => onOpacityEnd?.()}
-            onPointerUp={() => onOpacityEnd?.()}
+            onChange={(e) => transientPatchObjects(ids, opacityPatch(Number(e.target.value) / 100))}
+            onBlur={() => endTransient()}
+            onPointerUp={() => endTransient()}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.stopPropagation();
-                onOpacityCancel?.();
+                abortTransient();
                 (e.target as HTMLInputElement).blur();
               }
             }}
@@ -599,6 +919,117 @@ function ColorField({
           <span>{Math.round(opacity * 100)}%</span>
         </label>
       )}
+    </div>
+  );
+}
+
+function StopSwatch({
+  color,
+  ids,
+  patch,
+}: {
+  color: string;
+  ids: string[];
+  patch: (color: string) => ObjectPatch;
+}) {
+  const { transientPatchObjects, endTransient } = useEditor();
+  const ref = useRef<HTMLInputElement>(null);
+  useNativePickerEnd(ref);
+  return (
+    <label className="swatch-input small" title={color}>
+      <span className="swatch-input-color" style={{ background: color }} />
+      <input
+        ref={ref}
+        type="color"
+        value={isHexColor(color) ? normalizeHex(color, '#111111') : '#111111'}
+        onChange={(e) => transientPatchObjects(ids, patch(normalizeHex(e.target.value, '#111111')))}
+        onBlur={() => endTransient()}
+        aria-label="Stop color"
+      />
+    </label>
+  );
+}
+
+function GradientEditor({ ids, grad }: { ids: string[]; grad: FillGradient }) {
+  const { updateObjects, transientPatchObjects, endTransient, abortTransient } = useEditor();
+  const withGrad = (g: FillGradient): ObjectPatch => ({ fillGradient: g });
+  const setStop = (i: number, stop: GradientStop): ObjectPatch =>
+    withGrad({ ...grad, stops: grad.stops.map((s, j) => (j === i ? stop : s)) });
+
+  const addStop = () => {
+    if (grad.stops.length >= 8) return;
+    const ss = grad.stops;
+    let bi = 0;
+    let bw = -1;
+    for (let i = 0; i < ss.length - 1; i += 1) {
+      const w = ss[i + 1].offset - ss[i].offset;
+      if (w > bw) {
+        bw = w;
+        bi = i;
+      }
+    }
+    const at = Math.round(((ss[bi].offset + ss[bi + 1].offset) / 2) * 100) / 100;
+    const stops = [...ss.slice(0, bi + 1), { offset: at, color: ss[bi].color }, ...ss.slice(bi + 1)];
+    updateObjects(ids, withGrad({ ...grad, stops }));
+  };
+  const removeStop = (i: number) => {
+    if (grad.stops.length <= 2) return;
+    updateObjects(ids, withGrad({ ...grad, stops: grad.stops.filter((_, j) => j !== i) }));
+  };
+
+  // Document order is the stops' identity: offsets may cross during a drag
+  // and renderers clamp them; nothing re-sorts behind the user's back.
+  const preview = `linear-gradient(${grad.angle + 90}deg, ${grad.stops
+    .map((s) => `${s.color} ${Math.round(s.offset * 100)}%`)
+    .join(', ')})`;
+  return (
+    <div className="grad-editor">
+      <div className="grad-preview" style={{ background: preview }} aria-hidden="true" />
+      <NumField
+        label="Angle"
+        value={grad.angle}
+        suffix="°"
+        ids={ids}
+        patch={(v) => withGrad({ ...grad, angle: round1(v) })}
+      />
+      {grad.stops.map((s, i) => (
+        <div className="stop-row" key={i}>
+          <StopSwatch color={s.color} ids={ids} patch={(color) => setStop(i, { ...s, color })} />
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(s.offset * 100)}
+            onChange={(e) =>
+              transientPatchObjects(ids, setStop(i, { ...s, offset: Number(e.target.value) / 100 }))
+            }
+            onBlur={() => endTransient()}
+            onPointerUp={() => endTransient()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                abortTransient();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            aria-label={`Stop ${i + 1} offset`}
+          />
+          <span className="stop-pct">{Math.round(s.offset * 100)}%</span>
+          <button
+            className="mini-btn danger-hover"
+            title="Remove stop"
+            disabled={grad.stops.length <= 2}
+            onClick={() => removeStop(i)}
+            aria-label={`Remove stop ${i + 1}`}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+      <button className="btn secondary full" disabled={grad.stops.length >= 8} onClick={addStop}>
+        <Plus size={14} />
+        <span>Add stop</span>
+      </button>
     </div>
   );
 }

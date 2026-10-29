@@ -19,9 +19,20 @@ function base(partial: Partial<DesignObject> & Pick<DesignObject, 'id' | 'type'>
     opacity: 1,
     fill: '',
     fillOpacity: 1,
+    fillGradient: null,
+    fillStyleId: null,
+    constraints: null,
     stroke: '',
     strokeWidth: 0,
     cornerRadius: 0,
+    cornerRadii: null,
+    componentId: null,
+    sourceId: null,
+    componentSnapshot: null,
+    imageId: null,
+    imageName: '',
+    naturalW: 0,
+    naturalH: 0,
     clip: false,
     text: '',
     fontFamily: SANS,
@@ -125,6 +136,10 @@ export function createSampleDoc(): UndesignDoc {
       { id: posterPageId, name: 'Type specimen', objects: p2 },
     ],
     activePageId: pageId,
+    components: [],
+    colorStyles: [],
+    // Demo: the hero "View tour" button opens the type specimen in Present mode.
+    prototypeLinks: [{ id: 's_link_tour', sourceId: 's_cta_secondary', targetFrameId: 's_t_frame' }],
   };
 }
 
@@ -136,5 +151,8 @@ export function createBlankDoc(): UndesignDoc {
     name: 'Untitled',
     pages: [{ id: pageId, name: 'Page 1', objects: [] }],
     activePageId: pageId,
+    components: [],
+    colorStyles: [],
+    prototypeLinks: [],
   };
 }

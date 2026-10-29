@@ -8,10 +8,12 @@ import {
   EyeOff,
   Files,
   Frame,
+  Image as ImageIcon,
   Layers,
   Lock,
   LockOpen,
   Minus,
+  Pen,
   Plus,
   Search,
   Square,
@@ -20,8 +22,10 @@ import {
 } from 'lucide-react';
 import { FONT_STACKS, useEditor } from '../store';
 import type { DesignObject } from '../types';
-import { childrenOf, uid } from '../utils';
-import { ContextMenu, useContextMenu, useEnterEscape } from './ui';
+import { childrenOf, isHexColor, normalizeHex, uid } from '../utils';
+import { creationBlockers, liveSource } from '../library';
+import { canHaveFillStyle } from '../system';
+import { ContextMenu, useContextMenu, useEnterEscape, useNativePickerEnd } from './ui';
 
 type Tab = 'layers' | 'assets' | 'pages';
 
@@ -37,6 +41,8 @@ function TypeIcon({ type, size = 13 }: { type: DesignObject['type']; size?: numb
       return <Type size={size} />;
     case 'line':
       return <Minus size={size} />;
+    case 'image':
+      return <ImageIcon size={size} />;
   }
 }
 
@@ -91,6 +97,7 @@ function LayersPanel() {
     page, selectedIds, select, renameObject, toggleVisibility, toggleLock,
     deleteObjects, duplicateSelected, copySelected, cutSelected, paste,
     hasClipboard, reorder, moveObject, selectAll,
+    groupSelected, ungroupSelected, createComponentFromSelected, detachSelectedInstance,
   } = useEditor();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -163,6 +170,25 @@ function LayersPanel() {
       { label: 'Send backward', shortcut: 'Ctrl+[', onSelect: () => reorder(id, 'down') },
       { label: 'Bring to front', onSelect: () => reorder(id, 'top') },
       { label: 'Send to back', onSelect: () => reorder(id, 'bottom') },
+      { divider: true },
+      { label: 'Group selection', shortcut: 'Ctrl+G', onSelect: groupSelected },
+      ...(obj?.type === 'frame'
+        ? [{ label: 'Ungroup selection', shortcut: 'Ctrl+Shift+G', onSelect: ungroupSelected }]
+        : []),
+      { divider: true },
+      {
+        label: 'Create component',
+        shortcut: 'Ctrl+Alt+K',
+        disabled: creationBlockers(page.objects, selectedIds.includes(id) ? selectedIds : [id]) !== null,
+        onSelect: createComponentFromSelected,
+      },
+      ...(obj?.componentId
+        ? [{
+          label: 'Detach instance',
+          disabled: (selectedIds.includes(id) ? selectedIds : [id]).length !== 1,
+          onSelect: detachSelectedInstance,
+        }]
+        : []),
       { divider: true },
       { label: 'Delete', shortcut: 'Del', danger: true, onSelect: () => deleteObjects(selectedIds.includes(id) ? selectedIds : [id]) },
     ]);
@@ -302,7 +328,7 @@ function LayersPanel() {
                 {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
               </span>
               <span className="layer-type">
-                <TypeIcon type={obj.type} />
+                {obj.componentId ? <Component size={13} /> : <TypeIcon type={obj.type} />}
               </span>
               {editingId === obj.id ? (
                 <input
@@ -465,10 +491,12 @@ function assetObjects(kind: string): DesignObject[] {
   const frameId = uid('obj');
   const mk = (partial: Partial<DesignObject> & Pick<DesignObject, 'id' | 'type'>): DesignObject => ({
     name: 'Layer', parentId: null, x: 0, y: 0, w: 100, h: 40, rotation: 0,
-    visible: true, locked: false, opacity: 1, fill: '', fillOpacity: 1,
-    stroke: '', strokeWidth: 0, cornerRadius: 0, clip: false, text: '',
+    visible: true, locked: false, opacity: 1, fill: '', fillOpacity: 1, fillGradient: null,
+    fillStyleId: null, constraints: null,
+    stroke: '', strokeWidth: 0, cornerRadius: 0, cornerRadii: null, clip: false, text: '',
     fontFamily: FONT_STACKS[0].value, fontSize: 14, fontWeight: 400,
-    textAlign: 'left', lineHeight: 1.4, ...partial,
+    textAlign: 'left', lineHeight: 1.4, componentId: null, sourceId: null,
+    componentSnapshot: null, imageId: null, imageName: '', naturalW: 0, naturalH: 0, ...partial,
   });
   switch (kind) {
     case 'button':
@@ -495,6 +523,267 @@ function assetObjects(kind: string): DesignObject[] {
   }
 }
 
+function LibrarySection() {
+  const {
+    doc, page, selectedIds, createComponentFromSelected, insertComponentInstance,
+    deleteComponent, renameComponent, gotoComponentSource,
+  } = useEditor();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const defs = doc.components ?? [];
+  const blocker = creationBlockers(page.objects, selectedIds);
+  const counts = new Map<string, number>();
+  for (const p of doc.pages) {
+    for (const o of p.objects) {
+      if (o.componentId) counts.set(o.componentId, (counts.get(o.componentId) ?? 0) + 1);
+    }
+  }
+  const commitRename = (id: string) => {
+    if (editingId === id) renameComponent(id, draft);
+    setEditingId(null);
+  };
+  const renameKeys = (id: string) => ({
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitRename(id);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setEditingId(null);
+      }
+    },
+  });
+
+  return (
+    <div className="asset-section">
+      <h3>Library</h3>
+      <p className="dim small">Reusable components. Edit a source — every instance updates.</p>
+      <button
+        className="btn secondary full"
+        disabled={blocker !== null}
+        title={
+          blocker === 'empty'
+            ? 'Select objects on the canvas first'
+            : blocker === 'nested'
+              ? 'Components cannot nest — detach instances first'
+              : undefined
+        }
+        onClick={createComponentFromSelected}
+      >
+        <Plus size={14} />
+        <span>New component from selection</span>
+      </button>
+      {defs.length === 0 ? (
+        <p className="dim small comp-empty">No components yet.</p>
+      ) : (
+        <div className="comp-list">
+          {defs.map((def) => {
+            const missing = liveSource(doc, def) === null;
+            const n = counts.get(def.id) ?? 0;
+            return (
+              <div className="comp-row" key={def.id}>
+                <span className="layer-type">
+                  <Component size={13} />
+                </span>
+                <span className="comp-main">
+                  {editingId === def.id ? (
+                    <input
+                      className="layer-rename"
+                      value={draft}
+                      autoFocus
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => commitRename(def.id)}
+                      onFocus={(e) => e.target.select()}
+                      {...renameKeys(def.id)}
+                      aria-label="Component name"
+                    />
+                  ) : (
+                    <span
+                      className="comp-name"
+                      title="Double-click to rename"
+                      onDoubleClick={() => {
+                        setEditingId(def.id);
+                        setDraft(def.name);
+                      }}
+                    >
+                      {def.name}
+                    </span>
+                  )}
+                  <span className="dim small">
+                    {missing ? 'Source missing' : `${n} instance${n === 1 ? '' : 's'}`}
+                  </span>
+                </span>
+                <span className="comp-actions">
+                  <button
+                    className="mini-btn"
+                    title={missing ? 'Source missing' : 'Insert instance at canvas center'}
+                    disabled={missing}
+                    onClick={() => insertComponentInstance(def.id)}
+                    aria-label={`Insert ${def.name}`}
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button
+                    className="mini-btn"
+                    title={missing ? 'Source missing' : 'Go to source'}
+                    disabled={missing}
+                    onClick={() => gotoComponentSource(def.id)}
+                    aria-label={`Edit ${def.name} source`}
+                  >
+                    <Pen size={13} />
+                  </button>
+                  <button
+                    className="mini-btn danger-hover"
+                    title="Delete component (instances become plain objects)"
+                    onClick={() => deleteComponent(def.id)}
+                    aria-label={`Delete ${def.name}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StyleSwatch({ styleId, color }: { styleId: string; color: string }) {
+  const { transientUpdate, endTransient } = useEditor();
+  const ref = useRef<HTMLInputElement>(null);
+  useNativePickerEnd(ref);
+  return (
+    <label className="swatch-input small" title={color} onClick={(e) => e.stopPropagation()}>
+      <span className="swatch-input-color" style={{ background: color }} />
+      <input
+        ref={ref}
+        type="color"
+        value={isHexColor(color) ? normalizeHex(color, '#111111') : '#111111'}
+        onChange={(e) => {
+          const next = normalizeHex(e.target.value, '#111111');
+          transientUpdate((d) => ({
+            ...d,
+            colorStyles: (d.colorStyles ?? []).map((s) => (s.id === styleId ? { ...s, color: next } : s)),
+          }));
+        }}
+        onBlur={() => endTransient()}
+        aria-label="Style color"
+      />
+    </label>
+  );
+}
+
+function ColorStylesManager() {
+  const {
+    doc, selected, createColorStyle, applyColorStyle,
+    renameColorStyle, deleteColorStyle,
+  } = useEditor();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const styles = doc.colorStyles ?? [];
+  const canCreate = selected.some((s) => canHaveFillStyle(s.type));
+  const counts = new Map<string, number>();
+  for (const p of doc.pages) {
+    for (const o of p.objects) {
+      if (o.fillStyleId) counts.set(o.fillStyleId, (counts.get(o.fillStyleId) ?? 0) + 1);
+    }
+  }
+  const commitRename = (id: string) => {
+    if (editingId === id) renameColorStyle(id, draft);
+    setEditingId(null);
+  };
+  const keys = useEnterEscape(
+    () => {
+      if (editingId) commitRename(editingId);
+    },
+    () => setEditingId(null),
+  );
+
+  return (
+    <div className="style-manager">
+      <button
+        className="btn secondary full"
+        disabled={!canCreate}
+        title={canCreate ? 'Create a shared style from the selection' : 'Select a shape or text first'}
+        onClick={createColorStyle}
+      >
+        <Plus size={14} />
+        <span>New style from selection</span>
+      </button>
+      {styles.length > 0 && (
+        <div className="comp-list">
+          {styles.map((s) => {
+            const n = counts.get(s.id) ?? 0;
+            return (
+              <div
+                className="comp-row style-row"
+                key={s.id}
+                role="button"
+                tabIndex={0}
+                title={canCreate ? 'Apply to selection' : 'Select a shape or text to apply'}
+                onClick={() => applyColorStyle(s.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyColorStyle(s.id);
+                }}
+              >
+                <StyleSwatch styleId={s.id} color={s.color} />
+                <span className="comp-main">
+                  {editingId === s.id ? (
+                    <input
+                      className="layer-rename"
+                      value={draft}
+                      autoFocus
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => commitRename(s.id)}
+                      onFocus={(e) => e.target.select()}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        // Don't let Enter also trigger the row's apply action.
+                        if (e.key === 'Enter') e.stopPropagation();
+                        keys.onKeyDown(e);
+                      }}
+                      aria-label="Style name"
+                    />
+                  ) : (
+                    <span
+                      className="comp-name"
+                      title="Double-click to rename"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(s.id);
+                        setDraft(s.name);
+                      }}
+                    >
+                      {s.name}
+                    </span>
+                  )}
+                  <span className="dim small">{`${n} linked`}</span>
+                </span>
+                <span className="comp-actions">
+                  <button
+                    className="mini-btn danger-hover"
+                    title="Delete style (fills keep their colors)"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteColorStyle(s.id);
+                    }}
+                    aria-label={`Delete ${s.name}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssetsPanel() {
   const { insertAtCenter, selected, updateObjects } = useEditor();
   const selectedIds = selected.map((s) => s.id);
@@ -502,6 +791,7 @@ function AssetsPanel() {
 
   return (
     <div className="assets-panel">
+      <LibrarySection />
       <div className="asset-section">
         <h3>Components</h3>
         <p className="dim small">Click to insert at the canvas center.</p>
@@ -526,6 +816,8 @@ function AssetsPanel() {
       </div>
       <div className="asset-section">
         <h3>Color styles</h3>
+        <ColorStylesManager />
+        <p className="dim small comp-empty">Quick colors apply a plain fill.</p>
         <p className="dim small">
           {selected.length > 0 ? 'Click to apply fill to the selection.' : 'Select an object to apply a fill.'}
         </p>
@@ -536,7 +828,7 @@ function AssetsPanel() {
               className="swatch"
               title={`${c.name} ${c.value}`}
               disabled={selected.length === 0}
-              onClick={() => updateObjects(selectedIds, { fill: c.value })}
+              onClick={() => updateObjects(selectedIds, { fill: c.value, fillStyleId: null })}
             >
               <span className="swatch-color" style={{ background: c.value }} />
               <span className="swatch-name">{c.name}</span>

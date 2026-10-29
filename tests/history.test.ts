@@ -37,6 +37,10 @@ function doc(tag: string): UndesignDoc {
     name: tag,
     pages: [{ id: 'p', name: 'p', objects: [] }],
     activePageId: 'p',
+    components: [],
+    colorStyles: [],
+    prototypeLinks: [],
+    colorStyles: [],
   };
 }
 
@@ -48,8 +52,10 @@ function textObj(id: string, text: string): DesignObject {
   return {
     id, type: 'text', name: id, parentId: null, x: 0, y: 0, w: 200, h: 20,
     rotation: 0, visible: true, locked: false, opacity: 1,
-    fill: '#111111', fillOpacity: 1, stroke: '', strokeWidth: 0,
-    cornerRadius: 0, clip: false, text, fontFamily: 'sans',
+    fill: '#111111', fillOpacity: 1, fillGradient: null, fillStyleId: null, constraints: null, stroke: '', strokeWidth: 0,
+    cornerRadius: 0, cornerRadii: null,
+    imageId: null, imageName: '', naturalW: 0, naturalH: 0,
+    componentId: null, sourceId: null, componentSnapshot: null, clip: false, text, fontFamily: 'sans',
     fontSize: 16, fontWeight: 400, textAlign: 'left', lineHeight: 1.4,
   };
 }
@@ -60,6 +66,10 @@ function docWith(objects: DesignObject[]): UndesignDoc {
     name: 't',
     pages: [{ id: 'p', name: 'p', objects }],
     activePageId: 'p',
+    components: [],
+    colorStyles: [],
+    prototypeLinks: [],
+    colorStyles: [],
   };
 }
 
@@ -231,11 +241,40 @@ test('patchDocObjects leaves other pages shared', () => {
       { id: 'p2', name: 'p2', objects: [textObj('b', 'B')] },
     ],
     activePageId: 'p1',
+    components: [],
+    colorStyles: [],
+    prototypeLinks: [],
+    colorStyles: [],
   };
   const next = patchDocObjects(d, ['a', 'b'], { text: 'X' });
   assert(next.pages[1] === d.pages[1], 'inactive page untouched');
   assert(next.pages[1].objects[0].text === 'B', 'inactive objects untouched');
   assert(next.pages[0].objects[0].text === 'X', 'active page patched');
+});
+
+test('undo during a transient session discards the session, then undoes', () => {
+  // past=[A], present=B (confirmed); a drag session opens on B and moves to B'.
+  let h = state('A');
+  h = commitDoc(h, doc('B'));
+  h = beginTransientEntry(h);
+  h = setPresent(h, doc("B'"));
+  // Store-level undo composes abort + undo: the in-progress B' must not
+  // land in the redo stack, and present must return to A.
+  h = undoHistory(abortTransientEntry(h));
+  assert(h.present.name === 'A', `present reverted to A (got ${h.present.name})`);
+  assert(h.past.length === 0, 'past consumed');
+  assert(h.future.length === 1 && h.future[0].name === 'B', 'redo holds B, not the session draft');
+});
+
+test('redo during a transient session discards the session', () => {
+  let h = state('A');
+  h = commitDoc(h, doc('B'));
+  h = undoHistory(h); // past=[], present=A, future=[B]
+  h = beginTransientEntry(h); // starting a session clears redo, like any new edit
+  h = setPresent(h, doc("A'"));
+  h = redoHistory(abortTransientEntry(h));
+  assert(h.present.name === 'A', `session draft discarded (got ${h.present.name})`);
+  assert(h.future.length === 0, 'redo stays empty: the session cleared it at begin');
 });
 
 if (failures > 0) {

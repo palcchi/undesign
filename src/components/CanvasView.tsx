@@ -3,17 +3,42 @@ import { Frame, Plus, Square, Type } from 'lucide-react';
 import { useEditor } from '../store';
 import type { DesignObject } from '../types';
 import {
-  absolutePosition,
+  GRID_PITCH,
+  SNAP_THRESHOLD_PX,
   canonicalLine,
   childrenOf,
   clamp,
+  descendantIds,
+  effectiveGradient,
+  gradientVector,
+  hasIndependentCorners,
+  isFormTarget,
   marqueeHits,
   moveLineEnd,
+  resolveRadii,
+  rootsOf,
+  roundedRectPath,
   screenToWorld,
-  vectorBounds,
+  snapMoveDelta,
   worldToScreen,
 } from '../utils';
+import type { SnapBounds, SnapGuide } from '../utils';
+import {
+  IDENTITY,
+  applyMatrix,
+  fmtNum,
+  invertMatrix,
+  objectCorners,
+  pageMatrixOf,
+  parentLocalPoint,
+  pointInObject,
+  transformedBounds,
+  translateLocalByPageDelta,
+} from '../transform';
+import type { Matrix } from '../transform';
 import { ContextMenu, useContextMenu } from './ui';
+import { cachedDataUrl, resolveAssetDataUrl } from '../assets';
+import { creationBlockers } from '../library';
 
 const SELECT_BLUE = '#0D99FF';
 
@@ -22,18 +47,57 @@ type DragState =
   | { kind: 'move'; startSX: number; startSY: number; moved: boolean; orig: Map<string, { x: number; y: number }>; pendingCollapse: string | null }
   | { kind: 'draw'; startWX: number; startWY: number; id: string; parentId: string | null; moved: boolean }
   | { kind: 'marquee'; startSX: number; startSY: number; curSX: number; curSY: number; active: boolean }
-  | { kind: 'resize'; id: string; handle: string; startWX: number; startWY: number; orig: { x: number; y: number; w: number; h: number; rotation: number } }
+  | { kind: 'resize'; id: string; handle: string; inv: Matrix; startLX: number; startLY: number; orig: { x: number; y: number; w: number; h: number; rotation: number } }
   | { kind: 'rotate'; id: string; cx: number; cy: number; startAngle: number; startRot: number }
-  | { kind: 'line-end'; id: string; end: 0 | 1; startWX: number; startWY: number; orig: { x: number; y: number; w: number; h: number } };
+  | { kind: 'line-end'; id: string; end: 0 | 1; inv: Matrix; startLX: number; startLY: number; orig: { x: number; y: number; w: number; h: number } };
 
 const CLICK_THRESHOLD = 3;
 
+/** Async image element: resolves pixels from the asset store, else a placeholder. */
+function CanvasImage({ obj }: { obj: DesignObject }) {
+  const [url, setUrl] = useState<string | null>(() => (obj.imageId ? cachedDataUrl(obj.imageId) : null));
+  useEffect(() => {
+    if (!obj.imageId) {
+      setUrl(null);
+      return;
+    }
+    const cached = cachedDataUrl(obj.imageId);
+    if (cached) {
+      setUrl(cached);
+      return;
+    }
+    let live = true;
+    setUrl(null);
+    resolveAssetDataUrl(obj.imageId).then((u) => {
+      if (live) setUrl(u);
+    });
+    return () => {
+      live = false;
+    };
+  }, [obj.imageId]);
+  if (!url) {
+    const label = (obj.imageName || 'Image unavailable').slice(0, 28);
+    return (
+      <g>
+        <rect x={0} y={0} width={obj.w} height={obj.h} fill="#E9E9E9" stroke="#B5B5B5" strokeWidth={1} strokeDasharray="4 3" />
+        {obj.h >= 24 && (
+          <text x={obj.w / 2} y={obj.h / 2 + 4} textAnchor="middle" fontSize={12} fill="#8A8A8A">
+            {label}
+          </text>
+        )}
+      </g>
+    );
+  }
+  return <image x={0} y={0} width={obj.w} height={obj.h} href={url} preserveAspectRatio="none" />;
+}
+
 export function CanvasView() {
   const editor = useEditor();
-  const { page, selectedIds, selected, tool, viewport, gridVisible } = editor;
+  const { doc, page, selectedIds, selected, tool, viewport, gridVisible } = editor;
   const wrapRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
   const [panning, setPanning] = useState(false);
@@ -64,14 +128,22 @@ export function CanvasView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page.id]);
 
-  /* ---------- external fit request (Shift+1) ---------- */
+  /* ---------- external fit requests (Shift+1 / Shift+2) ---------- */
   useEffect(() => {
     const onFit = () => {
       const el = wrapRef.current;
       if (el && el.clientWidth > 0) editorRef.current.zoomFit(el.clientWidth, el.clientHeight);
     };
+    const onFitSelection = () => {
+      const el = wrapRef.current;
+      if (el && el.clientWidth > 0) editorRef.current.zoomFitSelection(el.clientWidth, el.clientHeight);
+    };
+    window.addEventListener('undesign:fit-selection', onFitSelection);
     window.addEventListener('undesign:fit', onFit);
-    return () => window.removeEventListener('undesign:fit', onFit);
+    return () => {
+      window.removeEventListener('undesign:fit', onFit);
+      window.removeEventListener('undesign:fit-selection', onFitSelection);
+    };
   }, []);
 
   /* ---------- wheel: zoom on ctrl/pinch, pan otherwise ---------- */
@@ -113,14 +185,13 @@ export function CanvasView() {
 
   /* ---------- space key for temporary pan ---------- */
   useEffect(() => {
-    const isTyping = (t: EventTarget | null) =>
-      t instanceof HTMLInputElement ||
-      t instanceof HTMLTextAreaElement ||
-      t instanceof HTMLButtonElement ||
-      t instanceof HTMLSelectElement ||
-      (t instanceof HTMLElement && t.isContentEditable);
+    // Buttons keep native Space activation on top of the shared form guard.
+    const keepNative = (t: EventTarget | null) => {
+      if (!(t instanceof HTMLElement)) return false;
+      return t.tagName === 'BUTTON' || isFormTarget(t.tagName, t.isContentEditable);
+    };
     const onDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat && !isTyping(e.target)) {
+      if (e.code === 'Space' && !e.repeat && !keepNative(e.target)) {
         e.preventDefault();
         setSpaceDown(true);
       }
@@ -136,6 +207,24 @@ export function CanvasView() {
     };
   }, []);
 
+  /* ---------- Escape cancels the active drag before global deselect ---------- */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (!dragRef.current) return;
+      // Registered before the global shortcut handler; keep it from deselecting.
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      dragRef.current = null;
+      setPanning(false);
+      setMarquee(null);
+      setSnapGuides([]);
+      editorRef.current.abortTransient();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   /* ---------- pointer helpers ---------- */
   const toLocal = (e: { clientX: number; clientY: number }) => {
     const rect = wrapRef.current?.getBoundingClientRect();
@@ -147,8 +236,7 @@ export function CanvasView() {
     for (let i = objs.length - 1; i >= 0; i--) {
       const o = objs[i];
       if (o.type !== 'frame' || !o.visible || o.locked) continue;
-      const p = absolutePosition(objs, o);
-      if (wx >= p.x && wx <= p.x + o.w && wy >= p.y && wy <= p.y + o.h) return o;
+      if (pointInObject(objs, o, wx, wy)) return o;
     }
     return null;
   };
@@ -183,8 +271,11 @@ export function CanvasView() {
     // Draw tools: create the object immediately, resize during drag.
     const world = screenToWorld(pt.x, pt.y, viewportRef.current);
     const parent = frameAtPoint(world.x, world.y);
-    const parentAbs = parent ? absolutePosition(pageRef.current.objects, parent) : { x: 0, y: 0 };
-    const local = { x: Math.round(world.x - parentAbs.x), y: Math.round(world.y - parentAbs.y) };
+    const localPt = parentLocalPoint(pageRef.current.objects, parent, world.x, world.y) ?? {
+      x: world.x,
+      y: world.y,
+    };
+    const local = { x: Math.round(localPt.x), y: Math.round(localPt.y) };
     ed.beginTransient();
     // Non-committing insert: the whole draw (insert + drag sizing) is one step.
     const id = ed.addObject(t, { x: local.x, y: local.y, w: 2, h: t === 'line' ? 0 : 2, parentId: parent?.id ?? null }, false);
@@ -217,10 +308,18 @@ export function CanvasView() {
       ed.select([id]);
     }
     const current = sel.includes(id) ? sel : [id];
+    // Top-most only: dragging a frame already moves its children.
+    const topIds = new Set(
+      rootsOf(
+        current
+          .map((oid) => pageRef.current.objects.find((oo) => oo.id === oid))
+          .filter((o): o is DesignObject => o !== undefined),
+      ).map((o) => o.id),
+    );
     const orig = new Map<string, { x: number; y: number }>();
     for (const oid of current) {
       const o = pageRef.current.objects.find((oo) => oo.id === oid);
-      if (o && !o.locked) orig.set(oid, { x: o.x, y: o.y });
+      if (o && topIds.has(oid) && !o.locked) orig.set(oid, { x: o.x, y: o.y });
     }
     dragRef.current = {
       kind: 'move', startSX: pt.x, startSY: pt.y, moved: false, orig,
@@ -253,6 +352,66 @@ export function CanvasView() {
             ed.beginTransient();
           }
           const orig = drag.orig;
+          // Smart guides + grid snap adjust the page-space delta before it is
+          // mapped into each object's local frame. Alt bypasses snapping.
+          let ax = dxW;
+          let ay = dyW;
+          let exactX = false;
+          let exactY = false;
+          const wantSnap = !e.altKey && (ed.snapObjects || (ed.snapGrid && ed.gridVisible));
+          if (wantSnap && orig.size > 0) {
+            const pg = pageRef.current;
+            const movedIds = new Set(orig.keys());
+            for (const oid of orig.keys()) {
+              for (const did of descendantIds(pg.objects, oid)) movedIds.add(did);
+            }
+            const hypo = pg.objects.map((o) => {
+              const s = orig.get(o.id);
+              if (!s) return o;
+              const nl = translateLocalByPageDelta(pg.objects, { ...o, x: s.x, y: s.y }, dxW, dyW);
+              return { ...o, x: nl.x, y: nl.y };
+            });
+            let mx0 = Infinity;
+            let my0 = Infinity;
+            let mx1 = -Infinity;
+            let my1 = -Infinity;
+            for (const o of hypo) {
+              if (!movedIds.has(o.id)) continue;
+              const b = transformedBounds(hypo, o);
+              mx0 = Math.min(mx0, b.x);
+              my0 = Math.min(my0, b.y);
+              mx1 = Math.max(mx1, b.x + b.w);
+              my1 = Math.max(my1, b.y + b.h);
+            }
+            if (mx0 !== Infinity) {
+              const cands: SnapBounds[] = [];
+              if (ed.snapObjects) {
+                for (const o of pg.objects) {
+                  if (movedIds.has(o.id) || !o.visible) continue;
+                  cands.push(transformedBounds(pg.objects, o));
+                }
+              }
+              const r = snapMoveDelta(
+                { x: mx0, y: my0, w: mx1 - mx0, h: my1 - my0 },
+                cands,
+                {
+                  grid: ed.snapGrid && ed.gridVisible ? GRID_PITCH : null,
+                  threshold: SNAP_THRESHOLD_PX / v.zoom,
+                },
+              );
+              ax = dxW + r.dx;
+              ay = dyW + r.dy;
+              // Object snaps land on exact (possibly fractional) coordinates;
+              // grid snaps and untouched axes keep the standard rounding.
+              exactX = r.dx !== 0 && r.guides.some((g) => g.x1 === g.x2);
+              exactY = r.dy !== 0 && r.guides.some((g) => g.y1 === g.y2);
+              setSnapGuides(r.guides);
+            } else {
+              setSnapGuides([]);
+            }
+          } else {
+            setSnapGuides([]);
+          }
           ed.transientUpdate((d) => ({
             ...d,
             pages: d.pages.map((p) =>
@@ -260,7 +419,14 @@ export function CanvasView() {
                 ...p,
                 objects: p.objects.map((o) => {
                   const s = orig.get(o.id);
-                  return s ? { ...o, x: Math.round(s.x + dxW), y: Math.round(s.y + dyW) } : o;
+                  if (!s) return o;
+                  const nl = translateLocalByPageDelta(
+                    p.objects,
+                    { ...o, x: s.x, y: s.y },
+                    ax,
+                    ay,
+                  );
+                  return { ...o, x: exactX ? nl.x : Math.round(nl.x), y: exactY ? nl.y : Math.round(nl.y) };
                 }),
               },
             ),
@@ -274,12 +440,21 @@ export function CanvasView() {
           if (Math.hypot(dx, dy) * v.zoom < CLICK_THRESHOLD) break;
           drag.moved = true;
           const pg = pageRef.current;
-          const parent = drag.parentId ? pg.objects.find((o) => o.id === drag.parentId) : null;
-          const parentAbs = parent ? absolutePosition(pg.objects, parent) : { x: 0, y: 0 };
-          const x1 = drag.startWX - parentAbs.x;
-          const y1 = drag.startWY - parentAbs.y;
-          const x2 = world.x - parentAbs.x;
-          const y2 = world.y - parentAbs.y;
+          const parent = drag.parentId
+            ? (pg.objects.find((o) => o.id === drag.parentId) ?? null)
+            : null;
+          const p1 = parentLocalPoint(pg.objects, parent, drag.startWX, drag.startWY) ?? {
+            x: drag.startWX,
+            y: drag.startWY,
+          };
+          const p2 = parentLocalPoint(pg.objects, parent, world.x, world.y) ?? {
+            x: world.x,
+            y: world.y,
+          };
+          const x1 = p1.x;
+          const y1 = p1.y;
+          const x2 = p2.x;
+          const y2 = p2.y;
           ed.transientUpdate((d) => ({
             ...d,
             pages: d.pages.map((p) =>
@@ -325,13 +500,12 @@ export function CanvasView() {
         }
         case 'resize': {
           const world = screenToWorld(sx, sy, v);
-          const dxW = world.x - drag.startWX;
-          const dyW = world.y - drag.startWY;
+          const cur = applyMatrix(drag.inv, world.x, world.y);
+          const dxL = cur.x - drag.startLX;
+          const dyL = cur.y - drag.startLY;
           const rad = (drag.orig.rotation * Math.PI) / 180;
           const cos = Math.cos(rad);
           const sin = Math.sin(rad);
-          const dxL = dxW * cos + dyW * sin;
-          const dyL = -dxW * sin + dyW * cos;
           const hnd = drag.handle;
           let { x, y, w, h } = drag.orig;
           let ldx = 0;
@@ -346,7 +520,22 @@ export function CanvasView() {
             h = drag.orig.h - dyL;
             ldy = dyL;
           }
-          const isLine = pageRef.current.objects.find((o) => o.id === drag.id)?.type === 'line';
+          const target = pageRef.current.objects.find((o) => o.id === drag.id);
+          const isLine = target?.type === 'line';
+          // Shift locks image proportions (photos should not stretch by accident).
+          if (e.shiftKey && target?.type === 'image' && drag.orig.w > 0 && drag.orig.h > 0) {
+            const ratio = drag.orig.w / drag.orig.h;
+            const corner =
+              (hnd.includes('e') || hnd.includes('w')) && (hnd.includes('s') || hnd.includes('n'));
+            if (corner) {
+              if (Math.abs(w / drag.orig.w - 1) >= Math.abs(h / drag.orig.h - 1)) h = w / ratio;
+              else w = h * ratio;
+            } else if (hnd.includes('e') || hnd.includes('w')) {
+              h = w / ratio;
+            } else {
+              w = h * ratio;
+            }
+          }
           w = Math.max(isLine && !hnd.includes('w') && !hnd.includes('e') ? drag.orig.w : 1, w);
           h = isLine ? Math.max(0, h) : Math.max(1, h);
           // Clamp origin shift when clamped.
@@ -388,7 +577,8 @@ export function CanvasView() {
         }
         case 'line-end': {
           const world = screenToWorld(sx, sy, v);
-          const g = moveLineEnd(drag.orig, drag.end, world.x - drag.startWX, world.y - drag.startWY);
+          const cur = applyMatrix(drag.inv, world.x, world.y);
+          const g = moveLineEnd(drag.orig, drag.end, cur.x - drag.startLX, cur.y - drag.startLY);
           const x = Math.round(g.x);
           const y = Math.round(g.y);
           const w = Math.round(g.w);
@@ -414,6 +604,7 @@ export function CanvasView() {
       if (!drag) return;
       dragRef.current = null;
       setPanning(false);
+      setSnapGuides([]);
       const ed = editorRef.current;
       const v = viewportRef.current;
 
@@ -488,9 +679,11 @@ export function CanvasView() {
     if (!obj || obj.locked) return;
     const pt = toLocal(e);
     const world = screenToWorld(pt.x, pt.y, viewport);
+    const inv = invertMatrix(pageMatrixOf(page.objects, obj)) ?? IDENTITY;
+    const startLocal = applyMatrix(inv, world.x, world.y);
     editor.beginTransient();
     dragRef.current = {
-      kind: 'resize', id, handle, startWX: world.x, startWY: world.y,
+      kind: 'resize', id, handle, inv, startLX: startLocal.x, startLY: startLocal.y,
       orig: { x: obj.x, y: obj.y, w: obj.w, h: obj.h, rotation: obj.rotation },
     };
   };
@@ -500,9 +693,9 @@ export function CanvasView() {
     if (e.button !== 0) return;
     const obj = page.objects.find((o) => o.id === id);
     if (!obj || obj.locked) return;
-    const p = absolutePosition(page.objects, obj);
-    const cx = p.x + obj.w / 2;
-    const cy = p.y + obj.h / 2;
+    const center = applyMatrix(pageMatrixOf(page.objects, obj), obj.w / 2, obj.h / 2);
+    const cx = center.x;
+    const cy = center.y;
     const pt = toLocal(e);
     const world = screenToWorld(pt.x, pt.y, viewport);
     const startAngle = (Math.atan2(world.y - cy, world.x - cx) * 180) / Math.PI;
@@ -517,9 +710,11 @@ export function CanvasView() {
     if (!obj || obj.locked) return;
     const pt = toLocal(e);
     const world = screenToWorld(pt.x, pt.y, viewport);
+    const inv = invertMatrix(pageMatrixOf(page.objects, obj)) ?? IDENTITY;
+    const startLocal = applyMatrix(inv, world.x, world.y);
     editor.beginTransient();
     dragRef.current = {
-      kind: 'line-end', id, end, startWX: world.x, startWY: world.y,
+      kind: 'line-end', id, end, inv, startLX: startLocal.x, startLY: startLocal.y,
       orig: { x: obj.x, y: obj.y, w: obj.w, h: obj.h },
     };
   };
@@ -553,6 +748,23 @@ export function CanvasView() {
       { divider: true },
       { label: 'Bring forward', shortcut: 'Ctrl+]', disabled: sel.length !== 1, onSelect: () => ed.reorder(sel[0], 'up') },
       { label: 'Send backward', shortcut: 'Ctrl+[', disabled: sel.length !== 1, onSelect: () => ed.reorder(sel[0], 'down') },
+      { divider: true },
+      { label: 'Group selection', shortcut: 'Ctrl+G', onSelect: ed.groupSelected },
+      { label: 'Ungroup selection', shortcut: 'Ctrl+Shift+G', onSelect: ed.ungroupSelected },
+      { divider: true },
+      {
+        label: 'Create component',
+        shortcut: 'Ctrl+Alt+K',
+        disabled: creationBlockers(pageRef.current.objects, sel) !== null,
+        onSelect: ed.createComponentFromSelected,
+      },
+      ...(pageRef.current.objects.find((o) => o.id === id)?.componentId
+        ? [{
+          label: 'Detach instance',
+          disabled: sel.length !== 1,
+          onSelect: ed.detachSelectedInstance,
+        }]
+        : []),
     ]);
   };
 
@@ -582,13 +794,21 @@ export function CanvasView() {
       style: { cursor: tool === 'hand' || spaceDown ? (panning ? 'grabbing' : 'grab') : tool === 'select' ? undefined : 'crosshair', pointerEvents: (locked ? 'none' : 'auto') as React.CSSProperties['pointerEvents'] },
     };
     const transform = `translate(${obj.x} ${obj.y})${obj.rotation !== 0 ? ` rotate(${obj.rotation} ${obj.w / 2} ${obj.h / 2})` : ''}`;
+    const gradPaint = effectiveGradient(obj) ? `url(#ugrad-${obj.id})` : null;
+    const paintFor = (fallback: string): string => (gradPaint === null ? obj.fill || fallback : gradPaint);
 
     let shape: React.ReactNode = null;
     if (obj.type === 'frame' || obj.type === 'rectangle') {
-      shape = (
+      shape = hasIndependentCorners(obj) ? (
+        <path
+          d={roundedRectPath(obj.w, obj.h, resolveRadii(obj))}
+          fill={paintFor('none')} fillOpacity={obj.fillOpacity}
+          stroke={obj.stroke || 'none'} strokeWidth={obj.strokeWidth}
+        />
+      ) : (
         <rect
           x={0} y={0} width={obj.w} height={obj.h} rx={obj.cornerRadius}
-          fill={obj.fill || 'none'} fillOpacity={obj.fillOpacity}
+          fill={paintFor('none')} fillOpacity={obj.fillOpacity}
           stroke={obj.stroke || 'none'} strokeWidth={obj.strokeWidth}
         />
       );
@@ -596,7 +816,7 @@ export function CanvasView() {
       shape = (
         <ellipse
           cx={obj.w / 2} cy={obj.h / 2} rx={obj.w / 2} ry={obj.h / 2}
-          fill={obj.fill || 'none'} fillOpacity={obj.fillOpacity}
+          fill={paintFor('none')} fillOpacity={obj.fillOpacity}
           stroke={obj.stroke || 'none'} strokeWidth={obj.strokeWidth}
         />
       );
@@ -608,7 +828,7 @@ export function CanvasView() {
         <text
           x={tx} y={obj.fontSize * 0.85}
           fontFamily={obj.fontFamily} fontSize={obj.fontSize} fontWeight={obj.fontWeight}
-          textAnchor={anchor} fill={obj.fill || '#111111'} fillOpacity={obj.fillOpacity}
+          textAnchor={anchor} fill={paintFor('#111111')} fillOpacity={obj.fillOpacity}
         >
           {lines.map((line, i) => (
             <tspan key={i} x={tx} dy={i === 0 ? 0 : obj.fontSize * obj.lineHeight}>
@@ -627,6 +847,8 @@ export function CanvasView() {
           />
         </>
       );
+    } else if (obj.type === 'image') {
+      shape = <CanvasImage obj={obj} />;
     }
 
     return (
@@ -649,18 +871,16 @@ export function CanvasView() {
       <g pointerEvents="none">
         {selected.map((obj) => {
           if (!obj.visible) return null;
-          const p = absolutePosition(page.objects, obj);
-          const g = vectorBounds(obj.w, obj.h);
+          const corners = objectCorners(page.objects, obj);
+          const points = corners.map((c) => `${fmtNum(c.x)},${fmtNum(c.y)}`).join(' ');
           const color = obj.locked ? '#8A8A8A' : SELECT_BLUE;
-          const hh = obj.type === 'line' && g.h === 0 ? 0.1 : g.h;
           return (
-            <g key={`sel-${obj.id}`} transform={`translate(${p.x + g.x} ${p.y + g.y})${obj.rotation !== 0 ? ` rotate(${obj.rotation} ${g.w / 2} ${g.h / 2})` : ''}`}>
-              <rect
-                x={0} y={0} width={g.w} height={hh}
-                fill="none" stroke={color} strokeWidth={1.5 / z}
-                strokeDasharray={obj.locked ? `${4 / z} ${3 / z}` : undefined}
-              />
-            </g>
+            <polygon
+              key={`sel-${obj.id}`}
+              points={points}
+              fill="none" stroke={color} strokeWidth={1.5 / z} strokeLinejoin="round"
+              strokeDasharray={obj.locked ? `${4 / z} ${3 / z}` : undefined}
+            />
           );
         })}
       </g>
@@ -672,7 +892,8 @@ export function CanvasView() {
     const obj = selected[0];
     if (!obj.visible || obj.locked) return null;
     const z = viewport.zoom;
-    const p = absolutePosition(page.objects, obj);
+    const m = pageMatrixOf(page.objects, obj);
+    const at = (lx: number, ly: number) => applyMatrix(m, lx, ly);
     const s = 9 / z;
     const hs = s / 2;
     const w = obj.w;
@@ -680,18 +901,18 @@ export function CanvasView() {
 
     if (obj.type === 'line') {
       const pts = [
-        { x: 0, y: 0, end: 0 as const },
-        { x: obj.w, y: obj.h, end: 1 as const },
+        { pt: at(0, 0), end: 0 as const },
+        { pt: at(obj.w, obj.h), end: 1 as const },
       ];
       return (
-        <g transform={`translate(${p.x} ${p.y})${obj.rotation !== 0 ? ` rotate(${obj.rotation} ${obj.w / 2} ${obj.h / 2})` : ''}`}>
-          {pts.map((pt, i) => (
+        <g>
+          {pts.map((p, i) => (
             <rect
               key={i}
-              x={pt.x - hs} y={pt.y - hs} width={s} height={s}
+              x={p.pt.x - hs} y={p.pt.y - hs} width={s} height={s}
               fill="#fff" stroke={SELECT_BLUE} strokeWidth={1.5 / z}
               style={{ cursor: 'move', pointerEvents: 'all' }}
-              onPointerDown={(e) => startLineEnd(e, obj.id, pt.end)}
+              onPointerDown={(e) => startLineEnd(e, obj.id, p.end)}
             />
           ))}
         </g>
@@ -708,25 +929,56 @@ export function CanvasView() {
       { id: 'w', x: 0, y: h / 2, cursor: 'ew-resize' },
       { id: 'e', x: w, y: h / 2, cursor: 'ew-resize' },
     ];
-    const rotY = -26 / z;
+    const rotLocal = { x: w / 2, y: -26 / z };
+    const rotPos = at(rotLocal.x, rotLocal.y);
+    const topPos = at(w / 2, 0);
     return (
-      <g transform={`translate(${p.x} ${p.y})${obj.rotation !== 0 ? ` rotate(${obj.rotation} ${w / 2} ${h / 2})` : ''}`}>
-        <line x1={w / 2} y1={0} x2={w / 2} y2={rotY} stroke={SELECT_BLUE} strokeWidth={1.5 / z} />
+      <g>
+        <line x1={topPos.x} y1={topPos.y} x2={rotPos.x} y2={rotPos.y} stroke={SELECT_BLUE} strokeWidth={1.5 / z} />
         <circle
-          cx={w / 2} cy={rotY} r={s / 1.6}
+          cx={rotPos.x} cy={rotPos.y} r={s / 1.6}
           fill="#fff" stroke={SELECT_BLUE} strokeWidth={1.5 / z}
           style={{ cursor: 'grab', pointerEvents: 'all' }}
           onPointerDown={(e) => startRotate(e, obj.id)}
         />
-        {handles.map((hh) => (
-          <rect
-            key={hh.id}
-            x={hh.x - hs} y={hh.y - hs} width={s} height={s}
-            fill="#fff" stroke={SELECT_BLUE} strokeWidth={1.5 / z}
-            style={{ cursor: hh.cursor, pointerEvents: 'all' }}
-            onPointerDown={(e) => startResize(e, obj.id, hh.id)}
-          />
-        ))}
+        {handles.map((hh) => {
+          const pos = at(hh.x, hh.y);
+          return (
+            <rect
+              key={hh.id}
+              x={pos.x - hs} y={pos.y - hs} width={s} height={s}
+              fill="#fff" stroke={SELECT_BLUE} strokeWidth={1.5 / z}
+              style={{ cursor: hh.cursor, pointerEvents: 'all' }}
+              onPointerDown={(e) => startResize(e, obj.id, hh.id)}
+            />
+          );
+        })}
+      </g>
+    );
+  };
+
+  const renderPrototypeBadges = () => {
+    if (tool !== 'select') return null;
+    const z = viewport.zoom;
+    const sources = new Set((doc.prototypeLinks ?? []).map((l) => l.sourceId));
+    if (sources.size === 0) return null;
+    return (
+      <g pointerEvents="none">
+        {page.objects.filter((o) => o.visible && sources.has(o.id)).map((o) => {
+          const c = objectCorners(page.objects, o);
+          const cx = (c[1].x + c[3].x) / 2;
+          const cy = (c[1].y + c[3].y) / 2;
+          const r = 7 / z;
+          return (
+            <g key={`plink-${o.id}`}>
+              <circle cx={cx} cy={cy} r={r} fill="#fff" stroke={SELECT_BLUE} strokeWidth={1.5 / z} />
+              <path
+                d={`M ${cx - r * 0.45} ${cy} L ${cx + r * 0.3} ${cy} M ${cx - r * 0.05} ${cy - r * 0.35} L ${cx + r * 0.3} ${cy} L ${cx - r * 0.05} ${cy + r * 0.35}`}
+                fill="none" stroke={SELECT_BLUE} strokeWidth={1.2 / z} strokeLinecap="round" strokeLinejoin="round"
+              />
+            </g>
+          );
+        })}
       </g>
     );
   };
@@ -750,15 +1002,43 @@ export function CanvasView() {
           </pattern>
           {page.objects.filter((o) => o.type === 'frame' && o.clip).map((o) => (
             <clipPath key={o.id} id={`clip-${o.id}`}>
-              <rect x={0} y={0} width={o.w} height={o.h} rx={o.cornerRadius} />
+              {hasIndependentCorners(o) ? (
+                <path d={roundedRectPath(o.w, o.h, resolveRadii(o))} />
+              ) : (
+                <rect x={0} y={0} width={o.w} height={o.h} rx={o.cornerRadius} />
+              )}
             </clipPath>
           ))}
+          {page.objects.filter((o) => o.visible && effectiveGradient(o)).map((o) => {
+            const g = effectiveGradient(o);
+            const v = gradientVector(g ? g.angle : 90);
+            return (
+              <linearGradient key={o.id} id={`ugrad-${o.id}`} x1={v.x1} y1={v.y1} x2={v.x2} y2={v.y2}>
+                {(g ? g.stops : []).map((s, i) => (
+                  <stop key={i} offset={s.offset} stopColor={s.color} />
+                ))}
+              </linearGradient>
+            );
+          })}
         </defs>
         <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}>
           {gridVisible && <rect x={-10000} y={-10000} width={20000} height={20000} fill="url(#undot)" />}
           {roots.map((o) => renderNode(o))}
           {renderSelection()}
           {renderHandles()}
+          {renderPrototypeBadges()}
+          {snapGuides.map((g, i) => (
+            <line
+              key={i}
+              x1={g.x1}
+              y1={g.y1}
+              x2={g.x2}
+              y2={g.y2}
+              stroke="#E5484D"
+              strokeWidth={1 / viewport.zoom}
+              pointerEvents="none"
+            />
+          ))}
         </g>
       </svg>
 
@@ -839,8 +1119,8 @@ function TextEditor({
     onDone();
   };
 
-  const p = absolutePosition(objects, obj);
-  const s = worldToScreen(p.x, p.y, viewport);
+  const topLeft = applyMatrix(pageMatrixOf(objects, obj), 0, 0);
+  const s = worldToScreen(topLeft.x, topLeft.y, viewport);
   const z = viewport.zoom;
 
   return (

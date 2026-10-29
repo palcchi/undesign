@@ -7,11 +7,12 @@ import {
   ZOOM_MIN,
   fitViewport,
   screenToWorld,
+  selectionBounds,
   worldToScreen,
   zoomAtPoint,
   zoomCentered,
 } from '../src/utils';
-import type { Viewport } from '../src/types';
+import type { DesignObject, ObjectType, Viewport } from '../src/types';
 
 let failures = 0;
 
@@ -110,6 +111,48 @@ test('fitViewport falls back gracefully when empty', () => {
   assertNear(v.zoom, 1, 'zoom');
   assertNear(v.x, 1000 / 2 - 200, 'pan x');
   assertNear(v.y, 800 / 3, 'pan y');
+});
+
+/* ---------- selection bounds ---------- */
+
+let vseq = 0;
+function vobj(type: ObjectType, over: Partial<DesignObject> = {}): DesignObject {
+  vseq += 1;
+  return {
+    id: `v${vseq}`,
+    type,
+    name: `${type}${vseq}`,
+    parentId: null,
+    x: 0, y: 0, w: 100, h: 60,
+    rotation: 0,
+    visible: true, locked: false, opacity: 1,
+    fill: '', fillOpacity: 1, fillGradient: null, fillStyleId: null, constraints: null, stroke: '', strokeWidth: 0,
+    cornerRadius: 0, cornerRadii: null,
+    imageId: null, imageName: '', naturalW: 0, naturalH: 0,
+    componentId: null, sourceId: null, componentSnapshot: null, clip: false,
+    text: '', fontFamily: 'sans', fontSize: 16, fontWeight: 400,
+    textAlign: 'left', lineHeight: 1.4,
+    ...over,
+  };
+}
+
+test('selectionBounds unions only the requested ids', () => {
+  const a = vobj('rectangle', { id: 'a', x: 10, y: 10, w: 50, h: 50 });
+  const b = vobj('rectangle', { id: 'b', x: 200, y: 200, w: 50, h: 50 });
+  const all = [a, b];
+  assert(JSON.stringify(selectionBounds(all, ['a'])) === JSON.stringify({ x: 10, y: 10, w: 50, h: 50 }), 'single');
+  assert(JSON.stringify(selectionBounds(all, ['a', 'b'])) === JSON.stringify({ x: 10, y: 10, w: 240, h: 240 }), 'union');
+  assert(selectionBounds(all, []) === null, 'empty selection');
+  assert(selectionBounds(all, ['zzz']) === null, 'unknown ids');
+});
+
+test('selectionBounds resolves nested children through the full tree', () => {
+  const f = vobj('frame', { id: 'f', x: 100, y: 100, w: 400, h: 400 });
+  const a = vobj('rectangle', { id: 'a', parentId: 'f', x: 10, y: 20, w: 50, h: 50 });
+  const hidden = vobj('rectangle', { id: 'h', x: 999, y: 999, w: 50, h: 50, visible: false });
+  const all = [f, a, hidden];
+  assert(JSON.stringify(selectionBounds(all, ['a'])) === JSON.stringify({ x: 110, y: 120, w: 50, h: 50 }), 'page-space child');
+  assert(JSON.stringify(selectionBounds(all, ['a', 'h'])) === JSON.stringify({ x: 110, y: 120, w: 50, h: 50 }), 'hidden skipped');
 });
 
 if (failures > 0) {
