@@ -15,6 +15,7 @@ import {
   Minus,
   Pen,
   Plus,
+  RefreshCw,
   Search,
   Square,
   Trash2,
@@ -22,9 +23,9 @@ import {
 } from 'lucide-react';
 import { FONT_STACKS, useEditor } from '../store';
 import type { DesignObject } from '../types';
-import { childrenOf, isHexColor, normalizeHex, uid } from '../utils';
+import { childrenOf, isHexColor, normalizeHex, rootsOf, uid } from '../utils';
 import { creationBlockers, liveSource } from '../library';
-import { canHaveFillStyle } from '../system';
+import { canHaveEffectStyle, canHaveFillStyle, canHaveTextStyle } from '../system';
 import { ContextMenu, useContextMenu, useEnterEscape, useNativePickerEnd } from './ui';
 
 type Tab = 'layers' | 'assets' | 'pages';
@@ -492,11 +493,12 @@ function assetObjects(kind: string): DesignObject[] {
   const mk = (partial: Partial<DesignObject> & Pick<DesignObject, 'id' | 'type'>): DesignObject => ({
     name: 'Layer', parentId: null, x: 0, y: 0, w: 100, h: 40, rotation: 0,
     visible: true, locked: false, opacity: 1, fill: '', fillOpacity: 1, fillGradient: null,
-    fillStyleId: null, constraints: null,
+    fillStyleId: null, textStyleId: null, shadow: null, effectStyleId: null, constraints: null,
+    layout: null, sizing: null,
     stroke: '', strokeWidth: 0, cornerRadius: 0, cornerRadii: null, clip: false, text: '',
     fontFamily: FONT_STACKS[0].value, fontSize: 14, fontWeight: 400,
     textAlign: 'left', lineHeight: 1.4, componentId: null, sourceId: null,
-    componentSnapshot: null, imageId: null, imageName: '', naturalW: 0, naturalH: 0, ...partial,
+    componentSnapshot: null, variant: null, exposedValues: null, imageId: null, imageName: '', naturalW: 0, naturalH: 0, ...partial,
   });
   switch (kind) {
     case 'button':
@@ -526,12 +528,16 @@ function assetObjects(kind: string): DesignObject[] {
 function LibrarySection() {
   const {
     doc, page, selectedIds, createComponentFromSelected, insertComponentInstance,
-    deleteComponent, renameComponent, gotoComponentSource,
+    deleteComponent, renameComponent, gotoComponentSource, combineVariantsFromSelected,
+    insertSetInstance, deleteVariantSet, renameVariantSet,
   } = useEditor();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const defs = doc.components ?? [];
+  const sets = doc.variantSets ?? [];
   const blocker = creationBlockers(page.objects, selectedIds);
+  const tops = rootsOf(page.objects.filter((o) => selectedIds.includes(o.id)));
   const counts = new Map<string, number>();
   for (const p of doc.pages) {
     for (const o of p.objects) {
@@ -542,6 +548,22 @@ function LibrarySection() {
     if (editingId === id) renameComponent(id, draft);
     setEditingId(null);
   };
+  const commitRenameSet = (id: string) => {
+    if (editingSetId === id) renameVariantSet(id, draft);
+    setEditingSetId(null);
+  };
+  const renameSetKeys = (id: string) => ({
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitRenameSet(id);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setEditingSetId(null);
+      }
+    },
+  });
   const renameKeys = (id: string) => ({
     onKeyDown: (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') {
@@ -566,13 +588,28 @@ function LibrarySection() {
           blocker === 'empty'
             ? 'Select objects on the canvas first'
             : blocker === 'nested'
-              ? 'Components cannot nest — detach instances first'
+              ? 'Select the whole instance instead of its parts'
               : undefined
         }
         onClick={createComponentFromSelected}
       >
         <Plus size={14} />
         <span>New component from selection</span>
+      </button>
+      <button
+        className="btn secondary full"
+        disabled={blocker !== null || tops.length < 2}
+        title={
+          blocker === 'nested'
+            ? 'Select the whole instance instead of its parts'
+            : tops.length < 2
+              ? 'Select two or more objects to combine'
+              : undefined
+        }
+        onClick={combineVariantsFromSelected}
+      >
+        <Layers size={14} />
+        <span>Combine as variants</span>
       </button>
       {defs.length === 0 ? (
         <p className="dim small comp-empty">No components yet.</p>
@@ -638,6 +675,67 @@ function LibrarySection() {
                     title="Delete component (instances become plain objects)"
                     onClick={() => deleteComponent(def.id)}
                     aria-label={`Delete ${def.name}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {sets.length > 0 && (
+        <div className="comp-list">
+          {sets.map((s) => {
+            const missing = s.variants.some((v) => (doc.components ?? []).find((d) => d.id === v) === undefined);
+            return (
+              <div className="comp-row" key={s.id}>
+                <span className="layer-type">
+                  <Layers size={13} />
+                </span>
+                <span className="comp-main">
+                  {editingSetId === s.id ? (
+                    <input
+                      className="layer-rename"
+                      value={draft}
+                      autoFocus
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => commitRenameSet(s.id)}
+                      onFocus={(e) => e.target.select()}
+                      {...renameSetKeys(s.id)}
+                      aria-label="Variant set name"
+                    />
+                  ) : (
+                    <span
+                      className="comp-name"
+                      title="Double-click to rename"
+                      onDoubleClick={() => {
+                        setEditingSetId(s.id);
+                        setDraft(s.name);
+                      }}
+                    >
+                      {s.name}
+                    </span>
+                  )}
+                  <span className="dim small">
+                    {missing ? 'Variant missing' : `${s.variants.length} variant${s.variants.length === 1 ? '' : 's'}`}
+                  </span>
+                </span>
+                <span className="comp-actions">
+                  <button
+                    className="mini-btn"
+                    title={missing ? 'Variant missing' : 'Insert default variant at canvas center'}
+                    disabled={missing}
+                    onClick={() => insertSetInstance(s.id)}
+                    aria-label={`Insert ${s.name}`}
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button
+                    className="mini-btn danger-hover"
+                    title="Delete set (member components are kept)"
+                    onClick={() => deleteVariantSet(s.id)}
+                    aria-label={`Delete ${s.name}`}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -784,6 +882,261 @@ function ColorStylesManager() {
   );
 }
 
+function TextStylesManager() {
+  const {
+    doc, selected, createTextStyle, applyTextStyle,
+    updateTextStyle, renameTextStyle, deleteTextStyle,
+  } = useEditor();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const styles = doc.textStyles ?? [];
+  const canCreate = selected.some((s) => canHaveTextStyle(s.type));
+  const counts = new Map<string, number>();
+  for (const p of doc.pages) {
+    for (const o of p.objects) {
+      if (o.textStyleId) counts.set(o.textStyleId, (counts.get(o.textStyleId) ?? 0) + 1);
+    }
+  }
+  const commitRename = (id: string) => {
+    if (editingId === id) renameTextStyle(id, draft);
+    setEditingId(null);
+  };
+  const keys = useEnterEscape(
+    () => {
+      if (editingId) commitRename(editingId);
+    },
+    () => setEditingId(null),
+  );
+
+  return (
+    <div className="style-manager">
+      <button
+        className="btn secondary full"
+        disabled={!canCreate}
+        title={canCreate ? 'Create a shared style from the selection' : 'Select a text layer first'}
+        onClick={createTextStyle}
+      >
+        <Plus size={14} />
+        <span>New style from selection</span>
+      </button>
+      {styles.length > 0 && (
+        <div className="comp-list">
+          {styles.map((s) => {
+            const n = counts.get(s.id) ?? 0;
+            return (
+              <div
+                className="comp-row style-row"
+                key={s.id}
+                role="button"
+                tabIndex={0}
+                title={canCreate ? 'Apply to selection' : 'Select a text layer to apply'}
+                onClick={() => applyTextStyle(s.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyTextStyle(s.id);
+                }}
+              >
+                <span
+                  className="text-style-sample"
+                  style={{
+                    fontFamily: s.fontFamily,
+                    fontWeight: s.fontWeight,
+                    fontSize: Math.min(s.fontSize, 22),
+                  }}
+                  aria-hidden="true"
+                >
+                  Ag
+                </span>
+                <span className="comp-main">
+                  {editingId === s.id ? (
+                    <input
+                      className="layer-rename"
+                      value={draft}
+                      autoFocus
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => commitRename(s.id)}
+                      onFocus={(e) => e.target.select()}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        // Don't let Enter also trigger the row's apply action.
+                        if (e.key === 'Enter') e.stopPropagation();
+                        keys.onKeyDown(e);
+                      }}
+                      aria-label="Text style name"
+                    />
+                  ) : (
+                    <span
+                      className="comp-name"
+                      title="Double-click to rename"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(s.id);
+                        setDraft(s.name);
+                      }}
+                    >
+                      {s.name}
+                    </span>
+                  )}
+                  <span className="dim small">{`${n} linked`}</span>
+                </span>
+                <span className="comp-actions">
+                  <button
+                    className="mini-btn"
+                    disabled={!canCreate}
+                    title={canCreate ? 'Update style from selection' : 'Select a text layer first'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateTextStyle(s.id);
+                    }}
+                    aria-label={`Update ${s.name} from selection`}
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                  <button
+                    className="mini-btn danger-hover"
+                    title="Delete style (text keeps its formatting)"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteTextStyle(s.id);
+                    }}
+                    aria-label={`Delete ${s.name}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EffectStylesManager() {
+  const {
+    doc, selected, createEffectStyle, applyEffectStyle,
+    updateEffectStyle, renameEffectStyle, deleteEffectStyle,
+  } = useEditor();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const styles = doc.effectStyles ?? [];
+  const canCreate = selected.some((s) => canHaveEffectStyle(s.type));
+  const counts = new Map<string, number>();
+  for (const p of doc.pages) {
+    for (const o of p.objects) {
+      if (o.effectStyleId) counts.set(o.effectStyleId, (counts.get(o.effectStyleId) ?? 0) + 1);
+    }
+  }
+  const commitRename = (id: string) => {
+    if (editingId === id) renameEffectStyle(id, draft);
+    setEditingId(null);
+  };
+  const keys = useEnterEscape(
+    () => {
+      if (editingId) commitRename(editingId);
+    },
+    () => setEditingId(null),
+  );
+
+  return (
+    <div className="style-manager">
+      <button
+        className="btn secondary full"
+        disabled={!canCreate}
+        title={canCreate ? 'Create a shared style from the selection' : 'Select an object first'}
+        onClick={createEffectStyle}
+      >
+        <Plus size={14} />
+        <span>New style from selection</span>
+      </button>
+      {styles.length > 0 && (
+        <div className="comp-list">
+          {styles.map((s) => {
+            const n = counts.get(s.id) ?? 0;
+            const sh = s.shadow;
+            return (
+              <div
+                className="comp-row style-row"
+                key={s.id}
+                role="button"
+                tabIndex={0}
+                title={canCreate ? 'Apply to selection' : 'Select an object to apply'}
+                onClick={() => applyEffectStyle(s.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyEffectStyle(s.id);
+                }}
+              >
+                <span
+                  className="swatch-color"
+                  style={{ background: '#FFFFFF', boxShadow: `${sh.offsetX}px ${sh.offsetY}px ${sh.blur}px ${sh.spread ?? 0}px ${sh.color}` }}
+                  aria-hidden="true"
+                />
+                <span className="comp-main">
+                  {editingId === s.id ? (
+                    <input
+                      className="layer-rename"
+                      value={draft}
+                      autoFocus
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => commitRename(s.id)}
+                      onFocus={(e) => e.target.select()}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        // Don't let Enter also trigger the row's apply action.
+                        if (e.key === 'Enter') e.stopPropagation();
+                        keys.onKeyDown(e);
+                      }}
+                      aria-label="Effect style name"
+                    />
+                  ) : (
+                    <span
+                      className="comp-name"
+                      title="Double-click to rename"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(s.id);
+                        setDraft(s.name);
+                      }}
+                    >
+                      {s.name}
+                    </span>
+                  )}
+                  <span className="dim small">{`${n} linked`}</span>
+                </span>
+                <span className="comp-actions">
+                  <button
+                    className="mini-btn"
+                    disabled={!canCreate}
+                    title={canCreate ? 'Update style from selection' : 'Select an object first'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateEffectStyle(s.id);
+                    }}
+                    aria-label={`Update ${s.name} from selection`}
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                  <button
+                    className="mini-btn danger-hover"
+                    title="Delete style (shadows keep their values)"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteEffectStyle(s.id);
+                    }}
+                    aria-label={`Delete ${s.name}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssetsPanel() {
   const { insertAtCenter, selected, updateObjects } = useEditor();
   const selectedIds = selected.map((s) => s.id);
@@ -838,6 +1191,7 @@ function AssetsPanel() {
       </div>
       <div className="asset-section">
         <h3>Text styles</h3>
+        <TextStylesManager />
         <p className="dim small">
           {hasTextSelected ? 'Click to apply to selected text.' : 'Select a text layer to apply a style.'}
         </p>
@@ -850,7 +1204,7 @@ function AssetsPanel() {
               onClick={() =>
                 updateObjects(
                   selected.filter((s) => s.type === 'text').map((s) => s.id),
-                  { fontSize: t.fontSize, fontWeight: t.fontWeight, fontFamily: FONT_STACKS[t.fontStack].value },
+                  { fontSize: t.fontSize, fontWeight: t.fontWeight, fontFamily: FONT_STACKS[t.fontStack].value, textStyleId: null },
                 )
               }
             >
@@ -871,6 +1225,10 @@ function AssetsPanel() {
             </button>
           ))}
         </div>
+      </div>
+      <div className="asset-section">
+        <h3>Effect styles</h3>
+        <EffectStylesManager />
       </div>
     </div>
   );

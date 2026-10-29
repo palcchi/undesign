@@ -22,6 +22,7 @@ import type {
 import {
   ZOOM_MAX,
   ZOOM_MIN,
+  autoTextHeight,
   centeredOrigin,
   childrenOf,
   clamp,
@@ -56,19 +57,32 @@ import {
   validateImageFile,
 } from './assets';
 import {
+  addComponentProp,
+  bindComponentProp,
   buildInstance,
+  combineAsVariants,
   createComponent,
   creationBlockers,
+  deleteComponentProp,
+  deleteVariantSet as dropVariantSet,
   detachComponents,
   detachInstance,
+  exposeNestedProp as exposeNested,
+  hasComponentCycle,
   isExpansion,
   isInstanceRoot,
   regenInstances,
   remapClonedInstances,
+  removeExposed,
   resetInstance,
+  resetInstancePropValue as resetPropValue,
+  resetLayerOverride,
+  setInstancePropValues,
+  swapInstance,
+  switchVariant,
 } from './library';
-import { propagateConstraints } from './layout';
-import { canHaveFillStyle, propagateStyles } from './system';
+import { layoutFrames, propagateConstraints } from './layout';
+import { applyEffectStyleShadow, applyTextStyleValues, canHaveEffectStyle, canHaveFillStyle, canHaveTextStyle, propagateEffectStyles, propagateStyles, propagateTextStyles, shadowEqual, textStyleValuesEqual, textStyleValuesOf } from './system';
 import { pruneLinks, setOutgoingLink } from './prototype';
 import { aiSelectionPatch, buildAiObjects, summarizeAiPlan } from './ai';
 import type { AiEditOp } from './ai';
@@ -102,11 +116,6 @@ function pruneCandidates(states: UndesignDoc[], candidates: string[]): void {
   }
 }
 
-function autoTextHeight(text: string, fontSize: number, lineHeight: number): number {
-  const lines = Math.max(1, text.split('\n').length);
-  return Math.max(fontSize * lineHeight, lines * fontSize * lineHeight);
-}
-
 function withActivePage(doc: UndesignDoc, fn: (page: DocPage) => DocPage): UndesignDoc {
   return {
     ...doc,
@@ -138,6 +147,25 @@ export function patchDocObjects(
       return next;
     }),
   }));
+}
+
+/**
+ * Pure patch by id across every page. Style detach on delete must reach
+ * linked objects on all pages, not just the active one.
+ */
+export function patchAllPages(
+  doc: UndesignDoc,
+  ids: string[],
+  patch: ObjectPatch,
+): UndesignDoc {
+  const idSet = new Set(ids);
+  let changed = false;
+  const pages = doc.pages.map((p) => {
+    if (!p.objects.some((o) => idSet.has(o.id))) return p;
+    changed = true;
+    return { ...p, objects: p.objects.map((o) => (idSet.has(o.id) ? { ...o, ...patch } : o)) };
+  });
+  return changed ? { ...doc, pages } : doc;
 }
 
 /**
@@ -272,11 +300,37 @@ interface EditorContextValue {
   deleteComponent: (compId: string) => void;
   renameComponent: (compId: string, name: string) => void;
   gotoComponentSource: (compId: string) => void;
+  combineVariantsFromSelected: () => void;
+  insertSetInstance: (setId: string) => void;
+  deleteVariantSet: (setId: string) => void;
+  renameVariantSet: (setId: string, name: string) => void;
+  switchInstanceVariant: (targetCompId: string) => void;
+  setInstancePropValue: (prop: string, value: boolean | string) => void;
+  resetInstancePropValue: (prop: string) => void;
+  addVariantProp: (compId: string, kind: 'boolean' | 'text') => void;
+  deleteVariantProp: (compId: string, name: string) => void;
+  bindVariantProp: (compId: string, name: string, layer: string | null) => void;
+  swapSelectedInstance: (targetCompId: string) => void;
+  exposeNestedProp: (compId: string, nestedSourceId: string, prop: string, alias: string) => void;
+  removeExposedAlias: (compId: string, alias: string) => void;
+  resetSelectedLayerOverride: () => void;
   createColorStyle: () => void;
   applyColorStyle: (styleId: string) => void;
   renameColorStyle: (styleId: string, name: string) => void;
   deleteColorStyle: (styleId: string) => void;
   detachFillStyle: () => void;
+  createTextStyle: () => void;
+  applyTextStyle: (styleId: string) => void;
+  updateTextStyle: (styleId: string) => void;
+  renameTextStyle: (styleId: string, name: string) => void;
+  deleteTextStyle: (styleId: string) => void;
+  detachTextStyle: () => void;
+  createEffectStyle: () => void;
+  applyEffectStyle: (styleId: string) => void;
+  updateEffectStyle: (styleId: string) => void;
+  renameEffectStyle: (styleId: string, name: string) => void;
+  deleteEffectStyle: (styleId: string) => void;
+  detachEffectStyle: () => void;
   setPrototypeLink: (sourceId: string, targetFrameId: string | null) => void;
   applyAiOps: (ops: AiEditOp[]) => void;
   align: (kind: AlignKind) => void;
@@ -361,9 +415,15 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         // transient tick so derived updates share one history step. Each
         // pass is a ref-preserving no-op when it has nothing to do.
         const withInstances = regenInstances(next);
-        const withLayout = propagateConstraints(h.present, withInstances);
+        const withAutoLayout = layoutFrames(withInstances);
+        const withLayout = propagateConstraints(h.present, withAutoLayout);
         const withStyles = propagateStyles(h.present, withLayout);
-        return commit ? commitDoc(h, withStyles) : setPresent(h, withStyles);
+        const withTextStyles = propagateTextStyles(h.present, withStyles);
+        const withEffects = propagateEffectStyles(h.present, withTextStyles);
+        // Style propagation can resize text (font size, line height), so a
+        // final layout sweep re-settles auto-layout frames in the same step.
+        const settled = layoutFrames(withEffects);
+        return commit ? commitDoc(h, settled) : setPresent(h, settled);
       });
     },
     [],
@@ -634,7 +694,12 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         fillOpacity: 1,
         fillGradient: null,
         fillStyleId: null,
+        textStyleId: null,
+        shadow: null,
+        effectStyleId: null,
         constraints: null,
+        layout: null,
+        sizing: null,
         stroke: '',
         strokeWidth: 0,
         cornerRadius: 0,
@@ -642,6 +707,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         componentId: null,
         sourceId: null,
         componentSnapshot: null,
+        variant: null,
+        exposedValues: null,
         imageId: null,
         imageName: '',
         naturalW: 0,
@@ -862,14 +929,14 @@ export function EditorProvider({ children }: { children: ReactNode }) {
           t = t.parentId ? pg.objects.find((o) => o.id === (t as DesignObject).parentId) : undefined;
         }
       }
-      applyDoc((d) => {
-        const pg = getPage(d);
+      const movedDoc = (() => {
+        const pg = getPage(history.present);
         const obj = pg.objects.find((o) => o.id === id);
-        if (!obj) return d;
-        if (id === targetParentId) return d;
-        if (targetParentId && descendantIds(pg.objects, id).includes(targetParentId)) return d;
+        if (!obj) return history.present;
+        if (id === targetParentId) return history.present;
+        if (targetParentId && descendantIds(pg.objects, id).includes(targetParentId)) return history.present;
         const target = targetParentId ? pg.objects.find((o) => o.id === targetParentId) : null;
-        if (targetParentId && (!target || target.type !== 'frame')) return d;
+        if (targetParentId && (!target || target.type !== 'frame')) return history.present;
         // Shared reparent math: the object keeps its exact visual transform.
         const local = reparentLocal(pg.objects, obj, targetParentId);
         const moved: DesignObject = {
@@ -900,8 +967,13 @@ export function EditorProvider({ children }: { children: ReactNode }) {
             result.push(o);
           }
         }
-        return withActivePage(d, (p) => ({ ...p, objects: result }));
-      }, true);
+        return withActivePage(history.present, (p) => ({ ...p, objects: result }));
+      })();
+      if (hasComponentCycle(movedDoc)) {
+        setNotice('That move would create a component cycle.');
+        return;
+      }
+      applyDoc(() => movedDoc, true);
     },
     [applyDoc, history.present],
   );
@@ -952,7 +1024,12 @@ export function EditorProvider({ children }: { children: ReactNode }) {
             fillOpacity: 1,
             fillGradient: null,
             fillStyleId: null,
+            textStyleId: null,
+            shadow: null,
+            effectStyleId: null,
             constraints: null,
+            layout: null,
+            sizing: null,
             stroke: '',
             strokeWidth: 0,
             cornerRadius: 0,
@@ -960,6 +1037,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
             componentId: null,
             sourceId: null,
             componentSnapshot: null,
+            variant: null,
+            exposedValues: null,
             imageId: assetId,
             imageName: file.name,
             naturalW: size.w,
@@ -1079,7 +1158,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     const blocker = creationBlockers(pg.objects, selectedIds);
     if (blocker === 'empty') return;
     if (blocker === 'nested') {
-      setNotice('Components cannot nest — detach instances first.');
+      setNotice('Select the whole instance instead of its parts.');
       return;
     }
     const defs = history.present.components ?? [];
@@ -1134,11 +1213,15 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       const count = history.present.pages
         .flatMap((p) => p.objects)
         .filter((o) => o.componentId === compId).length;
+      const set = (history.present.variantSets ?? []).find((s) => s.variants.includes(compId));
+      const rescued = set !== undefined && set.variants.length > 1;
       applyDoc((d) => detachComponents(d, [compId]), true);
       setNotice(
         count === 0
           ? `Component “${def.name}” deleted.`
-          : `Component “${def.name}” deleted — ${count} instance(s) detached.`,
+          : rescued
+            ? `Component “${def.name}” deleted — ${count} instance(s) moved to the default variant.`
+            : `Component “${def.name}” deleted — ${count} instance(s) detached.`,
       );
     },
     [applyDoc, history.present],
@@ -1169,6 +1252,172 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     },
     [history.present, selectPage, select],
   );
+
+  const combineVariantsFromSelected = useCallback(() => {
+    const pg = getPage(history.present);
+    const blocker = creationBlockers(pg.objects, selectedIds);
+    if (blocker === 'empty') return;
+    if (blocker === 'nested') {
+      setNotice('Select the whole instance instead of its parts.');
+      return;
+    }
+    const wanted = new Set(selectedIds);
+    const tops = rootsOf(pg.objects.filter((o) => wanted.has(o.id)));
+    if (tops.length < 2) {
+      setNotice('Select two or more objects to combine as variants.');
+      return;
+    }
+    const sets = history.present.variantSets ?? [];
+    const defs = history.present.components ?? [];
+    const name = `Set ${sets.length + 1}`;
+    const setId = uid('set');
+    const compPageId = defs[0]?.pageId ?? uid('page');
+    const res = combineAsVariants(history.present, pg.id, selectedIds, name, setId, () => ({
+      compId: uid('comp'),
+      componentsPageId: compPageId,
+      sourceRootId: uid('obj'),
+      instanceId: uid('obj'),
+      cloneId: () => uid('obj'),
+    }));
+    if ('error' in res) return;
+    applyDoc(() => res.doc, true);
+    setSelectedIds([res.instanceId]);
+    setNotice(`Variant set “${name}” created with ${tops.length} variants.`);
+  }, [applyDoc, history.present, selectedIds]);
+
+  const insertSetInstance = useCallback(
+    (setId: string) => {
+      const set = (history.present.variantSets ?? []).find((s) => s.id === setId);
+      const defId = set?.variants[0];
+      if (!set || !defId) {
+        setNotice('That set has no variants.');
+        return;
+      }
+      const built = buildInstance(history.present, defId, uid('obj'));
+      if (!built) {
+        setNotice('That component has no editable source.');
+        return;
+      }
+      insertAtCenter([built.root, ...built.children]);
+    },
+    [history.present, insertAtCenter],
+  );
+
+  const deleteVariantSet = useCallback(
+    (setId: string) => {
+      const set = (history.present.variantSets ?? []).find((s) => s.id === setId);
+      if (!set) return;
+      applyDoc((d) => dropVariantSet(d, setId), true);
+      setNotice(`Variant set “${set.name}” deleted — member components kept.`);
+    },
+    [applyDoc, history.present],
+  );
+
+  const renameVariantSet = useCallback(
+    (setId: string, name: string) => {
+      const clean = name.trim() || 'Set';
+      const set = (history.present.variantSets ?? []).find((s) => s.id === setId);
+      if (!set || set.name === clean) return;
+      applyDoc(
+        (d) => ({
+          ...d,
+          variantSets: (d.variantSets ?? []).map((s) => (s.id === setId ? { ...s, name: clean } : s)),
+        }),
+        true,
+      );
+    },
+    [applyDoc, history.present],
+  );
+
+  const switchInstanceVariant = useCallback(
+    (targetCompId: string) => {
+      if (selectedIds.length !== 1) return;
+      if (switchVariant(history.present, selectedIds[0], targetCompId) === history.present) return;
+      applyDoc(() => switchVariant(history.present, selectedIds[0], targetCompId), true);
+    },
+    [applyDoc, history.present, selectedIds],
+  );
+
+  const setInstancePropValue = useCallback(
+    (prop: string, value: boolean | string) => {
+      if (selectedIds.length !== 1) return;
+      if (
+        setInstancePropValues(history.present, selectedIds[0], { [prop]: value }) ===
+        history.present
+      ) {
+        return;
+      }
+      applyDoc(
+        () => setInstancePropValues(history.present, selectedIds[0], { [prop]: value }),
+        true,
+      );
+    },
+    [applyDoc, history.present, selectedIds],
+  );
+
+  const resetInstancePropValue = useCallback(
+    (prop: string) => {
+      if (selectedIds.length !== 1) return;
+      if (resetPropValue(history.present, selectedIds[0], prop) === history.present) return;
+      applyDoc(() => resetPropValue(history.present, selectedIds[0], prop), true);
+    },
+    [applyDoc, history.present, selectedIds],
+  );
+
+  const addVariantProp = useCallback(
+    (compId: string, kind: 'boolean' | 'text') => {
+      if (addComponentProp(history.present, compId, kind) === history.present) return;
+      applyDoc((d) => addComponentProp(d, compId, kind), true);
+    },
+    [applyDoc, history.present],
+  );
+
+  const deleteVariantProp = useCallback(
+    (compId: string, name: string) => {
+      if (deleteComponentProp(history.present, compId, name) === history.present) return;
+      applyDoc((d) => deleteComponentProp(d, compId, name), true);
+    },
+    [applyDoc, history.present],
+  );
+
+  const bindVariantProp = useCallback(
+    (compId: string, name: string, layer: string | null) => {
+      if (bindComponentProp(history.present, compId, name, layer) === history.present) return;
+      applyDoc((d) => bindComponentProp(d, compId, name, layer), true);
+    },
+    [applyDoc, history.present],
+  );
+
+  const swapSelectedInstance = useCallback(
+    (targetCompId: string) => {
+      if (selectedIds.length !== 1) return;
+      if (swapInstance(history.present, selectedIds[0], targetCompId) === history.present) return;
+      applyDoc(() => swapInstance(history.present, selectedIds[0], targetCompId), true);
+    },
+    [applyDoc, history.present, selectedIds],
+  );
+
+  const exposeNestedProp = useCallback(
+    (compId: string, nestedSourceId: string, prop: string, alias: string) => {
+      if (exposeNested(history.present, compId, nestedSourceId, prop, alias) === history.present) return;
+      applyDoc((d) => exposeNested(d, compId, nestedSourceId, prop, alias), true);
+    },
+    [applyDoc, history.present],
+  );
+
+  const removeExposedAlias = useCallback(
+    (compId: string, alias: string) => {
+      if (removeExposed(history.present, compId, alias) === history.present) return;
+      applyDoc((d) => removeExposed(d, compId, alias), true);
+    },
+    [applyDoc, history.present],
+  );
+
+  const resetSelectedLayerOverride = useCallback(() => {
+    if (selectedIds.length !== 1) return;
+    if (resetLayerOverride(history.present, selectedIds[0]) === history.present) return;
+    applyDoc(() => resetLayerOverride(history.present, selectedIds[0]), true);
+  }, [applyDoc, history.present, selectedIds]);
 
   const styleTargets = (ids: string[]): DesignObject[] =>
     getPage(history.present).objects.filter((o) => ids.includes(o.id) && canHaveFillStyle(o.type));
@@ -1236,7 +1485,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
           .flatMap((p) => p.objects)
           .filter((o) => o.fillStyleId === styleId)
           .map((o) => o.id);
-        return linked.length === 0 ? noStyle : patchDocObjects(noStyle, linked, { fillStyleId: null });
+        return linked.length === 0 ? noStyle : patchAllPages(noStyle, linked, { fillStyleId: null });
       }, true);
       setNotice(`Style “${style.name}” deleted — fills kept their colors.`);
     },
@@ -1251,6 +1500,242 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       { fillStyleId: null },
     );
   }, [history.present, selectedIds, updateObjects]);
+
+  const textStyleTargets = (ids: string[]): DesignObject[] =>
+    getPage(history.present).objects.filter((o) => ids.includes(o.id) && canHaveTextStyle(o.type));
+
+  const createTextStyle = useCallback(() => {
+    const targets = textStyleTargets(selectedIds);
+    if (targets.length === 0) return;
+    const t = targets[0];
+    const styles = history.present.textStyles ?? [];
+    const id = uid('style');
+    const name = `Text style ${styles.length + 1}`;
+    const values = {
+      fontFamily: t.fontFamily,
+      fontSize: t.fontSize,
+      fontWeight: t.fontWeight,
+      textAlign: t.textAlign,
+      lineHeight: t.lineHeight,
+    };
+    applyDoc((d) => {
+      const withStyle: UndesignDoc = {
+        ...d,
+        textStyles: [...(d.textStyles ?? []), { id, name, ...values }],
+      };
+      return patchDocObjects(
+        withStyle,
+        targets.map((x) => x.id),
+        { ...values, textStyleId: id },
+      );
+    }, true);
+    setNotice(`Style “${name}” created and applied.`);
+  }, [applyDoc, history.present, selectedIds]);
+
+  const applyTextStyle = useCallback(
+    (styleId: string) => {
+      const style = (history.present.textStyles ?? []).find((s) => s.id === styleId);
+      const targets = style ? textStyleTargets(selectedIds) : [];
+      if (!style || targets.length === 0) return;
+      updateObjects(
+        targets.map((t) => t.id),
+        {
+          fontFamily: style.fontFamily,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          textAlign: style.textAlign,
+          lineHeight: style.lineHeight,
+          textStyleId: styleId,
+        },
+      );
+    },
+    [history.present, selectedIds, updateObjects],
+  );
+
+  const renameTextStyle = useCallback(
+    (styleId: string, name: string) => {
+      const clean = name.trim() || 'Text style';
+      const style = (history.present.textStyles ?? []).find((s) => s.id === styleId);
+      if (!style || style.name === clean) return;
+      applyDoc(
+        (d) => ({
+          ...d,
+          textStyles: (d.textStyles ?? []).map((s) => (s.id === styleId ? { ...s, name: clean } : s)),
+        }),
+        true,
+      );
+    },
+    [applyDoc, history.present],
+  );
+
+  const deleteTextStyle = useCallback(
+    (styleId: string) => {
+      const style = (history.present.textStyles ?? []).find((s) => s.id === styleId);
+      if (!style) return;
+      applyDoc((d) => {
+        const noStyle: UndesignDoc = {
+          ...d,
+          textStyles: (d.textStyles ?? []).filter((s) => s.id !== styleId),
+        };
+        const linked = d.pages
+          .flatMap((p) => p.objects)
+          .filter((o) => o.textStyleId === styleId)
+          .map((o) => o.id);
+        return linked.length === 0 ? noStyle : patchAllPages(noStyle, linked, { textStyleId: null });
+      }, true);
+      setNotice(`Style “${style.name}” deleted — text kept its formatting.`);
+    },
+    [applyDoc, history.present],
+  );
+
+  const detachTextStyle = useCallback(() => {
+    const linked = textStyleTargets(selectedIds).filter((o) => o.textStyleId !== null);
+    if (linked.length === 0) return;
+    updateObjects(
+      linked.map((o) => o.id),
+      { textStyleId: null },
+    );
+  }, [history.present, selectedIds, updateObjects]);
+
+  const updateTextStyle = useCallback(
+    (styleId: string) => {
+      const style = (history.present.textStyles ?? []).find((s) => s.id === styleId);
+      const targets = style ? textStyleTargets(selectedIds) : [];
+      if (!style || targets.length === 0) return;
+      // Manual edits detach, so the named style (not the selection's link)
+      // selects the update target: push the selection's values in and re-link.
+      const values = textStyleValuesOf(targets[0]);
+      const inSync =
+        textStyleValuesEqual(style, values) && targets.every((t) => t.textStyleId === styleId);
+      if (inSync) {
+        setNotice(`Style “${style.name}” already matches the selection.`);
+        return;
+      }
+      applyDoc(
+        (d) =>
+          patchDocObjects(
+            applyTextStyleValues(d, styleId, values),
+            targets.map((t) => t.id),
+            { ...values, textStyleId: styleId },
+          ),
+        true,
+      );
+      setNotice(`Style “${style.name}” updated from selection.`);
+    },
+    [applyDoc, history.present, selectedIds],
+  );
+
+  const effectStyleTargets = (ids: string[]): DesignObject[] =>
+    getPage(history.present).objects.filter((o) => ids.includes(o.id) && canHaveEffectStyle(o.type));
+
+  const createEffectStyle = useCallback(() => {
+    const targets = effectStyleTargets(selectedIds);
+    if (targets.length === 0) return;
+    const raw = targets[0].shadow;
+    const shadow = raw
+      ? { ...raw, spread: Math.max(0, raw.spread ?? 0) }
+      : { offsetX: 0, offsetY: 4, blur: 12, spread: 0, color: '#000000', opacity: 0.25 };
+    const styles = history.present.effectStyles ?? [];
+    const id = uid('style');
+    const name = `Effect ${styles.length + 1}`;
+    applyDoc((d) => {
+      const withStyle: UndesignDoc = {
+        ...d,
+        effectStyles: [...(d.effectStyles ?? []), { id, name, shadow: { ...shadow } }],
+      };
+      return patchDocObjects(
+        withStyle,
+        targets.map((t) => t.id),
+        { shadow: { ...shadow }, effectStyleId: id },
+      );
+    }, true);
+    setNotice(`Style “${name}” created and applied.`);
+  }, [applyDoc, history.present, selectedIds]);
+
+  const applyEffectStyle = useCallback(
+    (styleId: string) => {
+      const style = (history.present.effectStyles ?? []).find((s) => s.id === styleId);
+      const targets = style ? effectStyleTargets(selectedIds) : [];
+      if (!style || targets.length === 0) return;
+      updateObjects(
+        targets.map((t) => t.id),
+        { shadow: { ...style.shadow }, effectStyleId: styleId },
+      );
+    },
+    [history.present, selectedIds, updateObjects],
+  );
+
+  const renameEffectStyle = useCallback(
+    (styleId: string, name: string) => {
+      const clean = name.trim() || 'Effect';
+      const style = (history.present.effectStyles ?? []).find((s) => s.id === styleId);
+      if (!style || style.name === clean) return;
+      applyDoc(
+        (d) => ({
+          ...d,
+          effectStyles: (d.effectStyles ?? []).map((s) => (s.id === styleId ? { ...s, name: clean } : s)),
+        }),
+        true,
+      );
+    },
+    [applyDoc, history.present],
+  );
+
+  const deleteEffectStyle = useCallback(
+    (styleId: string) => {
+      const style = (history.present.effectStyles ?? []).find((s) => s.id === styleId);
+      if (!style) return;
+      applyDoc((d) => {
+        const noStyle: UndesignDoc = {
+          ...d,
+          effectStyles: (d.effectStyles ?? []).filter((s) => s.id !== styleId),
+        };
+        const linked = d.pages
+          .flatMap((p) => p.objects)
+          .filter((o) => o.effectStyleId === styleId)
+          .map((o) => o.id);
+        return linked.length === 0 ? noStyle : patchAllPages(noStyle, linked, { effectStyleId: null });
+      }, true);
+      setNotice(`Style “${style.name}” deleted — shadows kept their values.`);
+    },
+    [applyDoc, history.present],
+  );
+
+  const detachEffectStyle = useCallback(() => {
+    const linked = effectStyleTargets(selectedIds).filter((o) => o.effectStyleId !== null);
+    if (linked.length === 0) return;
+    updateObjects(
+      linked.map((o) => o.id),
+      { effectStyleId: null },
+    );
+  }, [history.present, selectedIds, updateObjects]);
+
+  const updateEffectStyle = useCallback(
+    (styleId: string) => {
+      const style = (history.present.effectStyles ?? []).find((s) => s.id === styleId);
+      const targets = style ? effectStyleTargets(selectedIds).filter((o) => o.shadow !== null && o.shadow !== undefined) : [];
+      if (!style || targets.length === 0) return;
+      const raw = targets[0].shadow as NonNullable<DesignObject['shadow']>;
+      const shadow = { ...raw, spread: Math.max(0, raw.spread ?? 0) };
+      const inSync =
+        shadowEqual(style.shadow, shadow) && targets.every((t) => t.effectStyleId === styleId);
+      if (inSync) {
+        setNotice(`Style “${style.name}” already matches the selection.`);
+        return;
+      }
+      applyDoc(
+        (d) =>
+          patchDocObjects(
+            applyEffectStyleShadow(d, styleId, shadow),
+            targets.map((t) => t.id),
+            { shadow: { ...shadow }, effectStyleId: styleId },
+          ),
+        true,
+      );
+      setNotice(`Style “${style.name}” updated from selection.`);
+    },
+    [applyDoc, history.present, selectedIds],
+  );
 
   const setPrototypeLink = useCallback(
     (sourceId: string, targetFrameId: string | null) => {
@@ -1523,11 +2008,37 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     deleteComponent,
     renameComponent,
     gotoComponentSource,
+    combineVariantsFromSelected,
+    insertSetInstance,
+    deleteVariantSet,
+    renameVariantSet,
+    switchInstanceVariant,
+    setInstancePropValue,
+    resetInstancePropValue,
+    addVariantProp,
+    deleteVariantProp,
+    bindVariantProp,
+    swapSelectedInstance,
+    exposeNestedProp,
+    removeExposedAlias,
+    resetSelectedLayerOverride,
     createColorStyle,
     applyColorStyle,
     renameColorStyle,
     deleteColorStyle,
     detachFillStyle,
+    createTextStyle,
+    applyTextStyle,
+    updateTextStyle,
+    renameTextStyle,
+    deleteTextStyle,
+    detachTextStyle,
+    createEffectStyle,
+    applyEffectStyle,
+    updateEffectStyle,
+    renameEffectStyle,
+    deleteEffectStyle,
+    detachEffectStyle,
     setPrototypeLink,
     applyAiOps,
     align,

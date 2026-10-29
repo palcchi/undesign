@@ -134,13 +134,13 @@ test('createComponent nests source clones under rotated parents exactly', () => 
   assert(matEq(pageMatrixOf([f, a], a), pageMatrixOf(r.doc.pages[0].objects, exp)), 'nested visuals exact');
 });
 
-test('creation rejects empty selections and instance content', () => {
+test('creation rejects empty selections and bare expansion parts', () => {
   const d0 = doc([page('p', twoRects())]);
   assert((createComponent(d0, 'p', [], 'X', PACK) as { error: string }).error === 'empty', 'empty');
   assert((createComponent(d0, 'p', ['zzz'], 'X', PACK) as { error: string }).error === 'empty', 'unknown');
   const d1 = created();
-  assert(creationBlockers(d1.pages[0].objects, ['i1']) === 'nested', 'instance root blocked');
-  assert(creationBlockers(d1.pages[0].objects, [expansionId('i1', 's_a')]) === 'nested', 'expansion blocked');
+  assert(creationBlockers(d1.pages[0].objects, ['i1']) === null, 'instance root wrappable (nested)');
+  assert(creationBlockers(d1.pages[0].objects, [expansionId('i1', 's_a')]) === 'nested', 'bare expansion blocked');
   assert(creationBlockers(d1.pages[0].objects, ['nope']) === 'empty', 'blocker empty');
   assert(creationBlockers(d0.pages[0].objects, ['a']) === null, 'plain selection allowed');
 });

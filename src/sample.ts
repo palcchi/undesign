@@ -21,7 +21,12 @@ function base(partial: Partial<DesignObject> & Pick<DesignObject, 'id' | 'type'>
     fillOpacity: 1,
     fillGradient: null,
     fillStyleId: null,
+    textStyleId: null,
+    shadow: null,
+    effectStyleId: null,
     constraints: null,
+    layout: null,
+    sizing: null,
     stroke: '',
     strokeWidth: 0,
     cornerRadius: 0,
@@ -29,6 +34,8 @@ function base(partial: Partial<DesignObject> & Pick<DesignObject, 'id' | 'type'>
     componentId: null,
     sourceId: null,
     componentSnapshot: null,
+    variant: null,
+    exposedValues: null,
     imageId: null,
     imageName: '',
     naturalW: 0,
@@ -137,7 +144,10 @@ export function createSampleDoc(): UndesignDoc {
     ],
     activePageId: pageId,
     components: [],
+    variantSets: [],
     colorStyles: [],
+    textStyles: [],
+    effectStyles: [],
     // Demo: the hero "View tour" button opens the type specimen in Present mode.
     prototypeLinks: [{ id: 's_link_tour', sourceId: 's_cta_secondary', targetFrameId: 's_t_frame' }],
   };
@@ -152,7 +162,10 @@ export function createBlankDoc(): UndesignDoc {
     pages: [{ id: pageId, name: 'Page 1', objects: [] }],
     activePageId: pageId,
     components: [],
+    variantSets: [],
     colorStyles: [],
+    textStyles: [],
+    effectStyles: [],
     prototypeLinks: [],
   };
 }

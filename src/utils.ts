@@ -1,4 +1,4 @@
-import type { CornerRadii, DesignObject, DocPage, FillGradient, UndesignDoc, Viewport } from './types';
+import type { CornerRadii, DesignObject, DocPage, DropShadow, FillGradient, UndesignDoc, Viewport } from './types';
 import {
   IDENTITY,
   ancestorChain,
@@ -456,12 +456,39 @@ export function fitViewport(
   };
 }
 
+/** Auto text-box height from explicit newlines (no wrapping engine in v1). */
+export function autoTextHeight(text: string, fontSize: number, lineHeight: number): number {
+  const lines = Math.max(1, text.split('\n').length);
+  return Math.max(fontSize * lineHeight, lines * fontSize * lineHeight);
+}
+
 function escapeXml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * Inner primitives of a drop-shadow filter. Zero spread keeps the compact
+ * feDropShadow shorthand; positive spread expands the alpha with a dilate
+ * stage first (the shorthand has no spread parameter). Shared by the canvas
+ * and SVG export so both render identical shadows.
+ */
+export function shadowFilterInner(s: DropShadow): string {
+  const spread = Math.max(0, s.spread ?? 0);
+  if (spread === 0) {
+    return `<feDropShadow dx="${fmtNum(s.offsetX)}" dy="${fmtNum(s.offsetY)}" stdDeviation="${fmtNum(s.blur)}" flood-color="${escapeXml(s.color)}" flood-opacity="${fmtNum(s.opacity)}" />`;
+  }
+  return (
+    `<feMorphology in="SourceAlpha" operator="dilate" radius="${fmtNum(spread)}" result="d" />` +
+    `<feGaussianBlur in="d" stdDeviation="${fmtNum(s.blur)}" result="b" />` +
+    `<feOffset in="b" dx="${fmtNum(s.offsetX)}" dy="${fmtNum(s.offsetY)}" result="o" />` +
+    `<feFlood flood-color="${escapeXml(s.color)}" flood-opacity="${fmtNum(s.opacity)}" result="c" />` +
+    `<feComposite in="c" in2="o" operator="in" result="s" />` +
+    `<feMerge><feMergeNode in="s" /><feMergeNode in="SourceGraphic" /></feMerge>`
+  );
 }
 
 /** True when the object and all its ancestors are visible. */
@@ -530,11 +557,14 @@ function objectToSvg(
   indent: string,
   clipIds: Map<string, string>,
   gradIds: Map<string, string>,
+  shadowIds: Map<string, string>,
   assetDataUrl: AssetResolver | null,
   includeIds: boolean,
 ): string {
   const kids = childrenOf(objects, obj.id).filter((k) => k.visible);
-  const inner = kids.map((k) => objectToSvg(objects, k, indent + '  ', clipIds, gradIds, assetDataUrl, includeIds)).join('');
+  const inner = kids.map((k) => objectToSvg(objects, k, indent + '  ', clipIds, gradIds, shadowIds, assetDataUrl, includeIds)).join('');
+  const shadowRef = shadowIds.get(obj.id);
+  const filter = shadowRef ? ` filter="url(#${shadowRef})"` : '';
   const t =
     `translate(${fmtNum(obj.x)} ${fmtNum(obj.y)})` +
     (obj.rotation !== 0
@@ -561,10 +591,10 @@ function objectToSvg(
         : '';
       if (hasIndependentCorners(obj)) {
         const d = roundedRectPath(obj.w, obj.h, resolveRadii(obj), (n) => String(fmtNum(n)));
-        return `${open}${si}<path d="${d}" fill="${fill}"${fillOp}${stroke} />\n${inner}${close}`;
+        return `${open}${si}<path d="${d}" fill="${fill}"${fillOp}${stroke}${filter} />\n${inner}${close}`;
       }
       const rx = obj.cornerRadius > 0 ? ` rx="${fmtNum(obj.cornerRadius)}"` : '';
-      return `${open}${si}<rect x="0" y="0" width="${fmtNum(obj.w)}" height="${fmtNum(obj.h)}" fill="${fill}"${fillOp}${stroke}${rx} />\n${inner}${close}`;
+      return `${open}${si}<rect x="0" y="0" width="${fmtNum(obj.w)}" height="${fmtNum(obj.h)}" fill="${fill}"${fillOp}${stroke}${rx}${filter} />\n${inner}${close}`;
     }
     case 'ellipse': {
       const fill = paint('none');
@@ -572,7 +602,7 @@ function objectToSvg(
       const stroke = obj.stroke
         ? ` stroke="${escapeXml(obj.stroke)}" stroke-width="${obj.strokeWidth}"`
         : '';
-      return `${open}${si}<ellipse cx="${fmtNum(obj.w / 2)}" cy="${fmtNum(obj.h / 2)}" rx="${fmtNum(obj.w / 2)}" ry="${fmtNum(obj.h / 2)}" fill="${fill}"${fillOp}${stroke} />\n${inner}${close}`;
+      return `${open}${si}<ellipse cx="${fmtNum(obj.w / 2)}" cy="${fmtNum(obj.h / 2)}" rx="${fmtNum(obj.w / 2)}" ry="${fmtNum(obj.h / 2)}" fill="${fill}"${fillOp}${stroke}${filter} />\n${inner}${close}`;
     }
     case 'text': {
       const anchor =
@@ -587,11 +617,11 @@ function objectToSvg(
         .join('\n');
       const fill = paint('#111111');
       const fillOp = obj.fillOpacity < 1 ? ` fill-opacity="${obj.fillOpacity}"` : '';
-      return `${open}${si}<text x="${fmtNum(tx)}" y="${fmtNum(obj.fontSize * 0.85)}" font-family="${escapeXml(obj.fontFamily)}" font-size="${obj.fontSize}" font-weight="${obj.fontWeight}" text-anchor="${anchor}" fill="${fill}"${fillOp}>\n${tspans}\n${si}</text>\n${inner}${close}`;
+      return `${open}${si}<text x="${fmtNum(tx)}" y="${fmtNum(obj.fontSize * 0.85)}" font-family="${escapeXml(obj.fontFamily)}" font-size="${obj.fontSize}" font-weight="${obj.fontWeight}" text-anchor="${anchor}" fill="${fill}"${fillOp}${filter}>\n${tspans}\n${si}</text>\n${inner}${close}`;
     }
     case 'line': {
       const stroke = obj.stroke ? escapeXml(obj.stroke) : '#111111';
-      return `${open}${si}<line x1="0" y1="0" x2="${fmtNum(obj.w)}" y2="${fmtNum(obj.h)}" stroke="${stroke}" stroke-width="${obj.strokeWidth || 1}" stroke-linecap="round" />\n${inner}${close}`;
+      return `${open}${si}<line x1="0" y1="0" x2="${fmtNum(obj.w)}" y2="${fmtNum(obj.h)}" stroke="${stroke}" stroke-width="${obj.strokeWidth || 1}" stroke-linecap="round"${filter} />\n${inner}${close}`;
     }
     case 'image': {
       const dataUrl = assetDataUrl ? assetDataUrl(obj.imageId) : null;
@@ -599,7 +629,7 @@ function objectToSvg(
         const label = escapeXml(obj.imageName || obj.name || 'image');
         return `${open}${si}<!-- image "${label}" not embedded: asset unavailable in this session -->\n${si}<rect x="0" y="0" width="${fmtNum(obj.w)}" height="${fmtNum(obj.h)}" fill="#E4E4E4" stroke="#B5B5B5" stroke-width="1" stroke-dasharray="4 3" />\n${inner}${close}`;
       }
-      return `${open}${si}<image x="0" y="0" width="${fmtNum(obj.w)}" height="${fmtNum(obj.h)}" href="${escapeXml(dataUrl)}" preserveAspectRatio="none" />\n${inner}${close}`;
+      return `${open}${si}<image x="0" y="0" width="${fmtNum(obj.w)}" height="${fmtNum(obj.h)}" href="${escapeXml(dataUrl)}" preserveAspectRatio="none"${filter} />\n${inner}${close}`;
     }
   }
 }
@@ -610,14 +640,15 @@ function renderExportRoot(
   obj: DesignObject,
   clipIds: Map<string, string>,
   gradIds: Map<string, string>,
+  shadowIds: Map<string, string>,
   assetDataUrl: AssetResolver | null,
   includeIds: boolean,
 ): string {
   const m = ancestorMatrixOf(objects, obj);
   if (obj.parentId === null || isIdentity(m)) {
-    return objectToSvg(objects, obj, '  ', clipIds, gradIds, assetDataUrl, includeIds);
+    return objectToSvg(objects, obj, '  ', clipIds, gradIds, shadowIds, assetDataUrl, includeIds);
   }
-  return `  <g transform="${matrixToSvg(m)}">\n${objectToSvg(objects, obj, '    ', clipIds, gradIds, assetDataUrl, includeIds)}  </g>\n`;
+  return `  <g transform="${matrixToSvg(m)}">\n${objectToSvg(objects, obj, '    ', clipIds, gradIds, shadowIds, assetDataUrl, includeIds)}  </g>\n`;
 }
 
 /**
@@ -643,6 +674,8 @@ export function pageToSvg(
   const clipIds = new Map(clipped.map((o, i) => [o.id, `expclip${i}`]));
   const graded = rendered.filter((o) => effectiveGradient(o) !== null);
   const gradIds = new Map(graded.map((o, i) => [o.id, `expgrad${i}`]));
+  const shadowed = rendered.filter((o) => o.shadow !== null && o.shadow !== undefined);
+  const shadowIds = new Map(shadowed.map((o, i) => [o.id, `expshd${i}`]));
   const clipParts = clipped.map((o) => {
     const shape = hasIndependentCorners(o)
       ? `<path d="${roundedRectPath(o.w, o.h, resolveRadii(o), (n) => String(fmtNum(n)))}" />`
@@ -657,10 +690,14 @@ export function pageToSvg(
       .join('');
     return `<linearGradient id="${gradIds.get(o.id)}" x1="${fmtNum(v.x1)}" y1="${fmtNum(v.y1)}" x2="${fmtNum(v.x2)}" y2="${fmtNum(v.y2)}">${stops}</linearGradient>`;
   });
-  const defParts = [...clipParts, ...gradParts];
+  const shadowParts = shadowed.map((o) => {
+    const s = o.shadow as NonNullable<DesignObject['shadow']>;
+    return `<filter id="${shadowIds.get(o.id)}" x="-50%" y="-50%" width="200%" height="200%">${shadowFilterInner(s)}</filter>`;
+  });
+  const defParts = [...clipParts, ...gradParts, ...shadowParts];
   const defs =
     defParts.length > 0 ? `  <defs>\n${defParts.map((p) => `    ${p}`).join('\n')}\n  </defs>\n` : '';
-  const body = roots.map((o) => renderExportRoot(objects, o, clipIds, gradIds, assetDataUrl ?? null, includeIds)).join('');
+  const body = roots.map((o) => renderExportRoot(objects, o, clipIds, gradIds, shadowIds, assetDataUrl ?? null, includeIds)).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(bounds.w)}" height="${Math.ceil(bounds.h)}" viewBox="${fmtNum(bounds.x)} ${fmtNum(bounds.y)} ${fmtNum(bounds.w)} ${fmtNum(bounds.h)}">\n${defs}${body}</svg>\n`;
 }
 
@@ -892,7 +929,12 @@ export function groupObjects(
     fillOpacity: 1,
     fillGradient: null,
     fillStyleId: null,
+    textStyleId: null,
+    shadow: null,
+    effectStyleId: null,
     constraints: null,
+    layout: null,
+    sizing: null,
     stroke: '',
     strokeWidth: 0,
     cornerRadius: 0,
@@ -900,6 +942,8 @@ export function groupObjects(
     componentId: null,
     sourceId: null,
     componentSnapshot: null,
+    variant: null,
+    exposedValues: null,
     imageId: null,
     imageName: '',
     naturalW: 0,

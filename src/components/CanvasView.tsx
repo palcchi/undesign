@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Frame, Plus, Square, Type } from 'lucide-react';
 import { useEditor } from '../store';
-import type { DesignObject } from '../types';
+import type { ChildSizing, DesignObject } from '../types';
 import {
   GRID_PITCH,
   SNAP_THRESHOLD_PX,
@@ -21,6 +21,7 @@ import {
   rootsOf,
   roundedRectPath,
   screenToWorld,
+  shadowFilterInner,
   snapMoveDelta,
   worldToScreen,
 } from '../utils';
@@ -55,7 +56,7 @@ type DragState =
 const CLICK_THRESHOLD = 3;
 
 /** Async image element: resolves pixels from the asset store, else a placeholder. */
-function CanvasImage({ obj }: { obj: DesignObject }) {
+function CanvasImage({ obj, filter }: { obj: DesignObject; filter?: string }) {
   const [url, setUrl] = useState<string | null>(() => (obj.imageId ? cachedDataUrl(obj.imageId) : null));
   useEffect(() => {
     if (!obj.imageId) {
@@ -89,7 +90,7 @@ function CanvasImage({ obj }: { obj: DesignObject }) {
       </g>
     );
   }
-  return <image x={0} y={0} width={obj.w} height={obj.h} href={url} preserveAspectRatio="none" />;
+  return <image x={0} y={0} width={obj.w} height={obj.h} href={url} preserveAspectRatio="none" filter={filter} />;
 }
 
 export function CanvasView() {
@@ -346,13 +347,56 @@ export function CanvasView() {
             ed.beginTransient();
           }
           const orig = drag.orig;
+          // A lone flow child dragged inside an auto-layout frame reorders
+          // the stack instead of roaming: the layout pass owns its position,
+          // so the gesture moves it through the flow by drop index.
+          let reorderId: string | null = null;
+          let reorderIndex = -1;
+          if (orig.size === 1) {
+            const onlyId = [...orig.keys()][0];
+            const pg = pageRef.current;
+            const target = pg.objects.find((o) => o.id === onlyId);
+            const par = target?.parentId
+              ? pg.objects.find((o) => o.id === target.parentId)
+              : undefined;
+            if (
+              target !== undefined &&
+              par?.type === 'frame' &&
+              par.layout !== null &&
+              par.layout !== undefined &&
+              !(target.sizing?.absolute ?? false) &&
+              (target.sourceId === null || target.sourceId === undefined)
+            ) {
+              const world = screenToWorld(sx, sy, v);
+              const local = parentLocalPoint(pg.objects, par, world.x, world.y) ?? world;
+              const horiz = par.layout.direction === 'horizontal';
+              const main = horiz ? local.x : local.y;
+              const flow = pg.objects.filter(
+                (o) =>
+                  o.parentId === par.id &&
+                  o.id !== onlyId &&
+                  (o.sourceId === null || o.sourceId === undefined) &&
+                  !(o.sizing?.absolute ?? false),
+              );
+              reorderIndex = flow.length;
+              for (let i = 0; i < flow.length; i++) {
+                const c = horiz ? flow[i].x + flow[i].w / 2 : flow[i].y + flow[i].h / 2;
+                if (main < c) {
+                  reorderIndex = i;
+                  break;
+                }
+              }
+              reorderId = onlyId;
+            }
+          }
           // Smart guides + grid snap adjust the page-space delta before it is
           // mapped into each object's local frame. Alt bypasses snapping.
           let ax = dxW;
           let ay = dyW;
           let exactX = false;
           let exactY = false;
-          const wantSnap = !e.altKey && (ed.snapObjects || (ed.snapGrid && ed.gridVisible));
+          const wantSnap =
+            !e.altKey && reorderId === null && (ed.snapObjects || (ed.snapGrid && ed.gridVisible));
           if (wantSnap && orig.size > 0) {
             const pg = pageRef.current;
             const movedIds = new Set(orig.keys());
@@ -408,22 +452,42 @@ export function CanvasView() {
           }
           ed.transientUpdate((d) => ({
             ...d,
-            pages: d.pages.map((p) =>
-              p.id !== d.activePageId ? p : {
-                ...p,
-                objects: p.objects.map((o) => {
-                  const s = orig.get(o.id);
-                  if (!s) return o;
-                  const nl = translateLocalByPageDelta(
-                    p.objects,
-                    { ...o, x: s.x, y: s.y },
-                    ax,
-                    ay,
-                  );
-                  return { ...o, x: exactX ? nl.x : Math.round(nl.x), y: exactY ? nl.y : Math.round(nl.y) };
-                }),
-              },
-            ),
+            pages: d.pages.map((p) => {
+              if (p.id !== d.activePageId) return p;
+              let objects = p.objects.map((o) => {
+                const s = orig.get(o.id);
+                if (!s) return o;
+                const nl = translateLocalByPageDelta(
+                  p.objects,
+                  { ...o, x: s.x, y: s.y },
+                  ax,
+                  ay,
+                );
+                return { ...o, x: exactX ? nl.x : Math.round(nl.x), y: exactY ? nl.y : Math.round(nl.y) };
+              });
+              if (reorderId !== null && reorderIndex >= 0) {
+                const from = objects.findIndex((o) => o.id === reorderId);
+                if (from >= 0) {
+                  const moved = objects[from];
+                  const rest = objects.filter((o) => o.id !== reorderId);
+                  const slots = rest
+                    .map((o, i) => ({ o, i }))
+                    .filter(
+                      ({ o }) =>
+                        o.parentId === moved.parentId &&
+                        (o.sourceId === null || o.sourceId === undefined) &&
+                        !(o.sizing?.absolute ?? false),
+                    );
+                  const at =
+                    reorderIndex >= slots.length
+                      ? (slots.length > 0 ? slots[slots.length - 1].i + 1 : rest.length)
+                      : slots[reorderIndex].i;
+                  rest.splice(at, 0, moved);
+                  objects = rest;
+                }
+              }
+              return { ...p, objects };
+            }),
           }));
           break;
         }
@@ -661,6 +725,31 @@ export function CanvasView() {
     const world = screenToWorld(pt.x, pt.y, viewport);
     const inv = invertMatrix(pageMatrixOf(page.objects, obj)) ?? IDENTITY;
     const startLocal = applyMatrix(inv, world.x, world.y);
+    // Resizing a layout-driven axis would snap back: freeze it to fixed
+    // first, inside the same transient session so the gesture stays one step.
+    const curSizing: ChildSizing | null = obj.sizing ?? null;
+    if (curSizing !== null) {
+      const parent = obj.parentId ? page.objects.find((o) => o.id === obj.parentId) : undefined;
+      const flowChild =
+        parent?.type === 'frame' &&
+        parent.layout !== null &&
+        parent.layout !== undefined &&
+        !curSizing.absolute &&
+        (obj.sourceId === null || obj.sourceId === undefined);
+      const hugSelf = obj.type === 'frame' && obj.layout !== null && obj.layout !== undefined;
+      const freeze: Partial<ChildSizing> = {};
+      const touchesH = handle.includes('e') || handle.includes('w');
+      const touchesV = handle.includes('n') || handle.includes('s');
+      if (touchesH && curSizing.h !== 'fixed' && (flowChild || (hugSelf && curSizing.h === 'hug'))) {
+        freeze.h = 'fixed';
+      }
+      if (touchesV && curSizing.v !== 'fixed' && (flowChild || (hugSelf && curSizing.v === 'hug'))) {
+        freeze.v = 'fixed';
+      }
+      if (freeze.h !== undefined || freeze.v !== undefined) {
+        editor.transientPatchObjects([id], { sizing: { ...curSizing, ...freeze } });
+      }
+    }
     editor.beginTransient();
     dragRef.current = {
       kind: 'resize', id, handle, inv, startLX: startLocal.x, startLY: startLocal.y,
@@ -775,6 +864,7 @@ export function CanvasView() {
     };
     const transform = `translate(${obj.x} ${obj.y})${obj.rotation !== 0 ? ` rotate(${obj.rotation} ${obj.w / 2} ${obj.h / 2})` : ''}`;
     const gradPaint = effectiveGradient(obj) ? `url(#ugrad-${obj.id})` : null;
+    const filterRef = obj.shadow ? `url(#ushadow-${obj.id})` : undefined;
     const paintFor = (fallback: string): string => (gradPaint === null ? obj.fill || fallback : gradPaint);
 
     let shape: React.ReactNode = null;
@@ -784,12 +874,14 @@ export function CanvasView() {
           d={roundedRectPath(obj.w, obj.h, resolveRadii(obj))}
           fill={paintFor('none')} fillOpacity={obj.fillOpacity}
           stroke={obj.stroke || 'none'} strokeWidth={obj.strokeWidth}
+          filter={filterRef}
         />
       ) : (
         <rect
           x={0} y={0} width={obj.w} height={obj.h} rx={obj.cornerRadius}
           fill={paintFor('none')} fillOpacity={obj.fillOpacity}
           stroke={obj.stroke || 'none'} strokeWidth={obj.strokeWidth}
+          filter={filterRef}
         />
       );
     } else if (obj.type === 'ellipse') {
@@ -798,6 +890,7 @@ export function CanvasView() {
           cx={obj.w / 2} cy={obj.h / 2} rx={obj.w / 2} ry={obj.h / 2}
           fill={paintFor('none')} fillOpacity={obj.fillOpacity}
           stroke={obj.stroke || 'none'} strokeWidth={obj.strokeWidth}
+          filter={filterRef}
         />
       );
     } else if (obj.type === 'text' && obj.id !== editingId) {
@@ -809,6 +902,7 @@ export function CanvasView() {
           x={tx} y={obj.fontSize * 0.85}
           fontFamily={obj.fontFamily} fontSize={obj.fontSize} fontWeight={obj.fontWeight}
           textAnchor={anchor} fill={paintFor('#111111')} fillOpacity={obj.fillOpacity}
+          filter={filterRef}
         >
           {lines.map((line, i) => (
             <tspan key={i} x={tx} dy={i === 0 ? 0 : obj.fontSize * obj.lineHeight}>
@@ -824,11 +918,12 @@ export function CanvasView() {
           <line
             x1={0} y1={0} x2={obj.w} y2={obj.h}
             stroke={obj.stroke || '#111111'} strokeWidth={obj.strokeWidth || 1} strokeLinecap="round"
+            filter={filterRef}
           />
         </>
       );
     } else if (obj.type === 'image') {
-      shape = <CanvasImage obj={obj} />;
+      shape = <CanvasImage obj={obj} filter={filterRef} />;
     }
 
     return (
@@ -998,6 +1093,22 @@ export function CanvasView() {
                   <stop key={i} offset={s.offset} stopColor={s.color} />
                 ))}
               </linearGradient>
+            );
+          })}
+          {page.objects.filter((o) => o.visible && o.shadow).map((o) => {
+            const s = o.shadow;
+            if (!s) return null;
+            // Same builder as SVG export, so canvas and export match exactly.
+            return (
+              <filter
+                key={o.id}
+                id={`ushadow-${o.id}`}
+                x="-50%"
+                y="-50%"
+                width="200%"
+                height="200%"
+                dangerouslySetInnerHTML={{ __html: shadowFilterInner(s) }}
+              />
             );
           })}
         </defs>
