@@ -24,76 +24,93 @@ Other commands:
 - `npm run typecheck` — TypeScript check only
 - `npm test` — bundle and run the TypeScript regression suite with node
 - `npm run test:rust` — run the Rust engine-bridge tests with cargo
+- `npm run test:e2e` — run the adapter + converter against the real built
+  WASM engine in node (no browser needed)
 
 In GitHub Codespaces the port forwards automatically; use the forwarded
 address for port 5173 if `localhost` is unreachable.
 
 ## What works
 
-- **Canvas** — pan (space/middle-mouse/hand/scroll), zoom (Ctrl+scroll, buttons,
-  presets, fit, reset), dot grid, marquee selection, inline text editing
-- **Objects** — frames, rectangles, ellipses, text, lines; move, resize (8
-  handles), rotate handle, line-endpoint editing, auto-parenting into frames
+Everything below runs on the FigCraft engine (compiled to WASM) through the
+typed `EngineAdapter`; the React app keeps no parallel editable document.
+
+- **Canvas** — pan (space/middle-mouse/hand/scroll), zoom (Ctrl+scroll,
+  buttons, presets, fit, reset), marquee selection, engine-rendered SVG with
+  a selection/handle overlay
+- **Objects** — frames, rectangles, ellipses, polygons, stars, lines, arrows,
+  text, placed images; move, resize (8 handles), rotate handle,
+  auto-parenting into frames
+- **Structure** — group/ungroup, frame selection, masks, boolean
+  union/subtract/intersect/exclude + flatten, rasterize, swap orientation
 - **Layers** — hierarchy tree, expand/collapse, select, rename, visibility,
-  lock, drag reorder + reparenting, context menus
-- **Pages** — add, select, rename, delete
-- **Assets** — insertable components and variant sets, color/text/effect
-  styles that apply to the selection, per-style update-from-selection
-- **Components** — create from selection, instances with overrides, variant
-  switching, boolean/text properties, nested instances with cycle guards,
-  compatible swap, exposed properties with per-property reset, detach
-- **Styles** — shared color, typography, and drop-shadow styles with
-  cross-page propagation and detach-on-manual-edit
-- **Auto layout** — horizontal/vertical frames with gap, padding, alignment,
-  Fixed/Hug/Fill sizing, absolute children, and min/max clamps
-- **Properties** — contextual X/Y/W/H, rotation, radius, fill/stroke, full
-  typography, drop shadow (offset/blur/spread/color/opacity), layout and
-  sizing, component/variant controls, opacity, alignment/distribution
-- **Document** — inline rename, undo/redo (60 steps), cut/copy/paste,
-  duplicate, localStorage persistence with corrupt-data recovery, import/export
-  JSON, fullscreen prototype preview, keyboard shortcuts (`?` lists them,
-  suppressed while typing or while a dialog is open)
+  lock, drag reorder + reparenting
+- **Pages** — add, select, rename, duplicate, delete, move selection to page
+- **Assets** — engine shared styles (create from selection, apply, delete)
+  and components (create, insert instances, detach, reset)
+- **Auto layout** — add/remove on frames; gap, padding, alignment, Fixed/Hug
+  (frames/text) /Fill sizing, absolute children, min/max clamps migrate from
+  legacy documents where the engine accepts them
+- **Text** — content, font, size, alignment, bold/italic/underline/
+  strikethrough toggles, size stepping, case
+- **Properties** — contextual X/Y/W/H, rotation, radius, fill/stroke,
+  opacity, clip, alignment/distribution
+- **Document** — engine undo/redo, cut/copy/paste, duplicate, localStorage
+  persistence, import/export (engine JSON, UND JSON, SVG, PNG), fullscreen
+  page preview, keyboard shortcuts (`?` lists them, suppressed while typing
+  or while a dialog is open)
 
 ## Architecture
 
 ```
 src/
-  types.ts                  Document model (pages, objects, styles, variants)
-  utils.ts                  Geometry, ids, SVG serialization, shadow filters
-  transform.ts              Matrices, hit-testing, zoom math
-  storage.ts                localStorage persistence + validation/migration
-  history.ts                Undo/redo (past/present/future, transient sessions)
-  layout.ts                 Constraints + auto-layout solver, text measurement
-  library.ts                Components, variants, props, nested expansion
-  system.ts                 Shared-style propagation passes
-  assets.ts                 Image asset store, SVG/PNG export entry points
-  exportPng.ts              PNG rasterization
-  prototype.ts              Prototype link helpers
-  ai.ts                     AI-op object builder (applies through the store)
-  sample.ts                 Sample document built from real objects
-  store.tsx                 Editor state, selection, viewport, update pipeline
+  App.tsx                   Product shell, layout, global shortcuts, preview
+  main.tsx                  React entry point
+  types.ts                  Legacy UND document model (import/export format)
+  storage.ts                UND validation + legacy localStorage migration
+  sample.ts                 Sample document seed
+  utils.ts                  Zoom/viewport math, ids, downloads (+ legacy SVG)
+  transform.ts              Overlay matrix math for canvas interactions
+  exportPng.ts              PNG rasterization of exported SVG
+  engine/
+    adapter.ts              Typed boundary over engine commands (the only
+                            JSON-boundary crosser for editor operations)
+    store.tsx               React snapshot over the engine-owned document
+    convert.ts              UND→FC migration (explicit warnings, no silent loss)
+    readback.ts             FC→UND round-trip for export
+    geometry.ts             Engine-space geometry for the canvas overlay
+    tree.ts                 Layer-tree flattening + drag math
   components/
-    TopToolbar.tsx          Menus, tools, zoom, export/share/shortcut dialogs
-    LeftSidebar.tsx         Layers / Assets / Pages panels, style managers
-    CanvasView.tsx          SVG canvas, selection, drag/resize/rotate
-    PropertiesPanel.tsx     Contextual property + layout + component controls
+    TopToolbar.tsx          Menus, tools, zoom, import/export/share dialogs
+    EngineSidebar.tsx       Layers / Pages / Assets panels
+    EngineCanvas.tsx        Engine SVG + selection overlay + pointer tools
+    EngineInspector.tsx     Single/multi-selection property controls
+    EngineLab.tsx           Diagnostic view over a separate engine session
     ui.tsx                  Modal + context-menu primitives
-  App.tsx                   Layout, global shortcuts, prototype preview
   wasm/
     engine.ts               Lazy WASM loader + typed engine handle
-    pkg/                    Generated wasm-pack output (git-ignored)
+    pkg/                    Committed wasm-pack output (rebuilt by build:wasm)
 rust/
   Cargo.toml                undesign-wasm crate (pinned FigCraft git deps)
-  src/lib.rs                JSON-boundary bridge + unit tests
+  src/lib.rs                JSON-boundary bridge + real-engine unit tests
 third-party/figcraft/       Upstream license texts, NOTICE, reuse notes
+docs/
+  FIGCRAFT_REUSE_MAP.md     Source-level upstream→Undesign reuse mapping
 tests/
   run.mjs                   Bundles *.test.ts with esbuild, runs with node
+scripts/
+  e2e-engine.mjs            Real-WASM E2E runner (node, needs built glue)
+  e2e-driver.ts             Migration-triangle + command checks vs real engine
 ```
 
-State is a JSON-serializable document (`UndesignDoc`) with a past/present/future
-history wrapper. Every edit flows through one pipeline — instance regen,
-auto-layout, constraints, then style propagation — so canvas, layers, and
-properties stay synchronized and share a single undo step per edit.
+The engine owns the document, selection, and history exclusively. Every edit
+flows through `EngineAdapter` into `Session::execute`, then the store
+re-reads the snapshot (pages, tree, selection, SVG, undo depths) and
+persists it — canvas, layers, and inspector stay synchronized with one undo
+step per edit. The legacy TypeScript modules (`history.ts`, `layout.ts`,
+`library.ts`, `system.ts`, `assets.ts`, `ai.ts`, `docpatch.ts`) are not used
+by the live editor; they remain only as committed, tested reference
+implementations of the UND format.
 
 ## Scope notes
 
@@ -119,19 +136,29 @@ Engine Lab, kept as a diagnostic view over a separate engine session.
   (`rust/Cargo.toml`, `rust/Cargo.lock`). No upstream files are vendored or
   patched; the bridge in `rust/src/`, the loader in `src/wasm/`, the adapter
   and converter in `src/engine/`, and the editor UI are original Undesign
-  code.
+  code. The adapter wraps the engine's real command registry — pages,
+  shapes, text, transforms, alignment, booleans, frames, masks, rasterize,
+  auto-layout, shared styles, components/instances, prototype flows, text
+  styling, and image placement — with every command name verified against
+  upstream source at the pinned revision
+  (see `docs/FIGCRAFT_REUSE_MAP.md`).
 - Boundary: the engine owns its document exclusively. The React app crosses
   into it only through `execute` / `undo` / `redo` / selection / tree
   describe / hit-test / SVG export / save+load (see `rust/src/lib.rs`). There
   is no second editable TypeScript document model.
 - Migration: legacy JSON documents convert explicitly via
   `src/engine/convert.ts` (UND→FC) and read back via
-  `src/engine/readback.ts` (FC→UND); unsupported properties (components,
-  variants, styles, auto-layout, images, shadows) produce recorded warnings
-  and safe placeholders, never silent data loss. Rotation is clockwise in
-  UND/SVG and counter-clockwise in the engine; the boundary negates it.
-- Brand and separately licensed material (ArtCraft trademarks, OFL fonts) are
-  not reused.
+  `src/engine/readback.ts` (FC→UND). Auto-layout, child sizing (where the
+  engine accepts it: fill needs a layout parent, hug needs layout or text),
+  and constraints migrate; still-unsupported properties (component defs,
+  variant sets, shared style defs, prototype links, images, gradients beyond
+  their solid fallback, shadows) produce recorded warnings and safe
+  placeholders, never silent data loss. Rotation is clockwise in UND/SVG and
+  counter-clockwise in the engine; the boundary negates it.
+- Not reused: the upstream `ui-egui` editor shell (Rust-only, no React
+  equivalent — Undesign keeps its own product shell and panels), the
+  `mcp`/headless crates, and brand/separately licensed material (ArtCraft
+  trademarks, OFL fonts).
 
 If a future change patches or vendors upstream files, the modification must be
 recorded in `third-party/figcraft/README.md` with the file list.

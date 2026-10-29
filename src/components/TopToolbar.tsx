@@ -78,6 +78,7 @@ export function TopToolbar({
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
   const ready = ed.status === 'ready';
   const hasSel = ed.snapshot.selection.length > 0;
 
@@ -159,6 +160,17 @@ export function TopToolbar({
     });
   };
 
+  const onImageFile = (f: File | undefined) => {
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') ed.placeImageAtCenter(reader.result, f.name);
+      else ed.setNotice('Place image failed: could not read the file.');
+    };
+    reader.onerror = () => ed.setNotice('Place image failed: could not read the file.');
+    reader.readAsDataURL(f);
+  };
+
   const menuItem = (label: string, hint: string | null, fn: () => void, disabled = false) => (
     <button key={label} className="menu-item" disabled={disabled} onClick={pick(fn)}>
       <span>{label}</span>
@@ -182,6 +194,7 @@ export function TopToolbar({
                 setConfirm({ title: 'New document', message: 'Start a blank engine document? The current document stays in local history only as long as this session.', action: ed.newDocument }),
               )}
               {menuItem('Open…', null, () => fileRef.current?.click(), !ready)}
+              {menuItem('Place image…', null, () => imageRef.current?.click(), !ready)}
               <div className="menu-sep" />
               {menuItem('Export SVG', null, doExportSvg, !ready)}
               {menuItem('Export PNG', null, () => void doExportPng(), !ready)}
@@ -215,6 +228,31 @@ export function TopToolbar({
             <div className="menu-drop" role="menu">
               {menuItem('Group', 'Ctrl+G', ed.groupSelected, ed.snapshot.selection.length < 2)}
               {menuItem('Ungroup', 'Ctrl+Shift+G', ed.ungroupSelected, !hasSel)}
+              {menuItem('Frame selection', null, () => ed.frameSelected(), !hasSel)}
+              {menuItem('Remove frame', null, ed.removeFrameSelected, !hasSel)}
+              <div className="menu-sep" />
+              {menuItem('Use as mask', null, ed.maskSelected, !hasSel)}
+              {menuItem('Release mask', null, ed.releaseMaskSelected, !hasSel)}
+              <div className="menu-sep" />
+              {menuItem('Union', null, () => ed.booleanSelected('union'), ed.snapshot.selection.length < 2)}
+              {menuItem('Subtract', null, () => ed.booleanSelected('subtract'), ed.snapshot.selection.length < 2)}
+              {menuItem('Intersect', null, () => ed.booleanSelected('intersect'), ed.snapshot.selection.length < 2)}
+              {menuItem('Exclude', null, () => ed.booleanSelected('exclude'), ed.snapshot.selection.length < 2)}
+              {menuItem('Flatten', null, ed.flattenSelected, !hasSel)}
+              <div className="menu-sep" />
+              {menuItem('Swap orientation', null, ed.swapOrientationSelected, !hasSel)}
+              {menuItem('Rasterize', null, ed.rasterizeSelected, !hasSel)}
+              <div className="menu-sep" />
+              {menuItem('Add auto-layout', null, () => ed.layoutAddSelected(), !hasSel)}
+              {menuItem('Remove auto-layout', null, ed.layoutRemoveSelected, !hasSel)}
+              <div className="menu-sep" />
+              {menuItem('Create component', null, ed.createComponentFromSelection, !hasSel)}
+              {menuItem('Detach instance', null, ed.detachSelectedInstances, !hasSel)}
+              {menuItem('Reset instance', null, ed.resetSelectedInstances, !hasSel)}
+              <div className="menu-sep" />
+              {menuItem('Insert polygon', null, () => ed.insertShapeAtCenter('polygon'), !ready)}
+              {menuItem('Insert star', null, () => ed.insertShapeAtCenter('star'), !ready)}
+              {menuItem('Insert arrow', null, () => ed.insertShapeAtCenter('arrow'), !ready)}
               <div className="menu-sep" />
               {menuItem('Bring forward', ']', ed.bringForward, !hasSel)}
               {menuItem('Send backward', '[', ed.sendBackward, !hasSel)}
@@ -302,6 +340,16 @@ export function TopToolbar({
         hidden
         onChange={(e) => {
           void onFile(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={imageRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          onImageFile(e.target.files?.[0]);
           e.target.value = '';
         }}
       />

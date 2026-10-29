@@ -202,6 +202,46 @@ test('styling layers warn instead of silently dropping', () => {
   }
 });
 
+test('frame layout, sizing, and constraints migrate to engine keys', () => {
+  const frame = obj({
+    id: 'f', type: 'frame',
+    layout: { direction: 'horizontal', gap: 8, paddingTop: 4, paddingRight: 6, paddingBottom: 4, paddingLeft: 6, alignMain: 'space-between', alignCross: 'center' },
+    sizing: { h: 'hug', v: 'fixed', minW: null, maxW: null, minH: null, maxH: null, absolute: false },
+  });
+  const kid = obj({
+    id: 'k', parentId: 'f',
+    sizing: { h: 'fill', v: 'fixed', minW: 10, maxW: null, minH: null, maxH: 200, absolute: false },
+    constraints: { horizontal: 'stretch', vertical: 'middle' },
+  });
+  const { api, calls } = recordingApi();
+  const res = convertUndesignToEngine(doc([{ id: 'p', name: 'P', objects: [frame, kid] }]), api);
+  assert(!res.warnings.some((w) => w.property === 'layout' || w.property === 'sizing' || w.property === 'constraints'), 'no layout warnings');
+  const sets = byCmd(calls, 'node.set').map((c) => c.params as { props: Record<string, unknown> });
+  const fp = sets[0].props;
+  assert(fp.layout === 'horizontal', `layout mode, got ${fp.layout}`);
+  assert(fp.gap === 8 && fp.paddingRight === 6, 'gap and padding');
+  assert(fp.mainAlign === 'spaceBetween' && fp.crossAlign === 'center', `alignment mapping, got ${fp.mainAlign}/${fp.crossAlign}`);
+  assert(fp.sizingH === 'hug', 'layout frames can hug');
+  const kp = sets[1].props;
+  assert(kp.sizingH === 'fill' && kp.sizingV === 'fixed', 'fill under a layout parent migrates');
+  assert(kp.minWidth === 10 && kp.maxHeight === 200 && !('maxWidth' in kp), 'min/max clamps, nulls skipped');
+  assert(JSON.stringify(kp.constraints) === '{"horizontal":"leftRight","vertical":"center"}', `constraint mapping, got ${JSON.stringify(kp.constraints)}`);
+});
+
+test('sizing the engine refuses warns instead of failing the import', () => {
+  const plain = obj({ id: 'g', type: 'frame' });
+  const kid = obj({
+    id: 'k', parentId: 'g',
+    sizing: { h: 'fill', v: 'hug', minW: null, maxW: null, minH: null, maxH: null, absolute: false },
+  });
+  const { api, calls } = recordingApi();
+  const res = convertUndesignToEngine(doc([{ id: 'p', name: 'P', objects: [plain, kid] }]), api);
+  const skips = res.warnings.filter((w) => w.property === 'sizing');
+  assert(skips.length === 2, `both refused modes recorded, got ${skips.length}`);
+  const kp = (byCmd(calls, 'node.set')[1].params as { props: Record<string, unknown> }).props;
+  assert(!('sizingH' in kp) && !('sizingV' in kp), 'refused modes withheld from node.set');
+});
+
 test('dangling parents, cycles, and zero-length lines degrade safely', () => {
   const dangling = obj({ id: 'd', parentId: 'ghost' });
   const a = obj({ id: 'a', parentId: 'b' });
