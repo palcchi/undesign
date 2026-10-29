@@ -5,7 +5,9 @@ shapes, text, layers, contextual properties, and SVG/JSON export.
 
 ## Run it
 
-Requires Node 18+.
+Requires Node 18+. The WASM engine build additionally requires a Rust
+toolchain (`cargo`, `wasm-pack`, and the `wasm32-unknown-unknown` target —
+`npm run build:wasm` fails with setup instructions when any piece is missing).
 
 ```bash
 npm install
@@ -16,10 +18,12 @@ Then open **http://localhost:5173** in your browser.
 
 Other commands:
 
-- `npm run build` — type-check and build the production bundle to `dist/`
+- `npm run build` — build the WASM engine, type-check, and bundle to `dist/`
+- `npm run build:wasm` — compile the Rust engine to `src/wasm/pkg/` only
 - `npm run preview` — serve the production build locally
 - `npm run typecheck` — TypeScript check only
-- `npm test` — bundle and run the regression suite with node
+- `npm test` — bundle and run the TypeScript regression suite with node
+- `npm run test:rust` — run the Rust engine-bridge tests with cargo
 
 In GitHub Codespaces the port forwards automatically; use the forwarded
 address for port 5173 if `localhost` is unreachable.
@@ -75,6 +79,13 @@ src/
     PropertiesPanel.tsx     Contextual property + layout + component controls
     ui.tsx                  Modal + context-menu primitives
   App.tsx                   Layout, global shortcuts, prototype preview
+  wasm/
+    engine.ts               Lazy WASM loader + typed engine handle
+    pkg/                    Generated wasm-pack output (git-ignored)
+rust/
+  Cargo.toml                undesign-wasm crate (pinned FigCraft git deps)
+  src/lib.rs                JSON-boundary bridge + unit tests
+third-party/figcraft/       Upstream license texts, NOTICE, reuse notes
 tests/
   run.mjs                   Bundles *.test.ts with esbuild, runs with node
 ```
@@ -90,21 +101,29 @@ This milestone intentionally excludes accounts, real-time collaboration,
 billing, and deployment. Sharing works through portable JSON
 (File → Import/Export) until cloud features are added.
 
-## Relationship to FigCraft
+## WASM engine (FigCraft integration)
 
-FigCraft ([brydanforge/figcraft](https://github.com/brydanforge/figcraft),
-inspected at `9268272`, dual-licensed MIT OR Apache-2.0) was evaluated as a
-possible editor foundation and deliberately **not** integrated: it is a
-self-contained native Rust/egui application whose browser story is the whole
-app cross-compiled to WebAssembly — not an embeddable engine with a document
-API the React UI could drive. Embedding it would have meant either a
-superficial frame around a second editor or a bespoke Rust/WASM bridge with
-two document models, while Undesign's own TypeScript engine already covers
-the same capabilities (components, variants, auto layout, styles, undo/redo,
-SVG/PNG export) with a tested migration path for existing documents.
+Undesign embeds the FigCraft editor engine, compiled to WebAssembly, behind a
+documented JSON boundary. The **Engine** button in the top toolbar opens the
+Engine Lab: a live FigCraft session rendering real SVG, with working create,
+move, undo/redo, selection, and save/load controls.
 
-FigCraft therefore serves as a behavioral reference only. No FigCraft source,
-assets, branding, or dependencies are vendored in this repository, so no
-upstream license texts or notices ship with it. If FigCraft code is ever
-reused here, its MIT/Apache-2.0 texts, NOTICE, and per-file attribution must
-be added alongside it.
+- Upstream: [brydanforge/figcraft](https://github.com/brydanforge/figcraft),
+  revision `92682728e9d6a3a97ea25a99395be7a34a8db993`
+- License: MIT OR Apache-2.0 (texts and NOTICE in `third-party/figcraft/`);
+  © 2026 ArtCraft Team and the FigCraft contributors
+- Reuse: the `figcraft-engine`, `figcraft-doc`, and `figcraft-svg` crates,
+  **unmodified**, via pinned Cargo git dependencies (`rust/Cargo.toml`,
+  `rust/Cargo.lock`). No upstream files are vendored or patched; the bridge
+  in `rust/src/`, the loader in `src/wasm/`, and the lab UI are original
+  Undesign code.
+- Boundary: the engine owns its document exclusively. The React app crosses
+  into it only through `execute` / `undo` / `redo` / selection / SVG export /
+  save+load (see `rust/src/lib.rs`). There is one engine document per lab
+  session — no silent divergence with the TypeScript document model, which
+  remains the editor's main store while migration proceeds incrementally.
+- Brand and separately licensed material (ArtCraft trademarks, OFL fonts) are
+  not reused.
+
+If a future change patches or vendors upstream files, the modification must be
+recorded in `third-party/figcraft/README.md` with the file list.

@@ -6,10 +6,12 @@
   "description": "Undesign — a web-based visual design editor",
   "scripts": {
     "dev": "vite --host --port 5173",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run build:wasm && tsc --noEmit && vite build",
+    "build:wasm": "scripts/build-wasm.sh",
     "preview": "vite preview --host --port 5173",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/run.mjs"
+    "test": "node tests/run.mjs",
+    "test:rust": "cargo test --manifest-path rust/Cargo.toml"
   },
   "dependencies": {
     "lucide-react": "^0.469.0",

@@ -1,0 +1,29 @@
+# Undesign WASM engine bridge (original Undesign code).
+#
+# Thin adapter over the FigCraft engine (used unmodified via the pinned git
+# revisions below) exposing a JSON-string boundary for the React app:
+#   - execute(command, paramsJson) -> resultJson
+#   - undo / redo, selection get/set, page SVG export, save/load.
+# See third-party/figcraft/ for the upstream license texts and notices.
+
+[package]
+name = "undesign-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+figcraft-engine = { git = "https://github.com/brydanforge/figcraft", rev = "92682728e9d6a3a97ea25a99395be7a34a8db993" }
+figcraft-doc = { git = "https://github.com/brydanforge/figcraft", rev = "92682728e9d6a3a97ea25a99395be7a34a8db993" }
+figcraft-svg = { git = "https://github.com/brydanforge/figcraft", rev = "92682728e9d6a3a97ea25a99395be7a34a8db993" }
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# wasm-pack's built-in wasm-opt download needs direct network access, which
+# proxied sandboxes block; scripts/build-wasm.sh runs a PATH wasm-opt
+# instead when one is available, and otherwise ships unoptimized output.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

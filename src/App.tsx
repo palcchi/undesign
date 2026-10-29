@@ -5,6 +5,7 @@ import { isFormTarget } from './utils';
 import { TopToolbar } from './components/TopToolbar';
 import { LeftSidebar } from './components/LeftSidebar';
 import { CanvasView } from './components/CanvasView';
+import { EngineLab } from './components/EngineLab';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { exportPageSvg } from './assets';
 
@@ -18,6 +19,7 @@ export default function App() {
 
 function Shell() {
   const [preview, setPreview] = useState(false);
+  const [labOpen, setLabOpen] = useState(false);
   const [leftVisible, setLeftVisible] = useState(() => window.innerWidth > 900);
   const [rightVisible, setRightVisible] = useState(() => window.innerWidth > 1100);
   const { notice, dismissNotice } = useEditor();
@@ -30,10 +32,12 @@ function Shell() {
         rightVisible={rightVisible}
         onToggleLeft={() => setLeftVisible((v) => !v)}
         onToggleRight={() => setRightVisible((v) => !v)}
+        labOpen={labOpen}
+        onToggleLab={() => setLabOpen((v) => !v)}
       />
       <div className="workbench">
         {leftVisible && <LeftSidebar />}
-        <CanvasView />
+        {labOpen ? <EngineLab /> : <CanvasView />}
         {rightVisible && <PropertiesPanel />}
       </div>
       <KeyboardShortcuts previewOpen={preview} closePreview={() => setPreview(false)} />
