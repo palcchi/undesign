@@ -991,7 +991,10 @@ export function CanvasView() {
   return (
     <div
       ref={wrapRef}
+      id="main-canvas"
       className={`canvas-wrap ${cursorClass}`}
+      aria-label="Design canvas"
+      tabIndex={-1}
       onContextMenu={onCanvasContextMenu}
       onDragStart={(e) => e.preventDefault()}
     >

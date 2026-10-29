@@ -24,6 +24,9 @@ function Shell() {
 
   return (
     <div className="app">
+      <a className="skip-link" href="#main-canvas">
+        Skip to canvas
+      </a>
       <TopToolbar
         onPreview={() => setPreview(true)}
         leftVisible={leftVisible}
