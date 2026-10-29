@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Circle,
+  Cpu,
   Download,
   Frame,
   Hand,
@@ -57,12 +58,16 @@ export function TopToolbar({
   rightVisible,
   onToggleLeft,
   onToggleRight,
+  labOpen,
+  onToggleLab,
 }: {
   onPreview: () => void;
   leftVisible: boolean;
   rightVisible: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
+  labOpen: boolean;
+  onToggleLab: () => void;
 }) {
   const editor = useEditor();
   const {
@@ -394,6 +399,15 @@ export function TopToolbar({
       </div>
 
       <div className="topbar-right">
+        <button
+          className={`btn ghost${labOpen ? ' active' : ''}`}
+          data-tip="Toggle the WASM engine lab"
+          onClick={onToggleLab}
+          aria-pressed={labOpen}
+        >
+          <Cpu size={14} />
+          <span>Engine</span>
+        </button>
         <button className="btn ghost" data-tip="Present this page fullscreen (Esc to exit)" onClick={onPreview}>
           <Play size={14} />
           <span>Preview</span>
