@@ -182,12 +182,15 @@ export interface InstanceVariant {
 
 export type Tool =
   | 'select'
+  | 'hand'
   | 'frame'
   | 'rectangle'
   | 'ellipse'
+  | 'polygon'
+  | 'star'
   | 'text'
   | 'line'
-  | 'hand';
+  | 'arrow';
 
 export interface Viewport {
   /** Scale factor, 1 = 100%. */

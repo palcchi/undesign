@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useEngine } from '../engine/store';
 import { adjustedReorderIndex, dropIndex, flattenTree, subtreeIds, type FlatRow } from '../engine/tree';
+import { findChain } from '../engine/geometry';
 import type { EngineNode } from '../engine/adapter';
 
 function TypeIcon({ type }: { type: string }) {
@@ -81,6 +82,30 @@ export function EngineSidebar() {
     if (q === '') return all;
     return all.filter((r) => r.node.name.toLowerCase().includes(q) || r.node.type.toLowerCase().includes(q));
   }, [ed.snapshot.tree, expanded, filter]);
+
+  // Follow canvas selection: expand ancestors of the new selection and
+  // bring the first selected row into view (manual collapse still wins
+  // until the next selection change).
+  useEffect(() => {
+    const tree = ed.snapshot.tree;
+    if (!tree || ed.snapshot.selection.length === 0) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const id of ed.snapshot.selection) {
+        const chain = findChain(tree, id) ?? [];
+        for (const n of chain) {
+          if (n.id !== id) next.add(n.id);
+        }
+      }
+      return next;
+    });
+    const first = ed.snapshot.selection[0];
+    // Rows render after the expand above; scroll once they exist.
+    window.setTimeout(() => {
+      document.querySelector(`[data-layer-row="${first}"]`)?.scrollIntoView({ block: 'nearest' });
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ed.snapshot.selection]);
 
   // Releasing outside the list cancels the drag (commits happen in-list).
   useEffect(() => {

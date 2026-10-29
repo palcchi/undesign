@@ -1,43 +1,26 @@
 /**
- * Engine-driven top toolbar: menus, tools, zoom, import/export/share, and
- * dialogs. Every action operates on the engine document through the store —
- * no legacy TypeScript document state is read or written here.
+ * Engine-driven top toolbar: menus, history, zoom, import/export/share, and
+ * dialogs. Creation tools live in the floating ToolPalette. Every action
+ * operates on the engine document through the store — no legacy TypeScript
+ * document state is read or written here.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
-  Circle,
   Cpu,
   Download,
-  Frame,
-  Hand,
-  Minus,
-  MousePointer2,
   Play,
   Redo2,
   Share2,
-  Square,
-  Type,
   Undo2,
 } from 'lucide-react';
 import { useEngine } from '../engine/store';
-import type { Tool } from '../types';
 import { downloadFile } from '../utils';
 import { downloadBlob, svgToPngBlob } from '../exportPng';
 import { validateDoc } from '../storage';
 import { Modal } from './ui';
 
-const TOOLS: Array<{ id: Tool; icon: React.ReactNode; tip: string }> = [
-  { id: 'select', icon: <MousePointer2 size={15} />, tip: 'Select (V)' },
-  { id: 'hand', icon: <Hand size={15} />, tip: 'Pan (H or hold Space)' },
-  { id: 'frame', icon: <Frame size={15} />, tip: 'Frame (F)' },
-  { id: 'rectangle', icon: <Square size={15} />, tip: 'Rectangle (R)' },
-  { id: 'ellipse', icon: <Circle size={15} />, tip: 'Ellipse (O)' },
-  { id: 'text', icon: <Type size={15} />, tip: 'Text (T)' },
-  { id: 'line', icon: <Minus size={15} />, tip: 'Line (L)' },
-];
-
 const SHORTCUTS: Array<[string, string]> = [
-  ['V H R O T L F', 'Tools (select, pan, rectangle, ellipse, text, line, frame)'],
+  ['V H R O P T L F', 'Tools (select, pan, rectangle, ellipse, polygon, text, line, frame)'],
   ['Delete', 'Delete selection'],
   ['Ctrl/⌘ D', 'Duplicate selection'],
   ['Ctrl/⌘ Z / Shift+Z', 'Undo / redo'],
@@ -60,6 +43,8 @@ export function TopToolbar({
   onToggleRight,
   labOpen,
   onToggleLab,
+  shortcutsOpen,
+  onToggleShortcuts,
 }: {
   onPreview: () => void;
   leftVisible: boolean;
@@ -68,11 +53,12 @@ export function TopToolbar({
   onToggleRight: () => void;
   labOpen: boolean;
   onToggleLab: () => void;
+  shortcutsOpen: boolean;
+  onToggleShortcuts: () => void;
 }) {
   const ed = useEngine();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
@@ -277,26 +263,14 @@ export function TopToolbar({
           <button className="btn ghost" onClick={() => setOpenMenu(openMenu === 'help' ? null : 'help')}>Help</button>
           {openMenu === 'help' && (
             <div className="menu-drop" role="menu">
-              {menuItem('Keyboard shortcuts', '?', () => setShortcutsOpen(true))}
+              {menuItem('Keyboard shortcuts', '?', onToggleShortcuts)}
               {menuItem('About Undesign', null, () => setAboutOpen(true))}
             </div>
           )}
         </div>
       </div>
 
-      <div className="topbar-tools" role="toolbar" aria-label="Tools">
-        {TOOLS.map((t) => (
-          <button
-            key={t.id}
-            className={`tool-btn${ed.tool === t.id ? ' active' : ''}`}
-            data-tip={t.tip}
-            aria-pressed={ed.tool === t.id}
-            onClick={() => ed.setTool(t.id)}
-          >
-            {t.icon}
-          </button>
-        ))}
-        <span className="toolbar-sep" />
+      <div className="topbar-tools" role="toolbar" aria-label="History and zoom">
         <button className="tool-btn" data-tip="Undo (Ctrl+Z)" disabled={!ed.canUndo} onClick={ed.undo} aria-label="Undo">
           <Undo2 size={15} />
         </button>
@@ -385,7 +359,7 @@ export function TopToolbar({
       )}
 
       {shortcutsOpen && (
-        <Modal title="Keyboard shortcuts" onClose={() => setShortcutsOpen(false)} width={440}>
+        <Modal title="Keyboard shortcuts" onClose={onToggleShortcuts} width={440}>
           <div className="shortcut-list">
             {SHORTCUTS.map(([keys, what]) => (
               <div className="shortcut-row" key={what}>

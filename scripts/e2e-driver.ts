@@ -109,6 +109,18 @@ const before = api.undoDepth()[0];
 api.move([chipNode!.id], 5, 5);
 check(api.undoDepth()[0] === before + 1, 'move is undoable');
 check(api.undo() === true && api.redo() === true, 'undo/redo round-trips');
+{
+  const rx = api.createShape('rectangle', { x: 500, y: 500, width: 80, height: 40 });
+  api.setProps(rx, { rotation: 30 });
+  const after = api.describeNode(rx);
+  // The engine setter preserves the local-box center (540,520): recompute
+  // it from the reported origin through the -30deg screen matrix.
+  const rad = (-30 * Math.PI) / 180;
+  const cx = after.x + Math.cos(rad) * 40 - Math.sin(rad) * 20;
+  const cy = after.y + Math.sin(rad) * 40 + Math.cos(rad) * 20;
+  check(after.rotation === 30 && approx(cx, 540) && approx(cy, 520), `rotation commit preserves the box center (canvas pivots there)`);
+  api.remove([rx]);
+}
 const gid = api.group([chipNode!.id, headNode!.id]);
 check(typeof gid === 'number', 'group returns an id');
 api.ungroup([gid]);
@@ -127,6 +139,7 @@ const saved = api.save();
 const api2 = new EngineAdapter(new WasmEngine());
 api2.load(saved);
 check(api2.describePage(0).childCount === 1, 'save/load preserves the document');
+check(api.undoDepth()[0] > 0 && api2.undoDepth()[0] === 0, `save/load resets history (${api.undoDepth()[0]} -> ${api2.undoDepth()[0]}, boot relies on this)`);
 
 // ---- 5. Reuse-pass commands against the real engine ----
 function safe<T>(fn: () => T): { ok: true; value: T } | { ok: false; error: string } {

@@ -60,6 +60,33 @@ export function pageCorners(node: EngineNode, ancestorsRootFirst: EngineNode[]):
   ];
 }
 
+/**
+ * Page-space rotation pivot: the node's local-box center, which is what the
+ * engine's rotation setter preserves (`set_rotation_about_center`,
+ * upstream props.rs). A rotation-only commit never translates this point,
+ * so the drag and preview must pivot here too — the page-space AABB center
+ * only coincides with it while the node is unrotated, and pivoting there
+ * makes already-rotated objects swing on pointer-up.
+ */
+export function rotationPivot(node: EngineNode, ancestorsRootFirst: EngineNode[]): Pt {
+  const m = chainToPageMatrix([...ancestorsRootFirst, node]);
+  return applyMatrix(m, node.width / 2, node.height / 2);
+}
+
+/** Clockwise-from-north angle of p about center, in degrees. */
+export function pointerAngleDeg(center: Pt, p: Pt): number {
+  return (Math.atan2(p.x - center.x, -(p.y - center.y)) * 180) / Math.PI;
+}
+
+/**
+ * Displayed rotation for a drag pointer position. The grab offset (pointer
+ * angle minus displayed rotation at grab time) keeps the first move
+ * continuous no matter where the handle sits relative to the pivot.
+ */
+export function rotationFromPointer(center: Pt, p: Pt, grabOffset: number): number {
+  return pointerAngleDeg(center, p) - grabOffset;
+}
+
 /** Axis-aligned page-space box of a (possibly rotated, nested) node. */
 export function pageBounds(node: EngineNode, ancestorsRootFirst: EngineNode[]): { x: number; y: number; w: number; h: number } {
   const corners = pageCorners(node, ancestorsRootFirst);

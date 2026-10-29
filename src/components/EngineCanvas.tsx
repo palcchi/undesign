@@ -16,10 +16,18 @@ import {
   pageCorners,
   pageToLocal,
   pageToParentLocal,
+  pointerAngleDeg,
+  rotationFromPointer,
+  rotationPivot,
   unionBounds,
   type Pt,
 } from '../engine/geometry';
 import { applyMatrix, multiplyMatrices, rotateMatrix } from '../transform';
+import { isFormTarget, snapSelectionMove } from '../utils';
+import type { SnapBounds, SnapGuide } from '../utils';
+import { subtreeIds } from '../engine/tree';
+import { drawParamsForTool } from '../engine/draw';
+import { ToolPalette } from './ToolPalette';
 import type { EngineNode } from '../engine/adapter';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -31,10 +39,10 @@ const HANDLE_ANCHOR: Record<Handle, string> = {
 type Drag =
   | { mode: 'pan'; lastX: number; lastY: number }
   | { mode: 'marquee'; start: Pt; cur: Pt; additive: boolean; active: boolean }
-  | { mode: 'move'; start: Pt; cur: Pt; active: boolean }
+  | { mode: 'move'; start: Pt; cur: Pt; active: boolean; addedId: number | null }
   | { mode: 'draw'; start: Pt; cur: Pt }
   | { mode: 'resize'; handle: Handle; nodeId: number; startW: number; startH: number; start: Pt; cur: Pt }
-  | { mode: 'rotate'; nodeId: number; center: Pt; angle: number }
+  | { mode: 'rotate'; nodeId: number; center: Pt; angle: number; grabOffset: number }
   | null;
 
 const CLICK_PX = 3;
@@ -46,6 +54,11 @@ export function EngineCanvas() {
   const [drag, setDrag] = useState<Drag>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
+
+  // Hover would otherwise stick: it is only ever set from pointer-move.
+  useEffect(() => {
+    setHoverId(null);
+  }, [tool, snapshot.selection]);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -64,7 +77,10 @@ export function EngineCanvas() {
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      // Never hijack Space from form controls, buttons, or open dialogs:
+      // they keep their native activation and key handling.
+      if (t && (isFormTarget(t.tagName, t.isContentEditable) || t.tagName === 'BUTTON')) return;
+      if (document.querySelector('.modal-overlay') !== null) return;
       if (e.code === 'Space') {
         setSpaceDown(true);
         e.preventDefault();
@@ -147,6 +163,7 @@ export function EngineCanvas() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (ed.status !== 'ready') return;
+    setHoverId(null);
     (e.target as Element).setPointerCapture?.(e.pointerId);
     if (e.button === 1 || tool === 'hand' || spaceDown) {
       setDrag({ mode: 'pan', lastX: e.clientX, lastY: e.clientY });
@@ -162,9 +179,13 @@ export function EngineCanvas() {
     const h = hitHandle(s.x, s.y);
     if ((h === 'rotate' || (h !== null && single)) && single) {
       if (h === 'rotate') {
-        const box = pageBounds(single, ancestorsOf(single.id));
-        const center = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
-        setDrag({ mode: 'rotate', nodeId: single.id, center, angle: -single.rotation });
+        // Pivot on the local-box center the engine's rotation setter
+        // preserves (not the page-space AABB center, which drifts once the
+        // node is rotated) so the preview and the commit agree; the grab
+        // offset keeps the first move continuous from wherever the handle sits.
+        const center = rotationPivot(single, ancestorsOf(single.id));
+        const angle = -single.rotation;
+        setDrag({ mode: 'rotate', nodeId: single.id, center, angle, grabOffset: pointerAngleDeg(center, page) - angle });
       } else {
         setDrag({ mode: 'resize', handle: h, nodeId: single.id, startW: single.width, startH: single.height, start: page, cur: page });
       }
@@ -172,8 +193,14 @@ export function EngineCanvas() {
     }
     const top = safeTop(page);
     if (top !== null) {
-      if (!e.shiftKey && !snapshot.selection.includes(top)) ed.select([top]);
-      setDrag({ mode: 'move', start: page, cur: page, active: false });
+      // Add the grabbed layer immediately (shift or not) so a drag moves it;
+      // shift+click without a drag keeps it via addedId at pointer-up.
+      let addedId: number | null = null;
+      if (!snapshot.selection.includes(top)) {
+        ed.select([top], e.shiftKey);
+        if (e.shiftKey) addedId = top;
+      }
+      setDrag({ mode: 'move', start: page, cur: page, active: false, addedId });
       return;
     }
     setDrag({ mode: 'marquee', start: page, cur: page, additive: e.shiftKey, active: false });
@@ -189,7 +216,8 @@ export function EngineCanvas() {
       return;
     }
     if (drag.mode === 'pan') {
-      ed.setViewport({ zoom: viewport.zoom, x: viewport.x + e.clientX - drag.lastX, y: viewport.y + e.clientY - drag.lastY });
+      const v = viewportRef.current;
+      ed.setViewport({ zoom: v.zoom, x: v.x + e.clientX - drag.lastX, y: v.y + e.clientY - drag.lastY });
       setDrag({ mode: 'pan', lastX: e.clientX, lastY: e.clientY });
       return;
     }
@@ -209,9 +237,7 @@ export function EngineCanvas() {
       return;
     }
     if (drag.mode === 'rotate') {
-      const dx = page.x - drag.center.x;
-      const dy = page.y - drag.center.y;
-      let deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
+      let deg = rotationFromPointer(drag.center, page, drag.grabOffset);
       if (e.shiftKey) deg = Math.round(deg / 15) * 15;
       setDrag({ ...drag, angle: deg });
     }
@@ -236,13 +262,20 @@ export function EngineCanvas() {
     }
     if (d.mode === 'move') {
       if (!d.active) {
+        const top = safeTop(page);
+        if (top === null) return;
         if (e.shiftKey) {
-          const top = safeTop(page);
-          if (top !== null) ed.select([top], true);
+          // Toggle, unless this press just added the layer at pointer-down.
+          if (top !== d.addedId) ed.select([top], true);
+        } else if (snapshot.selection.length > 1) {
+          // Click without drag on a member collapses the multi-selection.
+          ed.select([top]);
         }
         return;
       }
-      ed.moveSelected(page.x - d.start.x, page.y - d.start.y);
+      const raw = { x: page.x - d.start.x, y: page.y - d.start.y };
+      const snapped = moveSnapFor(raw);
+      ed.moveSelected(snapped?.delta.x ?? raw.x, snapped?.delta.y ?? raw.y);
       return;
     }
     if (d.mode === 'draw') {
@@ -305,43 +338,87 @@ export function EngineCanvas() {
     } catch {
       parent = undefined;
     }
-    if (tool === 'text') {
+    const commit = drawParamsForTool(tool, a, b, local, viewport.zoom);
+    if (!commit) return;
+    if (commit.kind === 'text') {
       ed.createText({ x: local.x, y: local.y, parent });
       return;
     }
-    if (tool === 'line') {
-      // Lines stay at page root: their center-based angle math is page-space.
-      const x0 = Math.min(a.x, b.x);
-      const y0 = a.x <= b.x ? a.y : b.y;
-      const x1 = Math.max(a.x, b.x);
-      const y1 = a.x <= b.x ? b.y : a.y;
-      if (Math.hypot(x1 - x0, y1 - y0) * viewport.zoom < CLICK_PX) return;
-      ed.createShape('line', { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+    if (commit.kind === 'frame') {
+      ed.createFrame({ x: commit.x, y: commit.y, w: commit.w, h: commit.h, parent });
       return;
     }
-    const tiny = w * viewport.zoom < 4 || h * viewport.zoom < 4;
-    const size = tiny ? defaultSize(tool) : { w, h };
-    if (tool === 'frame') ed.createFrame({ x: local.x, y: local.y, w: size.w, h: size.h, parent });
-    else if (tool === 'rectangle' || tool === 'ellipse') {
-      ed.createShape(tool, { x: local.x, y: local.y, w: size.w, h: size.h, parent });
-    }
+    // Lines and arrows stay at page root: their angle math is page-space.
+    const shapeParent = commit.shape === 'line' || commit.shape === 'arrow' ? undefined : parent;
+    ed.createShape(commit.shape, { x: commit.x, y: commit.y, w: commit.w, h: commit.h, parent: shapeParent });
   };
 
-  const onWheel = (e: React.WheelEvent) => {
-    const s = localPos(e);
-    if (e.ctrlKey || e.metaKey) {
+  // Latest viewport for high-frequency handlers: render closures go stale
+  // when moves batch between renders, dropping deltas.
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+
+  // Native non-passive wheel listener: React attaches wheel passively, so a
+  // React onWheel preventDefault is a no-op and ctrl+wheel would also drive
+  // browser page zoom. Re-subscribed every render; add/remove is cheap.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || ed.status !== 'ready') return;
+    const onWheelNative = (e: WheelEvent) => {
       e.preventDefault();
-      ed.zoomAt(s.x, s.y, viewport.zoom * Math.pow(1.0015, -e.deltaY));
-    } else {
-      e.preventDefault();
-      const dx = e.shiftKey && e.deltaX === 0 ? e.deltaY : e.deltaX;
-      const dy = e.shiftKey && e.deltaX === 0 ? 0 : e.deltaY;
-      ed.setViewport({ zoom: viewport.zoom, x: viewport.x - dx, y: viewport.y - dy });
-    }
-  };
+      const v = viewportRef.current;
+      const r = el.getBoundingClientRect();
+      const s = { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (e.ctrlKey || e.metaKey) {
+        ed.zoomAt(s.x, s.y, v.zoom * Math.pow(1.0015, -e.deltaY));
+      } else {
+        const dx = e.shiftKey && e.deltaX === 0 ? e.deltaY : e.deltaX;
+        const dy = e.shiftKey && e.deltaX === 0 ? 0 : e.deltaY;
+        ed.setViewport({ zoom: v.zoom, x: v.x - dx, y: v.y - dy });
+      }
+    };
+    el.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', onWheelNative);
+  });
 
   const cursor = tool === 'hand' || spaceDown ? (drag?.mode === 'pan' ? 'grabbing' : 'grab') : tool === 'select' ? 'default' : 'crosshair';
-  const moveDelta = drag?.mode === 'move' && drag.active ? { x: drag.cur.x - drag.start.x, y: drag.cur.y - drag.start.y } : null;
+  /**
+   * Snap-adjusted move delta plus alignment guides for a raw drag delta.
+   * Candidates are visible, non-selected layers (whole selected subtrees
+   * excluded); ids/boxes come from the engine snapshot, so preview and
+   * commit below always agree.
+   */
+  function moveSnapFor(raw: Pt): { delta: Pt; guides: SnapGuide[] } | null {
+    const tree = snapshot.tree;
+    if (!tree || snapshot.selection.length === 0) return null;
+    const moving: SnapBounds[] = [];
+    for (const id of snapshot.selection) {
+      const n = snapshot.byId.get(id);
+      if (!n || n.type === 'PAGE') continue;
+      const chain = findChain(tree, id) ?? [];
+      moving.push(pageBounds(n, chain.slice(0, -1)));
+    }
+    const u = unionBounds(moving);
+    if (!u) return null;
+    const excluded = new Set<number>();
+    for (const id of snapshot.selection) {
+      for (const sid of subtreeIds(tree, id)) excluded.add(sid);
+    }
+    const candidates: SnapBounds[] = [];
+    for (const [id, n] of snapshot.byId) {
+      if (n.type === 'PAGE' || !n.visible || excluded.has(id)) continue;
+      const chain = findChain(tree, id) ?? [];
+      const b = pageBounds(n, chain.slice(0, -1));
+      candidates.push({ x: b.x, y: b.y, w: b.w, h: b.h });
+    }
+    const adj = snapSelectionMove({ x: u.x + raw.x, y: u.y + raw.y, w: u.w, h: u.h }, candidates, viewport.zoom);
+    return { delta: { x: raw.x + adj.dx, y: raw.y + adj.dy }, guides: adj.guides };
+  }
+
+  const rawMove = drag?.mode === 'move' && drag.active ? { x: drag.cur.x - drag.start.x, y: drag.cur.y - drag.start.y } : null;
+  const snappedMove = rawMove ? moveSnapFor(rawMove) : null;
+  const moveDelta = snappedMove?.delta ?? rawMove;
+  const gridSize = Math.max(6, 24 * viewport.zoom);
 
   return (
     <div
@@ -351,11 +428,11 @@ export function EngineCanvas() {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onWheel={onWheel}
+      onPointerLeave={() => setHoverId(null)}
     >
       <div
         className="engine-grid"
-        style={{ backgroundSize: `${Math.max(6, 24 * viewport.zoom)}px ${Math.max(6, 24 * viewport.zoom)}px` }}
+        style={{ backgroundSize: `${gridSize}px ${gridSize}px`, backgroundPosition: `${viewport.x % gridSize}px ${viewport.y % gridSize}px` }}
       />
       {ed.status === 'loading' && (
         <div className="engine-center">
@@ -389,6 +466,7 @@ export function EngineCanvas() {
           {renderOverlays()}
         </svg>
       )}
+      <ToolPalette />
     </div>
   );
 
@@ -398,7 +476,7 @@ export function EngineCanvas() {
     const shift = moveDelta ?? { x: 0, y: 0 };
     if (hoverId !== null && !snapshot.selection.includes(hoverId)) {
       const n = snapshot.byId.get(hoverId);
-      if (n && n.type !== 'PAGE') els.push(<g key="hover">{outline(n, ancestorsOf(n.id), '#0d99ff', 1, 0.55, { x: 0, y: 0 })}</g>);
+      if (n && n.type !== 'PAGE') els.push(<g key="hover">{outline(n, ancestorsOf(n.id), '#007a56', 1, 0.55, { x: 0, y: 0 })}</g>);
     }
     for (const id of snapshot.selection) {
       const n = snapshot.byId.get(id);
@@ -409,7 +487,7 @@ export function EngineCanvas() {
       } else if (drag?.mode === 'resize' && drag.nodeId === id) {
         els.push(<g key={`sel-${id}`}>{resizedPreview(n, ancestorsOf(id), drag)}</g>);
       } else {
-        els.push(<g key={`sel-${id}`}>{outline(n, ancestorsOf(id), '#0d99ff', 1.5, 1, off)}</g>);
+        els.push(<g key={`sel-${id}`}>{outline(n, ancestorsOf(id), '#007a56', 1.5, 1, off)}</g>);
       }
     }
     if (snapshot.selection.length > 1) {
@@ -422,7 +500,7 @@ export function EngineCanvas() {
         const s0 = toScreen({ x: u.x + shift.x, y: u.y + shift.y });
         const s1 = toScreen({ x: u.x + u.w + shift.x, y: u.y + u.h + shift.y });
         els.push(
-          <rect key="union" x={s0.x} y={s0.y} width={s1.x - s0.x} height={s1.y - s0.y} fill="none" stroke="#0d99ff" strokeWidth={1} strokeDasharray="5 4" />,
+          <rect key="union" x={s0.x} y={s0.y} width={s1.x - s0.x} height={s1.y - s0.y} fill="none" stroke="#007a56" strokeWidth={1} strokeDasharray="5 4" />,
         );
       }
     }
@@ -432,10 +510,21 @@ export function EngineCanvas() {
       els.push(
         <g key="handles" transform={`translate(${dx} ${dy})`}>
           {Object.entries(handleLayout.handles).map(([k, p]) => (
-            <rect key={k} x={p.x - 4} y={p.y - 4} width={8} height={8} fill="#ffffff" stroke="#0d99ff" strokeWidth={1.5} />
+            <rect key={k} x={p.x - 4} y={p.y - 4} width={8} height={8} fill="#ffffff" stroke="#007a56" strokeWidth={1.5} />
           ))}
-          <line x1={handleLayout.rotateBase.x} y1={handleLayout.rotateBase.y} x2={handleLayout.rotateAt.x} y2={handleLayout.rotateAt.y} stroke="#0d99ff" strokeWidth={1.5} />
-          <circle cx={handleLayout.rotateAt.x} cy={handleLayout.rotateAt.y} r={5} fill="#ffffff" stroke="#0d99ff" strokeWidth={1.5} />
+          <line x1={handleLayout.rotateBase.x} y1={handleLayout.rotateBase.y} x2={handleLayout.rotateAt.x} y2={handleLayout.rotateAt.y} stroke="#007a56" strokeWidth={1.5} />
+          <circle cx={handleLayout.rotateAt.x} cy={handleLayout.rotateAt.y} r={5} fill="#ffffff" stroke="#007a56" strokeWidth={1.5} />
+        </g>,
+      );
+    }
+    if (snappedMove && snappedMove.guides.length > 0) {
+      els.push(
+        <g key="snap-guides">
+          {snappedMove.guides.map((g, i) => {
+            const a = toScreen({ x: g.x1, y: g.y1 });
+            const b = toScreen({ x: g.x2, y: g.y2 });
+            return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#f24822" strokeWidth={1} />;
+          })}
         </g>,
       );
     }
@@ -468,16 +557,14 @@ export function EngineCanvas() {
     return <polygon points={pts} fill="none" stroke={color} strokeWidth={width} opacity={opacity} />;
   }
 
-  /** Rotate the live corners about their bbox center by the transient delta. */
+  /** Rotate the live corners about the engine pivot by the transient delta. */
   function rotatedPreview(n: EngineNode, ancestors: EngineNode[], angleDeg: number): React.ReactNode {
     const corners = pageCorners(n, ancestors);
-    const box = pageBounds(n, ancestors);
-    const cx = box.x + box.w / 2;
-    const cy = box.y + box.h / 2;
+    const { x: cx, y: cy } = rotationPivot(n, ancestors);
     const displayedClockwise = -n.rotation;
     const m = rotateMatrix(angleDeg - displayedClockwise, cx, cy);
     const pts = corners.map((p) => applyMatrix(m, p.x, p.y)).map((p) => toScreen(p)).map((p) => `${p.x},${p.y}`).join(' ');
-    return <polygon points={pts} fill="rgba(13,153,255,0.08)" stroke="#0d99ff" strokeWidth={1.5} />;
+    return <polygon points={pts} fill="rgba(0,122,86,0.08)" stroke="#007a56" strokeWidth={1.5} />;
   }
 
   /** Recompute the frame at the transient resized size (anchor point fixed). */
@@ -495,37 +582,26 @@ export function EngineCanvas() {
     const pts = [
       { x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h },
     ].map((p) => applyMatrix(m, p.x, p.y)).map((p) => toScreen(p)).map((p) => `${p.x},${p.y}`).join(' ');
-    return <polygon points={pts} fill="rgba(13,153,255,0.08)" stroke="#0d99ff" strokeWidth={1.5} />;
+    return <polygon points={pts} fill="rgba(0,122,86,0.08)" stroke="#007a56" strokeWidth={1.5} />;
   }
 
   function ghostRect(a: Pt, b: Pt): React.ReactNode {
     const s0 = toScreen({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) });
     const s1 = toScreen({ x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) });
     return (
-      <rect x={s0.x} y={s0.y} width={Math.max(1, s1.x - s0.x)} height={Math.max(1, s1.y - s0.y)} fill="rgba(13,153,255,0.08)" stroke="#0d99ff" strokeWidth={1} strokeDasharray="4 3" />
+      <rect x={s0.x} y={s0.y} width={Math.max(1, s1.x - s0.x)} height={Math.max(1, s1.y - s0.y)} fill="rgba(0,122,86,0.08)" stroke="#007a56" strokeWidth={1} strokeDasharray="4 3" />
     );
   }
 
   function ghostLine(a: Pt, b: Pt): React.ReactNode {
-    if (tool === 'line') {
+    if (tool === 'line' || tool === 'arrow') {
       const s0 = toScreen(a);
       const s1 = toScreen(b);
-      return <line x1={s0.x} y1={s0.y} x2={s1.x} y2={s1.y} stroke="#0d99ff" strokeWidth={1.5} />;
+      return <line x1={s0.x} y1={s0.y} x2={s1.x} y2={s1.y} stroke="#007a56" strokeWidth={1.5} />;
     }
     const s0 = toScreen({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) });
     const s1 = toScreen({ x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) });
-    return <rect x={s0.x} y={s0.y} width={Math.max(1, s1.x - s0.x)} height={Math.max(1, s1.y - s0.y)} fill="none" stroke="#0d99ff" strokeWidth={1} />;
-  }
-}
-
-function defaultSize(tool: string): { w: number; h: number } {
-  switch (tool) {
-    case 'frame':
-      return { w: 300, h: 200 };
-    case 'ellipse':
-      return { w: 80, h: 80 };
-    default:
-      return { w: 100, h: 60 };
+    return <rect x={s0.x} y={s0.y} width={Math.max(1, s1.x - s0.x)} height={Math.max(1, s1.y - s0.y)} fill="none" stroke="#007a56" strokeWidth={1} />;
   }
 }
 

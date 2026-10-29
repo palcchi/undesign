@@ -827,6 +827,20 @@ export function snapMoveDelta(
   return { dx, dy, guides };
 }
 
+/**
+ * Canvas entry point for move-snapping: object alignment only (never grid),
+ * with the 6px feel scaled into page units by the current zoom. `moving`
+ * is the selection union already offset by the raw drag delta; the result
+ * is the corrective offset plus guides in page coordinates.
+ */
+export function snapSelectionMove(
+  moving: SnapBounds,
+  candidates: SnapBounds[],
+  zoom: number,
+): { dx: number; dy: number; guides: SnapGuide[] } {
+  return snapMoveDelta(moving, candidates, { grid: null, threshold: SNAP_THRESHOLD_PX / Math.max(zoom, 1e-6) });
+}
+
 /* ================= group / ungroup ================= */
 
 /**

@@ -2,7 +2,7 @@
  * Regression tests for move-snapping (object alignment + grid).
  * Run with `npm test` (bundled by the project's esbuild, executed by node).
  */
-import { GRID_PITCH, SNAP_THRESHOLD_PX, snapMoveDelta } from '../src/utils';
+import { GRID_PITCH, SNAP_THRESHOLD_PX, snapMoveDelta, snapSelectionMove } from '../src/utils';
 import type { SnapBounds } from '../src/utils';
 
 let failures = 0;
@@ -100,6 +100,24 @@ test('zero-size moving bounds still snap', () => {
   const r = snapMoveDelta(box(95, 100, 50, 0), [box(150, 100, 60, 40)], { grid: null, threshold: 10 });
   assert(r.dx === 5, `x snaps (got ${r.dx})`);
   assert(r.dy === 0, 'y already aligned');
+});
+
+test('canvas move-snapping scales the threshold by zoom', () => {
+  // Moving right edge 5 page-units from the candidate left edge.
+  const at1 = snapSelectionMove(box(95, 0, 50, 50), [box(150, 0, 60, 60)], 1);
+  assert(at1.dx === 5 && at1.dy === 0, `snaps at zoom 1 (got ${at1.dx},${at1.dy})`);
+  assert(at1.guides.some((g) => g.x1 === 150 && g.x2 === 150), 'guide at x=150');
+  // At zoom 4 the same 5-unit gap is 20 screen px: outside the 6px feel.
+  const at4 = snapSelectionMove(box(95, 0, 50, 50), [box(150, 0, 60, 60)], 4);
+  assert(at4.dx === 0 && at4.dy === 0, `no snap at zoom 4 (got ${at4.dx},${at4.dy})`);
+  // Zero-offset exact alignment still reports its guide, Figma-style.
+  assert(at4.guides.every((g) => g.y1 === 0 && g.y2 === 0), 'only the exact y=0 guide');
+});
+
+test('canvas move-snapping never snaps to grid', () => {
+  // x=10 is 2 units off the 24-pitch grid but far from any object.
+  const r = snapSelectionMove(box(10, 10, 50, 50), [], 1);
+  assert(r.dx === 0 && r.dy === 0, 'objects-or-nothing');
 });
 
 if (failures > 0) {

@@ -8,6 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { EngineAdapter, type EngineNode, type EnginePage } from './adapter';
+import { resolveStoredEngine } from './boot';
 import { convertUndesignToEngine, type ConvertResult } from './convert';
 import { readEngineSnapshot } from './readback';
 import { loadWasmEngine, type WasmEngineInstance } from '../wasm/engine';
@@ -263,6 +264,8 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   );
 
   // ---- boot: stored engine doc → legacy UND conversion → sample seed ----
+  // Corrupt storage never bricks the app: bad bytes are backed up under
+  // `<key>.corrupt` and boot falls through to the next source with a notice.
   useEffect(() => {
     let alive = true;
     loadWasmEngine()
@@ -271,24 +274,57 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         factoryRef.current = createSession;
         const api = new EngineAdapter(engine);
         adapterRef.current = api;
+        const execute = (cmd: string, params: Record<string, unknown>): unknown => api.cmd(cmd, params);
+        const checkpoint = (): void => {
+          // Collapse conversion commands out of history: a fresh boot starts
+          // with nothing to undo. load() replaces state and resets history.
+          api.load(api.save());
+          try {
+            window.localStorage.setItem(ENGINE_STORAGE_KEY, api.save());
+          } catch {
+            // Quota/unavailable — the app keeps working in memory.
+          }
+        };
+        const bootFresh = (): string | null => {
+          const legacy = loadStoredDoc();
+          if (legacy) {
+            try {
+              const res = convertUndesignToEngine(legacy, { execute });
+              setMigration(res);
+              checkpoint();
+              return res.warnings.length === 0
+                ? `Migrated your document (${res.objects} objects, ${res.pages} pages).`
+                : `Migrated your document (${res.objects} objects) with ${res.warnings.length} noted approximation(s).`;
+            } catch {
+              // Unmigratable legacy doc — fall through to the sample seed.
+            }
+          }
+          convertUndesignToEngine(createSampleDoc(), { execute });
+          checkpoint();
+          return legacy ? 'The previous document could not be migrated, so a sample was started.' : null;
+        };
+        const corruptNote =
+          'The stored document was corrupt, so a fresh document was started. The corrupt bytes were kept for inspection.';
         let note: string | null = null;
         try {
-          const stored = window.localStorage.getItem(ENGINE_STORAGE_KEY);
-          if (stored) {
-            api.load(stored);
-          } else {
-            const legacy = loadStoredDoc();
-            if (legacy) {
-              const res = convertUndesignToEngine(legacy, { execute: (cmd, params) => api.cmd(cmd, params) });
-              setMigration(res);
-              note =
-                res.warnings.length === 0
-                  ? `Migrated your document (${res.objects} objects, ${res.pages} pages).`
-                  : `Migrated your document (${res.objects} objects) with ${res.warnings.length} noted approximation(s).`;
-            } else {
-              convertUndesignToEngine(createSampleDoc(), { execute: (cmd, params) => api.cmd(cmd, params) });
+          const resolved = resolveStoredEngine(window.localStorage, ENGINE_STORAGE_KEY);
+          if (resolved.json) {
+            try {
+              api.load(resolved.json);
+            } catch {
+              // Plausible shape but engine-rejected: preserve and boot fresh.
+              try {
+                window.localStorage.setItem(`${ENGINE_STORAGE_KEY}.corrupt`, resolved.json);
+                window.localStorage.removeItem(ENGINE_STORAGE_KEY);
+              } catch {
+                // Best-effort; recovery proceeds regardless.
+              }
+              bootFresh();
+              note = corruptNote;
             }
-            window.localStorage.setItem(ENGINE_STORAGE_KEY, api.save());
+          } else {
+            const freshNote = bootFresh();
+            note = resolved.recovered ? corruptNote : freshNote;
           }
         } catch (e) {
           if (!alive) return;
@@ -760,6 +796,8 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     const factory = factoryRef.current;
     if (!factory) return;
     adapterRef.current = new EngineAdapter(factory());
+    // The engine clipboard is per-session: a fresh session has nothing to paste.
+    clipboard.current = 0;
     setMigration(null);
     refresh();
     persist();
@@ -814,12 +852,15 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     try {
       const pages = api.pages();
       const current = pages.find((p) => p.current) ?? pages[0] ?? null;
+      // page.select clears engine selection on every hop: hold and restore.
+      const keepSelection = api.selection();
       const trees = new Map<number, EngineNode>();
       for (const p of pages) {
         api.selectPage(p.id);
         trees.set(p.id, api.describePage(32));
       }
       if (current) api.selectPage(current.id);
+      if (keepSelection.length > 0) api.setSelection(keepSelection);
       refresh();
       return { pages, trees };
     } catch (e) {
@@ -832,7 +873,11 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   const exportUndesignDoc = useCallback((): UndesignDoc | null => {
     const snap = snapshotAllPages();
     if (!snap) return null;
-    const { doc } = readEngineSnapshot(snap.pages, snap.trees, snapshot.docName);
+    const { doc, warnings } = readEngineSnapshot(snap.pages, snap.trees, snapshot.docName);
+    // Mirror the import path: lossy export must say so, not stay silent.
+    if (warnings.length > 0) {
+      setNotice(`Exported with ${warnings.length} noted approximation(s): ${warnings.slice(0, 3).map((w) => w.property).join(', ')}${warnings.length > 3 ? ', …' : ''}.`);
+    }
     return doc;
   }, [snapshotAllPages, snapshot.docName]);
 

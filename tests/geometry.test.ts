@@ -3,7 +3,7 @@
  * most importantly — agreement with real engine `absoluteBounds` from the
  * captured fixture (including a rotated node). Run with `npm test`.
  */
-import { chainToPageMatrix, findChain, pageBounds, pageCorners, pageToLocal } from '../src/engine/geometry';
+import { chainToPageMatrix, findChain, pageBounds, pageCorners, pageToLocal, pointerAngleDeg, rotationFromPointer, rotationPivot } from '../src/engine/geometry';
 import { parseEngineNode, type EngineNode } from '../src/engine/adapter';
 // @ts-ignore: JSON fixture import (esbuild bundles it; tsc never sees tests).
 import snapshotJson from './fixtures/engine-tree.json';
@@ -97,6 +97,39 @@ test('composed bounds agree with real engine absoluteBounds', () => {
 test('chainToPageMatrix of an empty chain is identity', () => {
   const m = chainToPageMatrix([]);
   assert(m.a === 1 && m.d === 1 && m.e === 0 && m.f === 0, 'identity');
+});
+
+test('rotation pivot is the local-box center the engine setter preserves', () => {
+  const plain = node({ x: 10, y: 20, width: 100, height: 50 });
+  const p0 = rotationPivot(plain, []);
+  assert(p0.x === 60 && p0.y === 45, `unrotated pivot, got ${p0.x},${p0.y}`);
+  // rotation 90 (ccw-positive) maps local (50,25) to page (35,-30).
+  const spun = node({ x: 10, y: 20, width: 100, height: 50, rotation: 90 });
+  const p1 = rotationPivot(spun, []);
+  assert(approx(p1.x, 35) && approx(p1.y, -30), `rotated pivot, got ${p1.x},${p1.y}`);
+  // Nested: frame offset (15,25) + R(-45deg) applied to local (10,5).
+  const frame = node({ id: 1, type: 'FRAME', x: 10, y: 20, width: 300, height: 200 });
+  const kid = node({ id: 2, x: 5, y: 5, width: 20, height: 10, rotation: 45 });
+  const p2 = rotationPivot(kid, [frame]);
+  assert(approx(p2.x, 25.6066, 1e-4) && approx(p2.y, 21.4645, 1e-4), `nested pivot, got ${p2.x},${p2.y}`);
+});
+
+test('pointer angle runs clockwise from north', () => {
+  const c = { x: 0, y: 0 };
+  assert(approx(pointerAngleDeg(c, { x: 0, y: -10 }), 0), 'north');
+  assert(approx(pointerAngleDeg(c, { x: 10, y: 0 }), 90), 'east');
+  assert(Math.abs(pointerAngleDeg(c, { x: 0, y: 10 })) === 180, 'south');
+  assert(approx(pointerAngleDeg(c, { x: -10, y: 0 }), -90), 'west');
+});
+
+test('grab offset keeps the first move continuous', () => {
+  const c = { x: 100, y: 100 };
+  const displayed = 30;
+  const grab = { x: 160, y: 100 }; // grabbed east of pivot, not at 30deg
+  const offset = pointerAngleDeg(c, grab) - displayed;
+  assert(approx(rotationFromPointer(c, grab, offset), displayed), 'no snap on grab');
+  const moved = { x: 100, y: 40 }; // swung east(90)->north(0): -90deg of drag
+  assert(approx(rotationFromPointer(c, moved, offset), displayed - 90), 'drag delta preserved');
 });
 
 if (failures > 0) {
