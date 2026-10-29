@@ -231,10 +231,10 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
             {TYPE_LABEL[obj.type]}{obj.componentId ? ' (Instance)' : ''}
           </span>
           <span className="prop-head-actions">
-            <button className={`mini-btn${obj.locked ? ' on' : ''}`} title={obj.locked ? 'Unlock' : 'Lock'} onClick={() => toggleLock(obj.id)}>
+            <button className={`mini-btn${obj.locked ? ' on' : ''}`} title={obj.locked ? 'Unlock' : 'Lock'} aria-label={obj.locked ? 'Unlock' : 'Lock'} aria-pressed={obj.locked} onClick={() => toggleLock(obj.id)}>
               {obj.locked ? <Lock size={13} /> : <LockOpen size={13} />}
             </button>
-            <button className="mini-btn" title={obj.visible ? 'Hide' : 'Show'} onClick={() => toggleVisibility(obj.id)}>
+            <button className="mini-btn" title={obj.visible ? 'Hide' : 'Show'} aria-label={obj.visible ? 'Hide' : 'Show'} aria-pressed={!obj.visible} onClick={() => toggleVisibility(obj.id)}>
               {obj.visible ? <Eye size={13} /> : <EyeOff size={13} />}
             </button>
           </span>
@@ -670,13 +670,13 @@ function MultiProperties({ objs }: { objs: DesignObject[] }) {
         </div>
         <div className="prop-section">
           <div className="prop-title">Align</div>
-          <div className="align-grid">
-            <button className="icon-btn" data-tip="Align left" onClick={() => align('left')}><AlignStartVertical size={15} /></button>
-            <button className="icon-btn" data-tip="Align center" onClick={() => align('centerX')}><AlignCenterVertical size={15} /></button>
-            <button className="icon-btn" data-tip="Align right" onClick={() => align('right')}><AlignEndVertical size={15} /></button>
-            <button className="icon-btn" data-tip="Align top" onClick={() => align('top')}><AlignStartHorizontal size={15} /></button>
-            <button className="icon-btn" data-tip="Align middle" onClick={() => align('centerY')}><AlignCenterHorizontal size={15} /></button>
-            <button className="icon-btn" data-tip="Align bottom" onClick={() => align('bottom')}><AlignEndHorizontal size={15} /></button>
+          <div className="align-grid" role="toolbar" aria-label="Align selection">
+            <button className="icon-btn" data-tip="Align left" aria-label="Align left" onClick={() => align('left')}><AlignStartVertical size={15} /></button>
+            <button className="icon-btn" data-tip="Align center" aria-label="Align center" onClick={() => align('centerX')}><AlignCenterVertical size={15} /></button>
+            <button className="icon-btn" data-tip="Align right" aria-label="Align right" onClick={() => align('right')}><AlignEndVertical size={15} /></button>
+            <button className="icon-btn" data-tip="Align top" aria-label="Align top" onClick={() => align('top')}><AlignStartHorizontal size={15} /></button>
+            <button className="icon-btn" data-tip="Align middle" aria-label="Align middle" onClick={() => align('centerY')}><AlignCenterHorizontal size={15} /></button>
+            <button className="icon-btn" data-tip="Align bottom" aria-label="Align bottom" onClick={() => align('bottom')}><AlignEndHorizontal size={15} /></button>
           </div>
         </div>
         <div className="prop-section">

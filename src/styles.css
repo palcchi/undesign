@@ -51,6 +51,27 @@ button {
   outline-offset: 1px;
 }
 
+/* Skip link: hidden until keyboard focus. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 700;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 7px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  top: 8px;
+  color: #fff;
+  outline-color: #fff;
+}
+
 /* ---------- app frame ---------- */
 
 .app {
@@ -92,6 +113,15 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.topbar-center .tool-group {
+  flex-shrink: 0;
+}
+
+.topbar-center .tool-sep {
+  flex-shrink: 0;
 }
 
 .topbar-right {
@@ -143,6 +173,9 @@ button {
   top: calc(100% + 4px);
   left: 0;
   min-width: 230px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -166,8 +199,10 @@ button {
   white-space: nowrap;
 }
 
-.menu-item:hover:not(:disabled) {
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible:not(:disabled) {
   background: var(--bg-softer);
+  outline: none;
 }
 
 .menu-item:disabled {
@@ -176,8 +211,14 @@ button {
 }
 
 .menu-shortcut {
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-size: 12px;
+}
+
+/* Keep the last (rightmost) menu inside the viewport. */
+.menu-wrap:last-child .menu-drop {
+  left: auto;
+  right: 0;
 }
 
 .menu-divider {
@@ -214,6 +255,7 @@ button {
   font-weight: 600;
   font-size: 13px;
   width: 200px;
+  max-width: 100%;
   outline: none;
 }
 
@@ -326,6 +368,11 @@ button {
   background: var(--bg-softer);
 }
 
+.btn.small {
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+
 .btn:disabled {
   opacity: 0.45;
   cursor: default;
@@ -372,7 +419,8 @@ button {
   position: relative;
 }
 
-[data-tip]:hover::after {
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
   content: attr(data-tip);
   position: absolute;
   top: calc(100% + 8px);
@@ -549,6 +597,16 @@ button {
   color: var(--ink-3);
   cursor: pointer;
   flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.layer-row:focus-visible,
+.page-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .collapse-btn.invisible {
@@ -590,7 +648,8 @@ button {
 }
 
 .layer-row:hover .layer-actions,
-.layer-row.selected .layer-actions {
+.layer-row.selected .layer-actions,
+.layer-row:focus-within .layer-actions {
   display: inline-flex;
 }
 
@@ -663,7 +722,7 @@ button {
 }
 
 .page-count {
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -936,6 +995,8 @@ button {
   padding: 28px 32px;
   text-align: center;
   max-width: 380px;
+  width: calc(100vw - 32px);
+  margin: 0 16px;
 }
 
 .canvas-empty-icon {
@@ -1082,7 +1143,7 @@ select.text-input {
 .num-suffix {
   position: absolute;
   right: 8px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-size: 11px;
   pointer-events: none;
 }
@@ -1128,6 +1189,11 @@ select.text-input {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.color-field .opacity-inline {
+  min-width: 0;
 }
 
 .swatch-input {
@@ -1456,6 +1522,7 @@ input[type="range"] {
 .ctx-menu {
   position: fixed;
   min-width: 210px;
+  max-width: calc(100vw - 16px);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1479,8 +1546,10 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-.ctx-item:hover:not(:disabled) {
+.ctx-item:hover:not(:disabled),
+.ctx-item:focus-visible:not(:disabled) {
   background: var(--bg-softer);
+  outline: none;
 }
 
 .ctx-item:disabled {
@@ -1493,7 +1562,7 @@ input[type="range"] {
 }
 
 .ctx-shortcut {
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-size: 12px;
 }
 
@@ -1512,6 +1581,8 @@ input[type="range"] {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
   z-index: 400;
 }
 
@@ -1519,10 +1590,12 @@ input[type="range"] {
   background: var(--bg);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 80px);
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  margin: auto;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .modal-head {
@@ -1568,6 +1641,7 @@ textarea.text-input {
 
 .dialog-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
 }
@@ -1584,9 +1658,16 @@ textarea.text-input {
   gap: 12px;
 }
 
+.field-row > .text-input,
+.field-row > .seg {
+  flex: 1;
+  min-width: 0;
+}
+
 .field-label {
   font-weight: 600;
   font-size: 12.5px;
+  flex-shrink: 0;
 }
 
 .shortcut-list {
@@ -1638,6 +1719,7 @@ textarea.text-input {
   gap: 10px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   max-width: min(520px, calc(100vw - 48px));
+  text-align: center;
 }
 
 .notice-toast .mini-btn {
@@ -1664,10 +1746,19 @@ textarea.text-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   padding: 12px 20px;
   color: #fff;
   font-weight: 600;
   cursor: default;
+}
+
+.preview-bar > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .preview-bar .dim {
@@ -1726,6 +1817,7 @@ textarea.text-input {
     top: 0;
     bottom: 0;
     z-index: 60;
+    max-width: 85vw;
     box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
   }
 
@@ -1741,12 +1833,34 @@ textarea.text-input {
     top: 0;
     bottom: 0;
     z-index: 60;
+    max-width: 85vw;
     box-shadow: 8px 0 24px rgba(0, 0, 0, 0.08);
   }
 
   .topbar {
     gap: 6px;
-    padding: 0 8px;
+    padding: 4px 8px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 48px;
+    row-gap: 4px;
+  }
+
+  .topbar-left {
+    flex: 1 1 auto;
+    order: 1;
+  }
+
+  .topbar-right {
+    flex: 0 0 auto;
+    order: 2;
+    margin-left: auto;
+  }
+
+  .topbar-center {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: center;
   }
 
   .topbar-right .btn span {
@@ -1759,6 +1873,107 @@ textarea.text-input {
 
   .menus {
     display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-left {
+    flex: 0 1 auto;
+  }
+
+  .topbar-right {
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+
+  .doc-name {
+    display: none;
+  }
+
+  .canvas-empty-actions {
+    flex-wrap: wrap;
+  }
+
+  .canvas-empty-card {
+    padding: 20px;
+  }
+
+  .preview-stage {
+    padding: 0 12px 20px;
+  }
+
+  .preview-bar .dim {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar-center {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  /* Only the Tools group scrolls: it holds no dropdown, so nothing gets clipped. */
+  .topbar-center .tool-group[aria-label="Tools"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .topbar-center .tool-group[aria-label="Tools"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  .field-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .shortcut-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .shortcut-keys {
+    min-width: 0;
+  }
+}
+
+/* Touch devices: larger targets, no hover-only controls, no iOS focus zoom. */
+@media (pointer: coarse) {
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .mini-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .layer-row {
+    height: 34px;
+  }
+
+  .layer-row .layer-actions {
+    display: inline-flex;
+  }
+
+  .sidebar-tab {
+    padding: 10px 10px 12px;
+  }
+
+  .text-input,
+  .layers-search input,
+  .doc-name-input,
+  .layer-rename {
+    font-size: 16px;
+  }
+
+  .color-field {
+    flex-wrap: wrap;
   }
 }
 
