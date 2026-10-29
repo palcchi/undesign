@@ -2,7 +2,7 @@
  * Regression tests for deletion planning and cycle-safe traversal.
  * Run with `npm test` (bundled by the project's esbuild, executed by node).
  */
-import { planObjectDeletion } from '../src/store';
+import { planObjectDeletion } from '../src/docpatch';
 import { descendantIds } from '../src/utils';
 import type { DesignObject } from '../src/types';
 

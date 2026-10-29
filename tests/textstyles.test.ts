@@ -4,7 +4,7 @@
  */
 import { applyTextStyleValues, canHaveTextStyle, propagateTextStyles, textStyleValuesEqual, textStyleValuesOf } from '../src/system';
 import { validateDoc } from '../src/storage';
-import { patchAllPages } from '../src/store';
+import { patchAllPages } from '../src/docpatch';
 import type { DesignObject, DocPage, ObjectType, TextStyle, UndesignDoc } from '../src/types';
 
 let failures = 0;

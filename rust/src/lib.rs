@@ -67,6 +67,42 @@ impl Engine {
         Ok(())
     }
 
+    /// Describe the active page subtree as JSON (engine `node_json` with
+    /// `depth` levels of children; deeper subtrees report `childCount`).
+    /// Depth is clamped to 0..=32. One call feeds the whole layer tree.
+    pub fn describe_page(&self, depth: usize) -> Result<String, String> {
+        let doc = self.session.doc().map_err(|e| e.to_string())?;
+        let page = self.session.page().map_err(|e| e.to_string())?;
+        let v = figcraft_engine::inspect::node_json(doc, page, depth.min(32));
+        serde_json::to_string(&v).map_err(|e| e.to_string())
+    }
+
+    /// Click-hit the active page in page coordinates. Returns the topmost
+    /// node id as JSON (`{"id":…}`) or `null`. Uses the engine's own
+    /// click-through rules; boolean-result outlines are not resolved (the
+    /// `result` closure is session-UI state, so plain geometry applies).
+    pub fn hit_test(&self, x: f64, y: f64) -> Result<String, String> {
+        let doc = self.session.doc().map_err(|e| e.to_string())?;
+        let page = self.session.page().map_err(|e| e.to_string())?;
+        let pt = figcraft_geom::Point::new(x, y);
+        let out = match doc.hit_test(page, pt, 0.5, None) {
+            Some(id) => serde_json::json!({ "id": id }),
+            None => serde_json::Value::Null,
+        };
+        serde_json::to_string(&out).map_err(|e| e.to_string())
+    }
+
+    /// Describe one node (includes direct-children summaries).
+    /// Errors when the id names no node.
+    pub fn describe_node(&self, id: u64) -> Result<String, String> {
+        let doc = self.session.doc().map_err(|e| e.to_string())?;
+        let v = figcraft_engine::inspect::node_json(doc, NodeId(id), 1);
+        if v.is_null() {
+            return Err(format!("no node {id}"));
+        }
+        serde_json::to_string(&v).map_err(|e| e.to_string())
+    }
+
     /// Small JSON summary of the active document: name, page count,
     /// node count, active page id, and selection.
     pub fn doc_info(&self) -> Result<String, String> {
@@ -167,6 +203,25 @@ impl WasmEngine {
         self.inner.doc_info().map_err(|e| JsValue::from_str(&e))
     }
 
+    #[wasm_bindgen(js_name = describePage)]
+    pub fn describe_page(&self, depth: u32) -> Result<String, JsValue> {
+        self.inner
+            .describe_page(depth as usize)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    #[wasm_bindgen(js_name = describeNode)]
+    pub fn describe_node(&self, id: f64) -> Result<String, JsValue> {
+        self.inner
+            .describe_node(id as u64)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    #[wasm_bindgen(js_name = hitTest)]
+    pub fn hit_test(&self, x: f64, y: f64) -> Result<String, JsValue> {
+        self.inner.hit_test(x, y).map_err(|e| JsValue::from_str(&e))
+    }
+
     #[wasm_bindgen(js_name = exportPageSvg)]
     pub fn export_page_svg(&self) -> Result<String, JsValue> {
         self.inner
@@ -253,6 +308,21 @@ mod tests {
     }
 
     #[test]
+    fn hit_test_returns_topmost_and_null() {
+        let mut engine = Engine::new();
+        let id = rect(&mut engine, 10.0, 10.0);
+        let hit = engine.hit_test(60.0, 40.0).expect("hit");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&hit).unwrap()["id"]
+                .as_u64()
+                .unwrap(),
+            id
+        );
+        let miss = engine.hit_test(500.0, 500.0).expect("miss");
+        assert_eq!(miss, "null");
+    }
+
+    #[test]
     fn page_svg_export_renders_created_shapes() {
         let mut engine = Engine::new();
         rect(&mut engine, 10.0, 20.0);
@@ -267,6 +337,241 @@ mod tests {
             svg.contains("matrix(1 0 0 1 10 20)"),
             "rectangle transform rendered, got {svg}"
         );
+    }
+
+    #[test]
+    fn describe_page_reports_the_whole_tree() {
+        let mut engine = Engine::new();
+        let f: u64 = serde_json::from_str::<serde_json::Value>(
+            &engine
+                .execute("node.create", r#"{"type":"frame","name":"Card","x":0,"y":0,"width":300,"height":200}"#)
+                .unwrap(),
+        )
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        engine
+            .execute(
+                "shape.rectangle",
+                &format!(r##"{{"x":8,"y":8,"width":40,"height":20,"parent":{f},"props":{{"fill":"#FF0000"}}}}"##),
+            )
+            .unwrap();
+        let tree: serde_json::Value = serde_json::from_str(&engine.describe_page(8).unwrap()).unwrap();
+        assert_eq!(tree["type"], "PAGE");
+        assert_eq!(tree["children"].as_array().unwrap().len(), 1);
+        let frame = &tree["children"][0];
+        assert_eq!(frame["name"], "Card");
+        assert_eq!(frame["type"], "FRAME");
+        assert_eq!(frame["children"].as_array().unwrap().len(), 1);
+        let rect = &frame["children"][0];
+        assert_eq!(rect["type"], "RECTANGLE");
+        assert_eq!(rect["fills"][0]["color"], "#FF0000");
+        // Depth 0 reports counts instead of subtrees.
+        let shallow: serde_json::Value = serde_json::from_str(&engine.describe_page(0).unwrap()).unwrap();
+        assert_eq!(shallow["childCount"], 1);
+        assert!(shallow.get("children").is_none());
+    }
+
+    #[test]
+    fn describe_node_reports_props_and_rejects_unknown_ids() {
+        let mut engine = Engine::new();
+        let id = rect(&mut engine, 5.0, 6.0);
+        let v: serde_json::Value = serde_json::from_str(&engine.describe_node(id).unwrap()).unwrap();
+        assert_eq!(v["id"], id);
+        assert_eq!(v["x"], 5.0);
+        assert_eq!(v["width"], 100.0);
+        assert!(engine.describe_node(999_999).is_err());
+    }
+
+    /// Mirrors the TypeScript UND→FC converter emission step for step: if the
+    /// converter's command sequence ever drifts from what the engine accepts,
+    /// this test (and its TS twin) fails first.
+    #[test]
+    fn migration_script_builds_a_full_page() {
+        let mut engine = Engine::new();
+        // Pages.
+        let pages: serde_json::Value = serde_json::from_str(
+            &engine.execute("page.list", "{}").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(pages.as_array().unwrap().len(), 1);
+        let p2: u64 = serde_json::from_str::<serde_json::Value>(
+            &engine.execute("page.add", r#"{"name":"Second"}"#).unwrap(),
+        )
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        engine
+            .execute("page.select", &format!(r#"{{"id":{p2}}}"#))
+            .unwrap();
+        engine
+            .execute("page.rename", &format!(r#"{{"id":{p2},"name":"Renamed"}}"#))
+            .unwrap();
+        // Frame + shapes with props.
+        let f: u64 = serde_json::from_str::<serde_json::Value>(
+            &engine.execute("node.create", r#"{"type":"frame","name":"Card","x":10,"y":20,"width":300,"height":200,"props":{"fills":[]}}"#).unwrap(),
+        )
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        let r: u64 = serde_json::from_str::<serde_json::Value>(
+            &engine.execute("shape.rectangle", &format!(r##"{{"x":16,"y":12,"width":80,"height":32,"parent":{f},"props":{{"fill":"#FF4D00","cornerRadius":8}}}}"##)).unwrap(),
+        )
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        let e: u64 = serde_json::from_str::<serde_json::Value>(
+            &engine.execute("shape.ellipse", &format!(r#"{{"x":16,"y":60,"width":40,"height":40,"parent":{f}}}"#)).unwrap(),
+        )
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        // Text with typography.
+        let t: u64 = serde_json::from_str::<serde_json::Value>(
+            &engine.execute("text.create", &format!(r#"{{"text":"Hello","x":16,"y":110,"parent":{f},"props":{{"fontSize":24}}}}"#)).unwrap(),
+        )
+        .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        engine
+            .execute("text.set", &format!(r#"{{"id":{t},"characters":"Hello!"}}"#))
+            .unwrap();
+        engine
+            .execute("node.set", &format!(r#"{{"id":{t},"props":{{"fontSize":20,"textAlign":"center"}}}}"#))
+            .unwrap();
+        // Geometry + style edits.
+        engine
+            .execute("node.set", &format!(r#"{{"id":{r},"props":{{"name":"Chip","opacity":0.5,"rotation":15}}}}"#))
+            .unwrap();
+        engine
+            .execute("fill.set", &format!(r##"{{"ids":[{r}],"color":"#00FF00"}}"##))
+            .unwrap();
+        engine
+            .execute("stroke.set", &format!(r##"{{"ids":[{r}],"color":"#000000"}}"##))
+            .unwrap();
+        engine
+            .execute("node.set", &format!(r#"{{"id":{r},"props":{{"strokeWeight":2}}}}"#))
+            .unwrap();
+        // Singular stroke + typed translucent fill (the converter's forms).
+        engine
+            .execute("node.set", &format!(r##"{{"id":{e},"props":{{"stroke":"#112233","strokeWeight":3}}}}"##))
+            .unwrap();
+        engine
+            .execute(
+                "node.set",
+                &format!(r##"{{"id":{e},"props":{{"fills":[{{"type":"solid","color":"#445566","opacity":0.5}}]}}}}"##),
+            )
+            .unwrap();
+        engine
+            .execute("transform.move", &format!(r#"{{"ids":[{e}],"dx":4,"dy":4}}"#))
+            .unwrap();
+        engine
+            .execute("transform.resize", &format!(r#"{{"ids":[{e}],"width":48,"height":48}}"#))
+            .unwrap();
+        // Duplicate via copy+paste, then delete the copy.
+        engine.execute("edit.copy", &format!(r#"{{"ids":[{r}]}}"#)).unwrap();
+        let pasted: u64 = serde_json::from_str::<serde_json::Value>(
+            &engine.execute("edit.paste", &format!(r#"{{"parent":{f},"x":200,"y":150}}"#)).unwrap(),
+        )
+        .unwrap()["ids"][0]
+            .as_u64()
+            .unwrap();
+        assert_ne!(pasted, r);
+        engine
+            .execute("edit.delete", &format!(r#"{{"ids":[{pasted}]}}"#))
+            .unwrap();
+        // Visibility / lock toggles with explicit values.
+        engine
+            .execute("object.toggleVisible", &format!(r#"{{"ids":[{e}],"visible":false}}"#))
+            .unwrap();
+        engine
+            .execute("object.toggleLock", &format!(r#"{{"ids":[{e}],"locked":true}}"#))
+            .unwrap();
+        // Verify the migrated state through describe.
+        let tree: serde_json::Value = serde_json::from_str(&engine.describe_page(8).unwrap()).unwrap();
+        assert_eq!(tree["children"].as_array().unwrap().len(), 1);
+        let frame = &tree["children"][0];
+        assert_eq!(frame["children"].as_array().unwrap().len(), 3);
+        let chip = &frame["children"][0];
+        assert_eq!(chip["name"], "Chip");
+        assert_eq!(chip["fills"][0]["color"], "#00FF00");
+        assert_eq!(chip["strokes"][0]["color"], "#000000");
+        assert_eq!(chip["strokeWeight"], 2.0);
+        assert_eq!(chip["opacity"], 0.5);
+        assert_eq!(chip["cornerRadius"], 8.0);
+        assert_eq!(chip["rotation"], 15.0);
+        let ell = &frame["children"][1];
+        assert_eq!(ell["visible"], false);
+        assert_eq!(ell["locked"], true);
+        assert_eq!(ell["x"], 20.0);
+        assert_eq!(ell["width"], 48.0);
+        assert_eq!(ell["strokes"][0]["color"], "#112233");
+        assert_eq!(ell["strokeWeight"], 3.0);
+        assert_eq!(ell["fills"][0]["color"], "#445566");
+        assert_eq!(ell["fills"][0]["opacity"], 0.5);
+        let txt = &frame["children"][2];
+        assert_eq!(txt["characters"], "Hello!");
+        assert_eq!(txt["fontSize"], 20.0);
+        assert_eq!(txt["textAlign"], "center");
+        // Hit-testing and marquee see the migrated layers.
+        let hit: serde_json::Value = serde_json::from_str(
+            &engine.execute("select.layersAt", r#"{"x":30,"y":40}"#).unwrap(),
+        )
+        .unwrap();
+        assert!(!hit["layers"].as_array().unwrap().is_empty(), "hit finds layers");
+        let area: serde_json::Value = serde_json::from_str(
+            &engine.execute("select.area", r#"{"x":0,"y":0,"width":500,"height":500}"#).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(area["selection"].as_array().unwrap().len(), 1, "marquee selects the frame");
+        // The whole script is undoable.
+        assert!(engine.undo_depth().0 > 10);
+    }
+
+    #[test]
+    fn line_rotation_maps_endpoints_clockwise_in_screen_space() {
+        let mut engine = Engine::new();
+        // UND line (10,20)->(110,80): the engine rotates
+        // counter-clockwise-positive about the line's center, so the
+        // converter negates the screen-clockwise UND angle (its exact
+        // formula) and centers the unrotated line on the UND midpoint.
+        let (x0, y0, x1, y1): (f64, f64, f64, f64) = (10.0, 20.0, 110.0, 80.0);
+        let len = ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt();
+        let deg = -((y1 - y0).atan2(x1 - x0).to_degrees());
+        let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+        let out: serde_json::Value = serde_json::from_str(
+            &engine
+                .execute(
+                    "shape.line",
+                    &format!(
+                        r#"{{"x":{},"y":{},"width":{},"props":{{"rotation":{}}}}}"#,
+                        cx - len / 2.0,
+                        cy,
+                        len,
+                        deg
+                    ),
+                )
+                .unwrap(),
+        )
+        .unwrap();
+        let id = out["id"].as_u64().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&engine.describe_node(id).unwrap()).unwrap();
+        let b = &v["absoluteBounds"];
+        assert!((b["x"].as_f64().unwrap() - 10.0).abs() < 1.0, "box x0, got {b}");
+        assert!((b["y"].as_f64().unwrap() - 20.0).abs() < 1.0, "box y0, got {b}");
+        assert!((b["width"].as_f64().unwrap() - 100.0).abs() < 1.0, "box w, got {b}");
+        assert!((b["height"].as_f64().unwrap() - 60.0).abs() < 1.0, "box h, got {b}");
+        // The box alone cannot tell up from down: the transform's b
+        // coefficient must be positive so the line descends left-to-right.
+        let t = engine
+            .session
+            .doc()
+            .unwrap()
+            .node(NodeId(id))
+            .unwrap()
+            .transform
+            .as_coeffs();
+        assert!(t[1] > 0.0, "line descends left-to-right, got {t:?}");
     }
 
     #[test]

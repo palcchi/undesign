@@ -19,6 +19,12 @@ export interface WasmEngineInstance {
   setSelection(idsJson: string): void;
   /** JSON document summary; see rust/src/lib.rs. */
   docInfo(): string;
+  /** Active page subtree as JSON (depth levels of children). */
+  describePage(depth: number): string;
+  /** One node as JSON; throws when the id names no node. */
+  describeNode(id: number): string;
+  /** Click-hit the active page in page coords: `{"id":…}` or `null`. */
+  hitTest(x: number, y: number): string;
   exportPageSvg(): string;
   save(): string;
   load(json: string): void;
@@ -56,6 +62,8 @@ async function importGlue(): Promise<WasmGlueModule> {
 
 export interface LoadedEngine {
   engine: WasmEngineInstance;
+  /** Spawn additional independent sessions (File → New reuses the module). */
+  createSession: () => WasmEngineInstance;
 }
 
 /**
@@ -77,7 +85,7 @@ export async function loadWasmEngine(
     throw new EngineLoadError(`Could not start the engine: ${loadFailureHint(e)}`);
   }
   try {
-    return { engine: new mod.WasmEngine() };
+    return { engine: new mod.WasmEngine(), createSession: () => new mod.WasmEngine() };
   } catch (e) {
     throw new EngineLoadError(`Could not create the engine session: ${loadFailureHint(e)}`);
   }
