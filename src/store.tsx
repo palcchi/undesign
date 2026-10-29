@@ -20,34 +20,42 @@ import type {
   Viewport,
 } from './types';
 import {
+  ZOOM_MAX,
+  ZOOM_MIN,
+  absoluteBounds,
   absolutePosition,
+  centeredOrigin,
   childrenOf,
   clamp,
   defaultName,
   descendantIds,
+  fitViewport,
   getPage,
   pageBounds,
-  screenToWorld,
+  placeRootsAtCenter,
+  rootsOf,
   uid,
+  viewportCenterWorld,
+  zoomAtPoint,
+  zoomCentered,
 } from './utils';
 import { createBlankDoc, createSampleDoc } from './sample';
 import { loadStoredDoc, saveStoredDoc } from './storage';
+import {
+  abortTransientEntry,
+  beginTransientEntry,
+  commitDoc,
+  redoHistory,
+  setPresent,
+  undoHistory,
+} from './history';
+import type { HistoryState } from './history';
 
 export const FONT_STACKS = [
   { label: 'Sans', value: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif' },
   { label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
   { label: 'Mono', value: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' },
 ];
-
-const HISTORY_LIMIT = 60;
-const MIN_ZOOM = 0.05;
-const MAX_ZOOM = 8;
-
-interface HistoryState {
-  past: UndesignDoc[];
-  present: UndesignDoc;
-  future: UndesignDoc[];
-}
 
 function autoTextHeight(text: string, fontSize: number, lineHeight: number): number {
   const lines = Math.max(1, text.split('\n').length);
@@ -59,6 +67,32 @@ function withActivePage(doc: UndesignDoc, fn: (page: DocPage) => DocPage): Undes
     ...doc,
     pages: doc.pages.map((p) => (p.id === doc.activePageId ? fn(p) : p)),
   };
+}
+
+/** Pure object patch used by both committed and transient updates. */
+export function patchDocObjects(
+  doc: UndesignDoc,
+  ids: string[],
+  patch: ObjectPatch,
+): UndesignDoc {
+  const idSet = new Set(ids);
+  return withActivePage(doc, (p) => ({
+    ...p,
+    objects: p.objects.map((o) => {
+      if (!idSet.has(o.id)) return o;
+      const next = { ...o, ...patch };
+      if (
+        o.type === 'text' &&
+        patch.h === undefined &&
+        (patch.text !== undefined ||
+          patch.fontSize !== undefined ||
+          patch.lineHeight !== undefined)
+      ) {
+        next.h = autoTextHeight(next.text, next.fontSize, next.lineHeight);
+      }
+      return next;
+    }),
+  }));
 }
 
 /** Clone root objects plus descendants, remapping ids. Keeps parent when requested. */
@@ -114,10 +148,12 @@ interface EditorContextValue {
 
   setTool: (tool: Tool) => void;
   setViewport: (viewport: Viewport) => void;
+  setCanvasSize: (w: number, h: number) => void;
   zoomAt: (screenX: number, screenY: number, zoom: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   zoomReset: () => void;
+  zoomTo: (zoom: number) => void;
   zoomFit: (containerW: number, containerH: number) => void;
   toggleGrid: () => void;
 
@@ -134,12 +170,16 @@ interface EditorContextValue {
   addObject: (
     type: ObjectType,
     init?: Partial<DesignObject> & { x?: number; y?: number; w?: number; h?: number },
+    commit?: boolean,
   ) => string;
-  insertObjects: (objects: DesignObject[], selectIds?: string[]) => void;
+  insertObjects: (objects: DesignObject[], selectIds?: string[], commit?: boolean) => void;
+  insertAtCenter: (objects: DesignObject[]) => void;
   updateObjects: (ids: string[], patch: ObjectPatch) => void;
+  transientPatchObjects: (ids: string[], patch: ObjectPatch) => void;
   beginTransient: () => void;
   transientUpdate: (fn: (doc: UndesignDoc) => UndesignDoc) => void;
   endTransient: () => void;
+  abortTransient: () => void;
   moveSelected: (dx: number, dy: number) => void;
   deleteSelected: () => void;
   deleteObjects: (ids: string[]) => void;
@@ -194,6 +234,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tool, setTool] = useState<Tool>('select');
   const [viewport, setViewportState] = useState<Viewport>({ zoom: 0.6, x: 48, y: 40 });
+  const [canvasSize, setCanvasSizeState] = useState({ w: 1280, h: 800 });
   const [gridVisible, setGridVisible] = useState(true);
   const [notice, setNotice] = useState<string | null>(initial.notice);
   const [clipboard, setClipboard] = useState<DesignObject[]>([]);
@@ -220,15 +261,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     (fn: (d: UndesignDoc) => UndesignDoc, commit: boolean) => {
       setHistory((h) => {
         const next = fn(h.present);
-        if (next === h.present) return h;
-        if (commit) {
-          return {
-            past: [...h.past.slice(-(HISTORY_LIMIT - 1)), h.present],
-            present: next,
-            future: [],
-          };
-        }
-        return { ...h, present: next };
+        return commit ? commitDoc(h, next) : setPresent(h, next);
       });
     },
     [],
@@ -237,11 +270,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const beginTransient = useCallback(() => {
     if (transientRef.current) return;
     transientRef.current = true;
-    setHistory((h) => ({
-      past: [...h.past.slice(-(HISTORY_LIMIT - 1)), h.present],
-      present: h.present,
-      future: [],
-    }));
+    setHistory(beginTransientEntry);
   }, []);
 
   const transientUpdate = useCallback(
@@ -256,49 +285,47 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     transientRef.current = false;
   }, []);
 
+  const abortTransient = useCallback(() => {
+    if (!transientRef.current) return;
+    transientRef.current = false;
+    setHistory(abortTransientEntry);
+  }, []);
+
   const setViewport = useCallback((v: Viewport) => {
-    setViewportState({ zoom: clamp(v.zoom, MIN_ZOOM, MAX_ZOOM), x: v.x, y: v.y });
+    setViewportState({ zoom: clamp(v.zoom, ZOOM_MIN, ZOOM_MAX), x: v.x, y: v.y });
+  }, []);
+
+  const setCanvasSize = useCallback((w: number, h: number) => {
+    setCanvasSizeState((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
   }, []);
 
   const zoomAt = useCallback(
     (sx: number, sy: number, zoom: number) => {
-      setViewportState((v) => {
-        const z = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
-        const world = screenToWorld(sx, sy, v);
-        return { zoom: z, x: sx - world.x * z, y: sy - world.y * z };
-      });
+      setViewportState((v) => zoomAtPoint(v, sx, sy, zoom));
     },
     [],
   );
 
   const zoomIn = useCallback(() => {
-    setViewportState((v) => ({ ...v, zoom: clamp(v.zoom * 1.25, MIN_ZOOM, MAX_ZOOM) }));
-  }, []);
+    setViewportState((v) => zoomCentered(v, canvasSize.w, canvasSize.h, v.zoom * 1.25));
+  }, [canvasSize]);
   const zoomOut = useCallback(() => {
-    setViewportState((v) => ({ ...v, zoom: clamp(v.zoom / 1.25, MIN_ZOOM, MAX_ZOOM) }));
-  }, []);
+    setViewportState((v) => zoomCentered(v, canvasSize.w, canvasSize.h, v.zoom / 1.25));
+  }, [canvasSize]);
   const zoomReset = useCallback(() => {
-    setViewportState((v) => ({ ...v, zoom: 1 }));
-  }, []);
+    setViewportState((v) => zoomCentered(v, canvasSize.w, canvasSize.h, 1));
+  }, [canvasSize]);
+  const zoomTo = useCallback(
+    (zoom: number) => {
+      setViewportState((v) => zoomCentered(v, canvasSize.w, canvasSize.h, zoom));
+    },
+    [canvasSize],
+  );
 
   const zoomFit = useCallback(
     (containerW: number, containerH: number) => {
       const bounds = pageBounds(page.objects.filter((o) => o.parentId === null));
-      if (!bounds) {
-        setViewportState({ zoom: 1, x: containerW / 2 - 200, y: containerH / 3 });
-        return;
-      }
-      const pad = 96;
-      const z = clamp(
-        Math.min((containerW - pad) / bounds.w, (containerH - pad) / bounds.h),
-        MIN_ZOOM,
-        2,
-      );
-      setViewportState({
-        zoom: z,
-        x: (containerW - bounds.w * z) / 2 - bounds.x * z,
-        y: (containerH - bounds.h * z) / 2 - bounds.y * z,
-      });
+      setViewportState(fitViewport(bounds, containerW, containerH));
     },
     [page],
   );
@@ -383,24 +410,36 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   );
 
   const insertObjects = useCallback(
-    (objects: DesignObject[], selectIds?: string[]) => {
+    (objects: DesignObject[], selectIds?: string[], commit = true) => {
       applyDoc(
         (d) =>
           withActivePage(d, (p) => ({
             ...p,
             objects: [...p.objects, ...objects],
           })),
-        true,
+        commit,
       );
-      setSelectedIds(selectIds ?? objects.map((o) => o.id));
+      // Default selection is roots only; explicit lists (duplicate/paste
+      // multi-select) pass through untouched.
+      setSelectedIds(selectIds ?? rootsOf(objects).map((o) => o.id));
     },
     [applyDoc],
+  );
+
+  const insertAtCenter = useCallback(
+    (objects: DesignObject[]) => {
+      if (objects.length === 0) return;
+      const center = viewportCenterWorld(viewport, canvasSize.w, canvasSize.h);
+      insertObjects(placeRootsAtCenter(objects, center));
+    },
+    [viewport, canvasSize, insertObjects],
   );
 
   const addObject = useCallback(
     (
       type: ObjectType,
       init?: Partial<DesignObject> & { x?: number; y?: number; w?: number; h?: number },
+      commit = true,
     ): string => {
       const id = uid('obj');
       const pageNow = getPage(history.present);
@@ -421,12 +460,17 @@ export function EditorProvider({ children }: { children: ReactNode }) {
             return { w: 160, h: 0, stroke: '#111111', strokeWidth: 2 };
         }
       })();
-      const center = screenToWorld(480, 320, viewport);
+      const center = viewportCenterWorld(viewport, canvasSize.w, canvasSize.h);
+      const origin = centeredOrigin(
+        init?.w ?? defaults.w ?? 100,
+        init?.h ?? defaults.h ?? 100,
+        center,
+      );
       const obj: DesignObject = {
         name: defaultName(type, pageNow.objects),
         parentId: null,
-        x: Math.round(center.x - (init?.w ?? defaults.w ?? 100) / 2),
-        y: Math.round(center.y - (init?.h ?? defaults.h ?? 100) / 2),
+        x: origin.x,
+        y: origin.y,
         w: 100,
         h: 100,
         rotation: 0,
@@ -451,39 +495,26 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         type,
       };
       if (type === 'text') obj.h = autoTextHeight(obj.text, obj.fontSize, obj.lineHeight);
-      insertObjects([obj], [id]);
+      insertObjects([obj], [id], commit);
       return id;
     },
-    [history.present, insertObjects, viewport],
+    [history.present, insertObjects, viewport, canvasSize],
   );
 
   const updateObjects = useCallback(
     (ids: string[], patch: ObjectPatch) => {
       if (ids.length === 0) return;
-      const idSet = new Set(ids);
-      applyDoc(
-        (d) =>
-          withActivePage(d, (p) => ({
-            ...p,
-            objects: p.objects.map((o) => {
-              if (!idSet.has(o.id)) return o;
-              const next = { ...o, ...patch };
-              if (
-                o.type === 'text' &&
-                patch.h === undefined &&
-                (patch.text !== undefined ||
-                  patch.fontSize !== undefined ||
-                  patch.lineHeight !== undefined)
-              ) {
-                next.h = autoTextHeight(next.text, next.fontSize, next.lineHeight);
-              }
-              return next;
-            }),
-          })),
-        true,
-      );
+      applyDoc((d) => patchDocObjects(d, ids, patch), true);
     },
     [applyDoc],
+  );
+
+  const transientPatchObjects = useCallback(
+    (ids: string[], patch: ObjectPatch) => {
+      if (ids.length === 0) return;
+      transientUpdate((d) => patchDocObjects(d, ids, patch));
+    },
+    [transientUpdate],
   );
 
   const moveSelected = useCallback(
@@ -668,28 +699,37 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         const idSet = new Set(selectedIds);
         const items = pg.objects.filter((o) => idSet.has(o.id));
         if (items.length < 2) return d;
-        const abs = items.map((o) => ({ o, p: absolutePosition(pg.objects, o) }));
+        const abs = items.map((o) => ({ o, b: absoluteBounds(pg.objects, o) }));
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const { o, p } of abs) {
-          minX = Math.min(minX, p.x);
-          maxX = Math.max(maxX, p.x + o.w);
-          minY = Math.min(minY, p.y);
-          maxY = Math.max(maxY, p.y + o.h);
+        for (const { b } of abs) {
+          minX = Math.min(minX, b.x);
+          maxX = Math.max(maxX, b.x + b.w);
+          minY = Math.min(minY, b.y);
+          maxY = Math.max(maxY, b.y + b.h);
         }
         const byId = new Map(pg.objects.map((o) => [o.id, o]));
         const moved = new Map<string, { x: number; y: number }>();
-        for (const { o, p } of abs) {
-          let nx = p.x;
-          let ny = p.y;
-          if (kind === 'left') nx = minX;
-          else if (kind === 'right') nx = maxX - o.w;
-          else if (kind === 'centerX') nx = (minX + maxX) / 2 - o.w / 2;
-          else if (kind === 'top') ny = minY;
-          else if (kind === 'bottom') ny = maxY - o.h;
-          else if (kind === 'centerY') ny = (minY + maxY) / 2 - o.h / 2;
+        for (const { o, b } of abs) {
+          const p = absolutePosition(pg.objects, o);
+          // Offset from model origin to bounds origin (<= 0; nonzero for
+          // negative line dims). Targets are computed in bounds space, then
+          // converted back so untouched axes never shift.
+          const ox = b.x - p.x;
+          const oy = b.y - p.y;
+          let tbx = b.x;
+          let tby = b.y;
+          if (kind === 'left') tbx = minX;
+          else if (kind === 'right') tbx = maxX - b.w;
+          else if (kind === 'centerX') tbx = (minX + maxX) / 2 - b.w / 2;
+          else if (kind === 'top') tby = minY;
+          else if (kind === 'bottom') tby = maxY - b.h;
+          else if (kind === 'centerY') tby = (minY + maxY) / 2 - b.h / 2;
           const parent = o.parentId ? byId.get(o.parentId) : undefined;
           const parentAbs = parent ? absolutePosition(pg.objects, parent) : { x: 0, y: 0 };
-          moved.set(o.id, { x: Math.round(nx - parentAbs.x), y: Math.round(ny - parentAbs.y) });
+          moved.set(o.id, {
+            x: Math.round(tbx - ox - parentAbs.x),
+            y: Math.round(tby - oy - parentAbs.y),
+          });
         }
         return withActivePage(d, (pp) => ({
           ...pp,
@@ -711,22 +751,28 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         const idSet = new Set(selectedIds);
         const items = pg.objects.filter((o) => idSet.has(o.id));
         if (items.length < 3) return d;
-        const abs = items.map((o) => ({ o, p: absolutePosition(pg.objects, o) }));
+        const abs = items.map((o) => ({
+          o,
+          p: absolutePosition(pg.objects, o),
+          b: absoluteBounds(pg.objects, o),
+        }));
         const horizontal = kind === 'horizontal';
         abs.sort((a, b) =>
-          horizontal ? a.p.x + a.o.w / 2 - (b.p.x + b.o.w / 2) : a.p.y + a.o.h / 2 - (b.p.y + b.o.h / 2),
+          horizontal ? a.b.x + a.b.w / 2 - (b.b.x + b.b.w / 2) : a.b.y + a.b.h / 2 - (b.b.y + b.b.h / 2),
         );
-        const first = horizontal ? abs[0].p.x + abs[0].o.w / 2 : abs[0].p.y + abs[0].o.h / 2;
+        const first = horizontal ? abs[0].b.x + abs[0].b.w / 2 : abs[0].b.y + abs[0].b.h / 2;
         const last = horizontal
-          ? abs[abs.length - 1].p.x + abs[abs.length - 1].o.w / 2
-          : abs[abs.length - 1].p.y + abs[abs.length - 1].o.h / 2;
+          ? abs[abs.length - 1].b.x + abs[abs.length - 1].b.w / 2
+          : abs[abs.length - 1].b.y + abs[abs.length - 1].b.h / 2;
         const step = (last - first) / (abs.length - 1);
         const byId = new Map(pg.objects.map((o) => [o.id, o]));
         const moved = new Map<string, { x: number; y: number }>();
-        abs.forEach(({ o, p }, i) => {
+        abs.forEach(({ o, p, b }, i) => {
           const center = first + step * i;
-          const nx = horizontal ? center - o.w / 2 : p.x;
-          const ny = horizontal ? p.y : center - o.h / 2;
+          const ox = b.x - p.x;
+          const oy = b.y - p.y;
+          const nx = horizontal ? center - b.w / 2 - ox : p.x;
+          const ny = horizontal ? p.y : center - b.h / 2 - oy;
           const parent = o.parentId ? byId.get(o.parentId) : undefined;
           const parentAbs = parent ? absolutePosition(pg.objects, parent) : { x: 0, y: 0 };
           moved.set(o.id, { x: Math.round(nx - parentAbs.x), y: Math.round(ny - parentAbs.y) });
@@ -789,20 +835,12 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   const undo = useCallback(() => {
     transientRef.current = false;
-    setHistory((h) => {
-      if (h.past.length === 0) return h;
-      const prev = h.past[h.past.length - 1];
-      return { past: h.past.slice(0, -1), present: prev, future: [h.present, ...h.future] };
-    });
+    setHistory(undoHistory);
   }, []);
 
   const redo = useCallback(() => {
     transientRef.current = false;
-    setHistory((h) => {
-      if (h.future.length === 0) return h;
-      const [next, ...rest] = h.future;
-      return { past: [...h.past, h.present], present: next, future: rest };
-    });
+    setHistory(redoHistory);
   }, []);
 
   const replaceDoc = useCallback(
@@ -842,10 +880,12 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     dismissNotice,
     setTool,
     setViewport,
+    setCanvasSize,
     zoomAt,
     zoomIn,
     zoomOut,
     zoomReset,
+    zoomTo,
     zoomFit,
     toggleGrid,
     select,
@@ -858,10 +898,13 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     deletePage,
     addObject,
     insertObjects,
+    insertAtCenter,
     updateObjects,
+    transientPatchObjects,
     beginTransient,
     transientUpdate,
     endTransient,
+    abortTransient,
     moveSelected,
     deleteSelected,
     deleteObjects,

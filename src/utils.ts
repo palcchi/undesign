@@ -1,4 +1,9 @@
-import type { DesignObject, DocPage, UndesignDoc } from './types';
+import type { DesignObject, DocPage, UndesignDoc, Viewport } from './types';
+
+export const ZOOM_MIN = 0.05;
+export const ZOOM_MAX = 8;
+const FIT_MAX_ZOOM = 2;
+const FIT_PAD = 96;
 
 let counter = 0;
 
@@ -56,6 +61,83 @@ export function absolutePosition(
   return { x, y };
 }
 
+/** Geometric bounds of a w/h vector: origin at the min corner, non-negative size. */
+export function vectorBounds(
+  w: number,
+  h: number,
+): { x: number; y: number; w: number; h: number } {
+  return { x: Math.min(0, w), y: Math.min(0, h), w: Math.abs(w), h: Math.abs(h) };
+}
+
+/** Absolute page-space geometric bounds (correct for negative line dims). */
+export function absoluteBounds(
+  objects: DesignObject[],
+  obj: DesignObject,
+): { x: number; y: number; w: number; h: number } {
+  const p = absolutePosition(objects, obj);
+  const g = vectorBounds(obj.w, obj.h);
+  return { x: p.x + g.x, y: p.y + g.y, w: g.w, h: g.h };
+}
+
+/**
+ * Canonical line geometry from two endpoints. The start is the leftmost
+ * endpoint (tie: topmost), so w >= 0 always; h keeps its sign so the
+ * diagonal direction (\ vs /) is preserved.
+ */
+export function canonicalLine(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): { x: number; y: number; w: number; h: number } {
+  if (x2 < x1 || (x2 === x1 && y2 < y1)) {
+    return { x: x2, y: y2, w: x1 - x2, h: y1 - y2 };
+  }
+  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+}
+
+/**
+ * Move one line endpoint by a delta; returns canonical geometry.
+ * Safe to drag an endpoint past the other end: the endpoints swap roles
+ * instead of mirroring or collapsing the line.
+ */
+export function moveLineEnd(
+  obj: { x: number; y: number; w: number; h: number },
+  end: 0 | 1,
+  dx: number,
+  dy: number,
+): { x: number; y: number; w: number; h: number } {
+  const p0 = { x: obj.x, y: obj.y };
+  const p1 = { x: obj.x + obj.w, y: obj.y + obj.h };
+  if (end === 0) {
+    p0.x += dx;
+    p0.y += dy;
+  } else {
+    p1.x += dx;
+    p1.y += dy;
+  }
+  return canonicalLine(p0.x, p0.y, p1.x, p1.y);
+}
+
+/** Ids of selectable objects intersecting a marquee rect (page-space corners). */
+export function marqueeHits(
+  objects: DesignObject[],
+  r1: { x: number; y: number },
+  r2: { x: number; y: number },
+): string[] {
+  const minX = Math.min(r1.x, r2.x);
+  const maxX = Math.max(r1.x, r2.x);
+  const minY = Math.min(r1.y, r2.y);
+  const maxY = Math.max(r1.y, r2.y);
+  return objects
+    .filter((o) => {
+      if (!o.visible || o.locked) return false;
+      const b = absoluteBounds(objects, o);
+      return b.x < maxX && b.x + b.w > minX && b.y < maxY && b.y + b.h > minY;
+    })
+    .map((o) => o.id);
+}
+
 /** Axis-aligned bounds of visible objects in page space (rotation ignored). */
 export function pageBounds(
   objects: DesignObject[],
@@ -67,13 +149,11 @@ export function pageBounds(
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const o of visible) {
-    const p = absolutePosition(objects, o);
-    const w = o.type === 'line' ? Math.abs(o.w) : o.w;
-    const h = o.type === 'line' ? Math.abs(o.h) : o.h;
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x + w);
-    maxY = Math.max(maxY, p.y + h);
+    const b = absoluteBounds(objects, o);
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w);
+    maxY = Math.max(maxY, b.y + b.h);
   }
   return { x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) };
 }
@@ -136,6 +216,104 @@ export function screenToWorld(
   viewport: { zoom: number; x: number; y: number },
 ): { x: number; y: number } {
   return { x: (sx - viewport.x) / viewport.zoom, y: (sy - viewport.y) / viewport.zoom };
+}
+
+/** World-space point at the center of the visible canvas viewport. */
+export function viewportCenterWorld(
+  viewport: Viewport,
+  canvasW: number,
+  canvasH: number,
+): { x: number; y: number } {
+  return screenToWorld(canvasW / 2, canvasH / 2, viewport);
+}
+
+/** Integer origin placing a w/h box centered on a target point. */
+export function centeredOrigin(
+  w: number,
+  h: number,
+  target: { x: number; y: number },
+): { x: number; y: number } {
+  return { x: Math.round(target.x - w / 2), y: Math.round(target.y - h / 2) };
+}
+
+/** Members of a set whose parent is absent from it (insertion roots). */
+export function rootsOf(objects: DesignObject[]): DesignObject[] {
+  const ids = new Set(objects.map((o) => o.id));
+  return objects.filter((o) => !o.parentId || !ids.has(o.parentId));
+}
+
+/**
+ * Offset root objects so their combined geometric bounds center lands on the
+ * target. Children keep their relative pose (positions are parent-relative),
+ * so group structure is preserved.
+ */
+export function placeRootsAtCenter(
+  objects: DesignObject[],
+  target: { x: number; y: number },
+): DesignObject[] {
+  const roots = rootsOf(objects);
+  if (roots.length === 0) return objects;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const r of roots) {
+    const gx = r.x + Math.min(0, r.w);
+    const gy = r.y + Math.min(0, r.h);
+    minX = Math.min(minX, gx);
+    minY = Math.min(minY, gy);
+    maxX = Math.max(maxX, gx + Math.abs(r.w));
+    maxY = Math.max(maxY, gy + Math.abs(r.h));
+  }
+  const dx = Math.round(target.x - (minX + maxX) / 2);
+  const dy = Math.round(target.y - (minY + maxY) / 2);
+  const rootIds = new Set(roots.map((r) => r.id));
+  return objects.map((o) =>
+    rootIds.has(o.id) ? { ...o, x: o.x + dx, y: o.y + dy } : o,
+  );
+}
+
+/** Zoom keeping the world point under (sx, sy) fixed. */
+export function zoomAtPoint(
+  v: Viewport,
+  sx: number,
+  sy: number,
+  zoom: number,
+): Viewport {
+  const z = clamp(zoom, ZOOM_MIN, ZOOM_MAX);
+  const world = screenToWorld(sx, sy, v);
+  return { zoom: z, x: sx - world.x * z, y: sy - world.y * z };
+}
+
+/** Zoom keeping the container center fixed. */
+export function zoomCentered(
+  v: Viewport,
+  containerW: number,
+  containerH: number,
+  zoom: number,
+): Viewport {
+  return zoomAtPoint(v, containerW / 2, containerH / 2, zoom);
+}
+
+/** Viewport fitting bounds into a container (graceful fallback when empty). */
+export function fitViewport(
+  bounds: { x: number; y: number; w: number; h: number } | null,
+  containerW: number,
+  containerH: number,
+): Viewport {
+  if (!bounds) {
+    return { zoom: 1, x: containerW / 2 - 200, y: containerH / 3 };
+  }
+  const z = clamp(
+    Math.min((containerW - FIT_PAD) / bounds.w, (containerH - FIT_PAD) / bounds.h),
+    ZOOM_MIN,
+    FIT_MAX_ZOOM,
+  );
+  return {
+    zoom: z,
+    x: (containerW - bounds.w * z) / 2 - bounds.x * z,
+    y: (containerH - bounds.h * z) / 2 - bounds.y * z,
+  };
 }
 
 function escapeXml(s: string): string {

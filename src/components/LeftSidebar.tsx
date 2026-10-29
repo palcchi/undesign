@@ -496,7 +496,7 @@ function assetObjects(kind: string): DesignObject[] {
 }
 
 function AssetsPanel() {
-  const { insertObjects, selected, updateObjects } = useEditor();
+  const { insertAtCenter, selected, updateObjects } = useEditor();
   const selectedIds = selected.map((s) => s.id);
   const hasTextSelected = selected.some((s) => s.type === 'text');
 
@@ -506,19 +506,19 @@ function AssetsPanel() {
         <h3>Components</h3>
         <p className="dim small">Click to insert at the canvas center.</p>
         <div className="asset-grid">
-          <button className="asset-card" onClick={() => insertObjects(assetObjects('button'))}>
+          <button className="asset-card" onClick={() => insertAtCenter(assetObjects('button'))}>
             <span className="asset-preview"><span className="pv-btn">Button</span></span>
             <span className="asset-name">Button / Primary</span>
           </button>
-          <button className="asset-card" onClick={() => insertObjects(assetObjects('card'))}>
+          <button className="asset-card" onClick={() => insertAtCenter(assetObjects('card'))}>
             <span className="asset-preview"><span className="pv-card"><span className="pv-cover" /><span className="pv-line" /><span className="pv-line short" /></span></span>
             <span className="asset-name">Card</span>
           </button>
-          <button className="asset-card" onClick={() => insertObjects(assetObjects('avatar'))}>
+          <button className="asset-card" onClick={() => insertAtCenter(assetObjects('avatar'))}>
             <span className="asset-preview"><span className="pv-avatar" /></span>
             <span className="asset-name">Avatar</span>
           </button>
-          <button className="asset-card" onClick={() => insertObjects(assetObjects('badge'))}>
+          <button className="asset-card" onClick={() => insertAtCenter(assetObjects('badge'))}>
             <span className="asset-preview"><span className="pv-badge">NEW</span></span>
             <span className="asset-name">Badge</span>
           </button>
