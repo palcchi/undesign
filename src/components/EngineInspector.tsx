@@ -26,8 +26,9 @@ import { useEngine } from '../engine/store';
 import type { EngineNode } from '../engine/adapter';
 
 function NumField({
-  label, value, onCommit, min, step = 1, disabled,
+  nodeId, label, value, onCommit, min, step = 1, disabled,
 }: {
+  nodeId: number;
   label: string;
   value: number;
   onCommit: (v: number) => void;
@@ -36,7 +37,7 @@ function NumField({
   disabled?: boolean;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
-  useEffect(() => setDraft(null), [value]);
+  useEffect(() => setDraft(null), [nodeId, value]);
   const shown = draft ?? String(Math.round(value * 100) / 100);
   const commit = () => {
     if (draft === null) return;
@@ -64,9 +65,9 @@ function NumField({
   );
 }
 
-function TextRow({ label, value, onCommit, mono }: { label: string; value: string; onCommit: (v: string) => void; mono?: boolean }) {
+function TextRow({ nodeId, label, value, onCommit, mono }: { nodeId: number; label: string; value: string; onCommit: (v: string) => void; mono?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
-  useEffect(() => setDraft(null), [value]);
+  useEffect(() => setDraft(null), [nodeId, value]);
   return (
     <label className="prop-field full">
       <span className="prop-label">{label}</span>
@@ -88,10 +89,10 @@ function TextRow({ label, value, onCommit, mono }: { label: string; value: strin
   );
 }
 
-function ColorRow({ color, label, onCommit }: { color: string; label: string; onCommit: (v: string) => void }) {
+function ColorRow({ nodeId, color, label, onCommit }: { nodeId: number; color: string; label: string; onCommit: (v: string) => void }) {
   // Draft locally: committing every picker tick would spam undo history.
   const [draft, setDraft] = useState<string | null>(null);
-  useEffect(() => setDraft(null), [color]);
+  useEffect(() => setDraft(null), [nodeId, color]);
   const shown = draft ?? toHex6(color);
   return (
     <>
@@ -244,15 +245,15 @@ export function EngineInspector() {
     <div className="sidebar right inspector">
       <div className="prop-section">
         <div className="prop-title">{typeLabel(n.type)}</div>
-        <TextRow label="Name" value={n.name} onCommit={(v) => ed.renameNode(n.id, v)} />
+        <TextRow nodeId={n.id} label="Name" value={n.name} onCommit={(v) => ed.renameNode(n.id, v)} />
         <div className="prop-grid-2">
-          <NumField label="X" value={n.x} onCommit={(v) => ed.setNodeProps(n.id, { x: v })} />
-          <NumField label="Y" value={n.y} onCommit={(v) => ed.setNodeProps(n.id, { y: v })} />
-          {!isLine && <NumField label="W" value={n.width} min={1} onCommit={(v) => ed.setNodeProps(n.id, { width: v })} />}
-          {!isLine && <NumField label="H" value={n.height} min={1} onCommit={(v) => ed.setNodeProps(n.id, { height: v })} />}
-          {isLine && <NumField label="Length" value={n.width} min={1} onCommit={(v) => ed.setNodeProps(n.id, { width: v })} />}
+          <NumField nodeId={n.id} label="X" value={n.x} onCommit={(v) => ed.setNodeProps(n.id, { x: v })} />
+          <NumField nodeId={n.id} label="Y" value={n.y} onCommit={(v) => ed.setNodeProps(n.id, { y: v })} />
+          {!isLine && <NumField nodeId={n.id} label="W" value={n.width} min={1} onCommit={(v) => ed.setNodeProps(n.id, { width: v })} />}
+          {!isLine && <NumField nodeId={n.id} label="H" value={n.height} min={1} onCommit={(v) => ed.setNodeProps(n.id, { height: v })} />}
+          {isLine && <NumField nodeId={n.id} label="Length" value={n.width} min={1} onCommit={(v) => ed.setNodeProps(n.id, { width: v })} />}
           {!isLine && (
-            <NumField label="Rotation" value={rotationCw} step={1} onCommit={(v) => ed.setNodeProps(n.id, { rotation: -v })} />
+            <NumField nodeId={n.id} label="Rotation" value={rotationCw} step={1} onCommit={(v) => ed.setNodeProps(n.id, { rotation: -v })} />
           )}
         </div>
         {isLine && <p className="dim small">Line endpoints are not draggable yet — move or delete the line.</p>}
@@ -270,7 +271,7 @@ export function EngineInspector() {
         <div className="prop-title">Fill</div>
         {fill ? (
           <div className="lab-buttons">
-            <ColorRow color={fill.color} label="Fill color" onCommit={(v) => ed.setNodeProps(n.id, { fill: v })} />
+            <ColorRow nodeId={n.id} color={fill.color} label="Fill color" onCommit={(v) => ed.setNodeProps(n.id, { fill: v })} />
             <button className="btn secondary" title="Remove fill" onClick={() => ed.setNodeProps(n.id, { fills: [] })}>
               Remove
             </button>
@@ -283,7 +284,7 @@ export function EngineInspector() {
             {n.fills.length > 0 && <span className="dim small">Non-solid fill (not editable yet)</span>}
           </div>
         )}
-        <NumField label="Opacity" value={n.opacity} min={0} step={0.05} onCommit={(v) => ed.setNodeProps(n.id, { opacity: Math.min(1, v) })} />
+        <NumField nodeId={n.id} label="Opacity" value={n.opacity} min={0} step={0.05} onCommit={(v) => ed.setNodeProps(n.id, { opacity: Math.min(1, v) })} />
       </div>
 
       {!isText && (
@@ -291,7 +292,7 @@ export function EngineInspector() {
           <div className="prop-title">Stroke</div>
           {stroke ? (
             <div className="lab-buttons">
-              <ColorRow color={stroke.color} label="Stroke color" onCommit={(v) => ed.setNodeProps(n.id, { stroke: v })} />
+              <ColorRow nodeId={n.id} color={stroke.color} label="Stroke color" onCommit={(v) => ed.setNodeProps(n.id, { stroke: v })} />
               <button className="btn secondary" title="Remove stroke" onClick={() => ed.setNodeProps(n.id, { strokes: [] })}>
                 Remove
               </button>
@@ -303,7 +304,7 @@ export function EngineInspector() {
               </button>
             </div>
           )}
-          {stroke && <NumField label="Weight" value={n.strokeWeight} min={0} step={0.5} onCommit={(v) => ed.setNodeProps(n.id, { strokeWeight: v })} />}
+          {stroke && <NumField nodeId={n.id} label="Weight" value={n.strokeWeight} min={0} step={0.5} onCommit={(v) => ed.setNodeProps(n.id, { strokeWeight: v })} />}
         </div>
       )}
 
@@ -311,6 +312,7 @@ export function EngineInspector() {
         <div className="prop-section">
           <div className="prop-title">Corners</div>
           <NumField
+            nodeId={n.id}
             label={cornersMixed ? 'Radius (mixed)' : 'Radius'}
             value={typeof n.cornerRadius === 'number' ? n.cornerRadius : 0}
             min={0}
@@ -353,7 +355,7 @@ export function EngineInspector() {
             </button>
           </div>
           <div className="prop-grid-2">
-            <NumField label="Size" value={n.fontSize ?? 16} min={1} onCommit={(v) => ed.setNodeProps(n.id, { fontSize: v })} />
+            <NumField nodeId={n.id} label="Size" value={n.fontSize ?? 16} min={1} onCommit={(v) => ed.setNodeProps(n.id, { fontSize: v })} />
             <label className="prop-field">
               <span className="prop-label">Align</span>
               <select
@@ -367,7 +369,7 @@ export function EngineInspector() {
               </select>
             </label>
           </div>
-          <TextRow label="Font" value={n.fontFamily ?? ''} onCommit={(v) => ed.setNodeProps(n.id, { fontFamily: v })} />
+          <TextRow nodeId={n.id} label="Font" value={n.fontFamily ?? ''} onCommit={(v) => ed.setNodeProps(n.id, { fontFamily: v })} />
         </div>
       )}
     </div>

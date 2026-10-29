@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { EngineProvider, useEngine } from './engine/store';
+import { isFormTarget } from './utils';
 import { TopToolbar } from './components/TopToolbar';
 import { EngineSidebar } from './components/EngineSidebar';
 import { EngineCanvas } from './components/EngineCanvas';
@@ -23,6 +24,7 @@ function Shell() {
   const ed = useEngine();
   const [preview, setPreview] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [leftVisible, setLeftVisible] = useState(() => window.innerWidth > 900);
   const [rightVisible, setRightVisible] = useState(() => window.innerWidth > 1100);
 
@@ -35,8 +37,7 @@ function Shell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      const typing =
-        t !== null && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable || t.tagName === 'SELECT');
+      const typing = t !== null && isFormTarget(t.tagName, t.isContentEditable);
       const modalOpen = document.querySelector('.modal-overlay') !== null;
       if (e.key === 'Escape') {
         if (preview) {
@@ -55,6 +56,10 @@ function Shell() {
 
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
+      if (e.key === '?') {
+        setShortcutsOpen(true);
+        return;
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && ed.snapshot.selection.length > 0) {
         e.preventDefault();
         ed.removeSelected();
@@ -142,7 +147,7 @@ function Shell() {
         return;
       }
       if (mod || e.altKey) return;
-      const tools = { v: 'select', h: 'hand', f: 'frame', r: 'rectangle', o: 'ellipse', t: 'text', l: 'line' } as const;
+      const tools = { v: 'select', h: 'hand', f: 'frame', r: 'rectangle', o: 'ellipse', p: 'polygon', t: 'text', l: 'line' } as const;
       if (k in tools) {
         ed.setTool(tools[k as keyof typeof tools]);
       }
@@ -163,6 +168,8 @@ function Shell() {
         onToggleRight={() => setRightVisible((v) => !v)}
         labOpen={labOpen}
         onToggleLab={() => setLabOpen((v) => !v)}
+        shortcutsOpen={shortcutsOpen}
+        onToggleShortcuts={() => setShortcutsOpen((v) => !v)}
       />
       <div className="workbench">
         {leftVisible && <EngineSidebar />}

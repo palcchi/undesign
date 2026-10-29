@@ -2173,3 +2173,464 @@ body {
   padding: 4px 7px;
   font-size: 11px;
 }
+
+/* ---------- FigCraft UI3 theme: clean Undesign chrome ----------
+   Token values imitate upstream crates/ui-egui/src/theme.rs (light):
+   white panels, #f5f5f5 canvas/fields, readable greens (#007a56 text and
+   outlines, #02da96 solid), mint selected rows, dark menus, red guides.
+   This block wins the cascade; structure stays Undesign's. */
+
+:root {
+  --ink: #1e1e1e;
+  --ink-2: #333333;
+  --ink-3: #6e6e6e;
+  --ink-4: #8a8a8a;
+  --line: #e6e6e6;
+  --line-2: #d9d9d9;
+  --bg: #ffffff;
+  --bg-soft: #f5f5f5;
+  --bg-softer: #e6e6e6;
+  --canvas-bg: #f5f5f5;
+  --accent: #007a56;
+  --accent-strong: #00875f;
+  --accent-solid: #02da96;
+  --accent-on: #07352a;
+  --accent-soft: #e0fbf1;
+  --accent-soft-child: #f1fcf7;
+  --brand-accent: #02da96;
+  --danger: #f24822;
+  --warning: #ffcd29;
+  --component: #9747ff;
+  --component-soft: #f1e9ff;
+  --guide: #f24822;
+  --menu-bg: #1e1e1e;
+  --menu-text: #ffffff;
+  --menu-dim: #9a9a9a;
+  --radius: 5px;
+  --radius-lg: 13px;
+  --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.16);
+  --shadow-win: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+body {
+  font-size: 12px;
+}
+
+.topbar {
+  height: 44px;
+}
+
+.brand-name {
+  font-size: 13px;
+}
+
+/* dark dropdown + context menus */
+.menu-drop {
+  background: var(--menu-bg);
+  border: 1px solid #444444;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-win);
+  padding: 8px;
+}
+
+.menu-item {
+  color: var(--menu-text);
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.menu-item:disabled {
+  color: var(--menu-dim);
+}
+
+.menu-shortcut {
+  color: var(--menu-dim);
+  font-size: 11px;
+}
+
+.menu-item:hover:not(:disabled) .menu-shortcut {
+  color: #fff;
+}
+
+.menu-divider {
+  background: #444444;
+}
+
+.ctx-menu {
+  background: var(--menu-bg);
+  border: 1px solid #444444;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-win);
+  padding: 8px;
+}
+
+.ctx-item {
+  color: var(--menu-text);
+  font-size: 12px;
+}
+
+.ctx-item:hover:not(:disabled) {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.ctx-item:disabled {
+  color: var(--menu-dim);
+}
+
+.ctx-item.danger {
+  color: #ff8a70;
+}
+
+.ctx-shortcut {
+  color: var(--menu-dim);
+  font-size: 11px;
+}
+
+.ctx-item:hover:not(:disabled) .ctx-shortcut {
+  color: #fff;
+}
+
+.ctx-divider {
+  background: #444444;
+}
+
+/* buttons */
+.btn {
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.btn.primary {
+  background: var(--accent-solid);
+  color: var(--accent-on);
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: #00bd82;
+}
+
+.btn.secondary {
+  background: #fff;
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: var(--bg-soft);
+  border-color: var(--line-2);
+}
+
+.btn.ghost.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.icon-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pv-badge {
+  background: var(--accent-solid);
+  color: var(--accent-on);
+}
+
+/* topbar history/zoom buttons (previously unstyled) */
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--ink);
+  position: relative;
+}
+
+.tool-btn:hover:not(:disabled) {
+  background: var(--bg-soft);
+}
+
+.tool-btn:disabled {
+  color: #bdbdbd;
+  cursor: default;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+  margin: 0 4px;
+}
+
+.zoom-label {
+  font-size: 12px;
+}
+
+/* fields: borderless until hovered, green on focus */
+.text-input,
+select.text-input {
+  background: var(--bg-soft);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.text-input:hover {
+  border-color: var(--line);
+  background: var(--bg-soft);
+}
+
+.text-input:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+
+.layers-search {
+  background: var(--bg-soft);
+  border-color: transparent;
+}
+
+.layer-rename {
+  border-color: var(--accent);
+  font-size: 12px;
+}
+
+/* rows: mint selection, green drop indicators */
+.layer-row {
+  height: 28px;
+  border-radius: 5px;
+  border: none;
+}
+
+.layer-row:hover {
+  background: var(--bg-soft);
+}
+
+.layer-row.selected {
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.layer-row.drop-before::before,
+.layer-row.drop-after::after {
+  background: var(--accent-strong);
+}
+
+.layer-row.drop-inside {
+  background: var(--accent-soft);
+  outline: 1px dashed var(--accent-strong);
+}
+
+.layer-name {
+  font-size: 12px;
+}
+
+.page-row.active {
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.page-index {
+  background: var(--bg-softer);
+}
+
+/* tabs + inspector type */
+.sidebar-tab.active {
+  border-bottom-color: var(--accent-strong);
+}
+
+.prop-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.prop-label {
+  font-size: 11px;
+}
+
+.mini-btn.on {
+  color: var(--accent-strong);
+}
+
+/* canvas dots soften against the lighter canvas */
+.engine-grid {
+  background-image: radial-gradient(circle, #d4d4d4 1px, transparent 1px);
+}
+
+/* toast floats above the tool palette */
+.toast,
+.notice-toast {
+  bottom: 78px;
+  background: var(--menu-bg);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+/* modal radius + shadow */
+.modal {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-win);
+}
+
+.modal-title {
+  font-size: 13px;
+}
+
+/* floating bottom tool palette */
+.tool-palette {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-win);
+  padding: 5px;
+  z-index: 60;
+  cursor: default;
+}
+
+.palette-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.palette-group + .palette-group {
+  border-left: 1px solid var(--line);
+  padding-left: 2px;
+  margin-left: 2px;
+}
+
+.palette-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.palette-btn:hover {
+  background: var(--bg-soft);
+}
+
+.palette-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.palette-caret {
+  width: 16px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--ink-4);
+}
+
+.palette-caret:hover,
+.palette-caret.open {
+  background: var(--bg-soft);
+  color: var(--ink);
+}
+
+.palette-flyout {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 168px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-win);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette-flyitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.palette-flyitem:hover {
+  background: var(--bg-soft);
+}
+
+.palette-flyitem.active {
+  background: var(--accent-soft);
+}
+
+.palette-flyicon {
+  display: inline-flex;
+  color: var(--ink-3);
+}
+
+.palette-flyitem.active .palette-flyicon {
+  color: var(--accent);
+}
+
+.palette-flylabel {
+  flex: 1;
+}
+
+.palette-flykey {
+  color: var(--ink-4);
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+/* palette tooltips open upward so they stay on screen */
+.tool-palette [data-tip]:hover::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-palette {
+    transform: translateX(-50%);
+  }
+}

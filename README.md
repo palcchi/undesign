@@ -81,7 +81,8 @@ src/
     geometry.ts             Engine-space geometry for the canvas overlay
     tree.ts                 Layer-tree flattening + drag math
   components/
-    TopToolbar.tsx          Menus, tools, zoom, import/export/share dialogs
+    TopToolbar.tsx          Menus, history, zoom, import/export/share dialogs
+    ToolPalette.tsx         Floating bottom tool palette (FigCraft grouping)
     EngineSidebar.tsx       Layers / Pages / Assets panels
     EngineCanvas.tsx        Engine SVG + selection overlay + pointer tools
     EngineInspector.tsx     Single/multi-selection property controls
