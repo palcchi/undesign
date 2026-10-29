@@ -1124,6 +1124,22 @@ select.text-input {
   accent-color: var(--ink);
 }
 
+/* Property value row: control plus an inline per-property reset button. */
+.prop-value-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prop-value-row.end {
+  align-items: flex-end;
+}
+
+.prop-value-row .grow {
+  flex: 1;
+  min-width: 0;
+}
+
 .color-field {
   display: flex;
   align-items: center;
@@ -1769,3 +1785,158 @@ textarea.text-input {
   }
 }
 
+/* ---------- Figma-inspired editor density ---------- */
+
+:root {
+  --ink: #1e1e1e;
+  --ink-2: #444444;
+  --ink-3: #767676;
+  --ink-4: #a0a0a0;
+  --line: #e5e5e5;
+  --line-2: #cfcfcf;
+  --bg: #ffffff;
+  --bg-soft: #f7f7f7;
+  --bg-softer: #eeeeee;
+  --canvas-bg: #e6e6e6;
+  --accent: #0d99ff;
+  --accent-soft: rgba(13, 153, 255, 0.14);
+  --brand-accent: #f24822;
+  --radius: 4px;
+}
+
+body {
+  font-size: 12px;
+}
+
+.topbar {
+  height: 48px;
+  padding: 0 8px;
+  gap: 8px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.brand {
+  gap: 6px;
+}
+
+.brand-name {
+  font-size: 13px;
+}
+
+.menu-btn {
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.doc-name-btn {
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.tool-group {
+  border-radius: 6px;
+  background: var(--bg);
+  border-color: var(--line);
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+}
+
+.icon-btn.active {
+  background: var(--accent);
+}
+
+.btn {
+  border-radius: 4px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.btn.primary {
+  background: #1e1e1e;
+}
+
+.sidebar.left,
+.sidebar.right {
+  width: 240px;
+}
+
+.sidebar-tabs {
+  padding: 2px 6px 0;
+  gap: 0;
+}
+
+.sidebar-tab {
+  flex: 1;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 6px 7px;
+  font-size: 11px;
+}
+
+.layers-search {
+  margin: 8px;
+  border-radius: 4px;
+  background: #f5f5f5;
+}
+
+.layer-row {
+  height: 26px;
+  border-radius: 3px;
+}
+
+.layer-name {
+  font-size: 12px;
+}
+
+.page-row {
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.props-scroll {
+  padding: 10px 12px;
+  gap: 0;
+}
+
+.prop-section {
+  padding: 10px 0;
+  gap: 7px;
+}
+
+.prop-title {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.text-input {
+  border-radius: 3px;
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.canvas-wrap {
+  background-color: #e6e6e6;
+}
+
+.canvas-svg {
+  isolation: isolate;
+}
+
+.canvas-empty-card {
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.seg {
+  border-radius: 4px;
+}
+
+.seg-btn {
+  border-radius: 3px;
+  padding: 4px 7px;
+  font-size: 11px;
+}

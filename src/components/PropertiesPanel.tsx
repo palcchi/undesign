@@ -33,11 +33,13 @@ import {
   X,
 } from 'lucide-react';
 import { FONT_STACKS, useEditor } from '../store';
-import type { Constraints, CornerRadii, DesignObject, FillGradient, GradientStop, ObjectPatch, TextAlign } from '../types';
+import type { ChildSizing, Constraints, CornerRadii, DesignObject, FillGradient, FrameLayout, GradientStop, ObjectPatch, SizingMode, TextAlign } from '../types';
+import { defaultChildSizing, defaultFrameLayout } from '../layout';
 import { clamp, downloadFile, effectiveGradient, hasIndependentCorners, isHexColor, normalizeHex, resolveHexCommit, resolveNumericCommit, resolveRadii, round1 } from '../utils';
 import type { DocPage } from '../types';
 import { exportPageSvg, fitImageSize } from '../assets';
-import { liveSource } from '../library';
+import { exposedControls, liveSource, setContaining } from '../library';
+import { canHaveEffectStyle } from '../system';
 import { useNativePickerEnd } from './ui';
 
 function TypeIcon({ type }: { type: DesignObject['type'] }) {
@@ -185,11 +187,34 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
     return null;
   })();
 
+  const sourceDefAuthorable = (() => {
+    const def = (editor.doc.components ?? []).find((d) => d.rootId === obj.id) ?? null;
+    if (!def) return null;
+    const inSet = (editor.doc.variantSets ?? []).some((s) => s.variants.includes(def.id));
+    if (inSet) return def;
+    const src = liveSource(editor.doc, def);
+    const hasNested = src
+      ? src.subtree.some((o) => o.componentId !== null && o.componentId !== undefined)
+      : false;
+    return hasNested ? def : null;
+  })();
+
   const showStroke = obj.type !== 'text' && obj.type !== 'image';
+  const showEffects = canHaveEffectStyle(obj.type);
   const showRadius = obj.type === 'frame' || obj.type === 'rectangle';
   const parentIsFrame =
     obj.parentId !== null &&
     editor.page.objects.find((o) => o.id === obj.parentId)?.type === 'frame';
+  const parentLayout = (() => {
+    if (obj.parentId === null) return null;
+    const p = editor.page.objects.find((o) => o.id === obj.parentId);
+    if (!p || p.type !== 'frame') return null;
+    return p.layout ?? null;
+  })();
+  const isFlowChild =
+    parentLayout !== null &&
+    !(obj.sizing?.absolute ?? false) &&
+    (obj.sourceId === null || obj.sourceId === undefined);
   const curConstraints: Constraints = obj.constraints ?? { horizontal: 'left', vertical: 'top' };
   const linkedStyle = obj.fillStyleId
     ? (editor.doc.colorStyles ?? []).find((s) => s.id === obj.fillStyleId) ?? null
@@ -265,8 +290,17 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
         {obj.sourceId && childOfDef && (
           <div className="prop-section">
             <div className="instance-note">Part of “{childOfDef.name}” — edits become overrides.</div>
+            <button
+              className="btn secondary full"
+              onClick={editor.resetSelectedLayerOverride}
+              title="Drop this layer's overrides back to the source"
+            >
+              <RotateCcw size={14} />
+              <span>Reset layer</span>
+            </button>
           </div>
         )}
+        {sourceDefAuthorable && <ComponentSourceSection defId={sourceDefAuthorable.id} />}
 
         <div className="prop-section">
           <div className="prop-title">Layout</div>
@@ -299,6 +333,9 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
               </div>
             )}
           </div>
+          {isFlowChild && (
+            <div className="prop-hint">Positioned by the parent stack — drag to reorder.</div>
+          )}
           {obj.type === 'frame' && (
             <label className="check-row">
               <input
@@ -340,6 +377,9 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
             </div>
           )}
         </div>
+
+        {obj.type === 'frame' && <AutoLayoutSection obj={obj} ids={ids} />}
+        {parentLayout && <ChildSizingSection obj={obj} ids={ids} />}
 
         {obj.type === 'image' ? (
           <ImageSection obj={obj} />
@@ -417,6 +457,8 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
 
         {obj.type === 'text' && <TextSection obj={obj} />}
 
+        {showEffects && <EffectsSection obj={obj} />}
+
         <PrototypeSection obj={obj} />
 
         <div className="prop-section">
@@ -446,6 +488,241 @@ function SingleProperties({ obj }: { obj: DesignObject }) {
         </div>
       </div>
     </div>
+  );
+}
+
+const SIZING_MODES: { v: SizingMode; label: string }[] = [
+  { v: 'fixed', label: 'Fixed' },
+  { v: 'hug', label: 'Hug' },
+  { v: 'fill', label: 'Fill' },
+];
+
+const ALIGN_MAIN_OPTS: { v: FrameLayout['alignMain']; label: string }[] = [
+  { v: 'start', label: 'Start' },
+  { v: 'center', label: 'Center' },
+  { v: 'end', label: 'End' },
+  { v: 'space-between', label: 'Space' },
+];
+
+const ALIGN_CROSS_OPTS: { v: FrameLayout['alignCross']; label: string }[] = [
+  { v: 'start', label: 'Start' },
+  { v: 'center', label: 'Center' },
+  { v: 'end', label: 'End' },
+];
+
+function AutoLayoutSection({ obj, ids }: { obj: DesignObject; ids: string[] }) {
+  const { updateObjects } = useEditor();
+  const L = obj.layout ?? null;
+  if (!L) {
+    return (
+      <div className="prop-section">
+        <div className="prop-title">Auto layout</div>
+        <div className="seg panel-seg" role="group" aria-label="Add auto layout">
+          <button
+            className="seg-btn"
+            onClick={() => updateObjects(ids, { layout: defaultFrameLayout('horizontal') })}
+            title="Stack children in a row"
+          >
+            <MoveHorizontal size={13} />
+            <span>Row</span>
+          </button>
+          <button
+            className="seg-btn"
+            onClick={() => updateObjects(ids, { layout: defaultFrameLayout('vertical') })}
+            title="Stack children in a column"
+          >
+            <MoveVertical size={13} />
+            <span>Column</span>
+          </button>
+        </div>
+        <div className="prop-hint">Stack children with gap, padding, and alignment.</div>
+      </div>
+    );
+  }
+  const set = (patch: Partial<FrameLayout>) => updateObjects(ids, { layout: { ...L, ...patch } });
+  const horiz = L.direction === 'horizontal';
+  return (
+    <div className="prop-section">
+      <div className="prop-title">Auto layout</div>
+      <div className="seg panel-seg" role="group" aria-label="Direction">
+        <button
+          className={`seg-btn${horiz ? ' active' : ''}`}
+          onClick={() => set({ direction: 'horizontal' })}
+          aria-pressed={horiz}
+        >
+          <MoveHorizontal size={13} />
+          <span>Row</span>
+        </button>
+        <button
+          className={`seg-btn${!horiz ? ' active' : ''}`}
+          onClick={() => set({ direction: 'vertical' })}
+          aria-pressed={!horiz}
+        >
+          <MoveVertical size={13} />
+          <span>Column</span>
+        </button>
+      </div>
+      <div className="prop-grid-2">
+        <NumField label="Gap" value={L.gap} min={0} ids={ids} patch={(v) => ({ layout: { ...L, gap: Math.max(0, v) } })} />
+      </div>
+      <span className="prop-label">Padding</span>
+      <div className="prop-grid-2">
+        <NumField label="Top" value={L.paddingTop} min={0} ids={ids} patch={(v) => ({ layout: { ...L, paddingTop: Math.max(0, v) } })} />
+        <NumField label="Right" value={L.paddingRight} min={0} ids={ids} patch={(v) => ({ layout: { ...L, paddingRight: Math.max(0, v) } })} />
+        <NumField label="Bottom" value={L.paddingBottom} min={0} ids={ids} patch={(v) => ({ layout: { ...L, paddingBottom: Math.max(0, v) } })} />
+        <NumField label="Left" value={L.paddingLeft} min={0} ids={ids} patch={(v) => ({ layout: { ...L, paddingLeft: Math.max(0, v) } })} />
+      </div>
+      <span className="prop-label">{horiz ? 'Horizontal align' : 'Vertical align'}</span>
+      <div className="seg tight" role="group" aria-label="Main axis alignment">
+        {ALIGN_MAIN_OPTS.map((o) => (
+          <button
+            key={o.v}
+            className={`seg-btn${L.alignMain === o.v ? ' active' : ''}`}
+            onClick={() => set({ alignMain: o.v })}
+            aria-pressed={L.alignMain === o.v}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <span className="prop-label">{horiz ? 'Vertical align' : 'Horizontal align'}</span>
+      <div className="seg tight" role="group" aria-label="Cross axis alignment">
+        {ALIGN_CROSS_OPTS.map((o) => (
+          <button
+            key={o.v}
+            className={`seg-btn${L.alignCross === o.v ? ' active' : ''}`}
+            onClick={() => set({ alignCross: o.v })}
+            aria-pressed={L.alignCross === o.v}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <button className="btn secondary full" onClick={() => updateObjects(ids, { layout: null })}>
+        <X size={14} />
+        <span>Remove auto layout</span>
+      </button>
+    </div>
+  );
+}
+
+function ChildSizingSection({ obj, ids }: { obj: DesignObject; ids: string[] }) {
+  const { updateObjects } = useEditor();
+  const s: ChildSizing = obj.sizing ?? defaultChildSizing();
+  const set = (patch: Partial<ChildSizing>) => updateObjects(ids, { sizing: { ...s, ...patch } });
+  return (
+    <div className="prop-section">
+      <div className="prop-title">Sizing</div>
+      <span className="prop-label">Width</span>
+      <div className="seg tight" role="group" aria-label="Width sizing">
+        {SIZING_MODES.map((o) => (
+          <button
+            key={o.v}
+            className={`seg-btn${s.h === o.v ? ' active' : ''}`}
+            onClick={() => set({ h: o.v })}
+            aria-pressed={s.h === o.v}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <span className="prop-label">Height</span>
+      <div className="seg tight" role="group" aria-label="Height sizing">
+        {SIZING_MODES.map((o) => (
+          <button
+            key={o.v}
+            className={`seg-btn${s.v === o.v ? ' active' : ''}`}
+            onClick={() => set({ v: o.v })}
+            aria-pressed={s.v === o.v}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <div className="prop-grid-2">
+        <OptNumField label="Min W" value={s.minW} ids={ids} patch={(v) => ({ sizing: { ...s, minW: v } })} />
+        <OptNumField label="Max W" value={s.maxW} ids={ids} patch={(v) => ({ sizing: { ...s, maxW: v } })} />
+        <OptNumField label="Min H" value={s.minH} ids={ids} patch={(v) => ({ sizing: { ...s, minH: v } })} />
+        <OptNumField label="Max H" value={s.maxH} ids={ids} patch={(v) => ({ sizing: { ...s, maxH: v } })} />
+      </div>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={s.absolute}
+          onChange={(e) => set({ absolute: e.target.checked })}
+        />
+        <span>Absolute position</span>
+      </label>
+      {s.absolute && <div className="prop-hint">Leaves the stack; X/Y place it freely.</div>}
+    </div>
+  );
+}
+
+/** Nullable numeric field: empty commits null. Mirrors NumField's caret-safe pattern. */
+function OptNumField({
+  label,
+  value,
+  ids,
+  patch,
+}: {
+  label: string;
+  value: number | null;
+  ids: string[];
+  patch: (v: number | null) => ObjectPatch;
+}) {
+  const { updateObjects } = useEditor();
+  const show = (v: number | null): string => (v === null ? '' : String(round1(v)));
+  const [text, setText] = useState(show(value));
+  const [focused, setFocused] = useState(false);
+  const cancelledRef = useRef(false);
+  useEffect(() => {
+    if (!focused) setText(show(value));
+  }, [value, focused]);
+
+  const commit = () => {
+    const t = text.trim();
+    if (t === '') {
+      if (value !== null) updateObjects(ids, patch(null));
+    } else {
+      const n = Number(t);
+      if (Number.isFinite(n)) updateObjects(ids, patch(Math.max(0, round1(n))));
+      else setText(show(value));
+    }
+  };
+
+  return (
+    <label className="prop-field">
+      <span className="prop-label">{label}</span>
+      <span className="num-wrap">
+        <input
+          className="text-input num"
+          value={text}
+          placeholder="—"
+          inputMode="decimal"
+          onChange={(e) => setText(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            if (cancelledRef.current) {
+              cancelledRef.current = false;
+              setText(show(value));
+            } else {
+              commit();
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            else if (e.key === 'Escape') {
+              e.stopPropagation();
+              cancelledRef.current = true;
+              setText(show(value));
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          aria-label={label}
+        />
+      </span>
+    </label>
   );
 }
 
@@ -490,15 +767,158 @@ function exportSelection(objs: DesignObject[], page: DocPage) {
 
 /* ================= component instance ================= */
 
+function PropTextInput({ prop, value }: { prop: string; value: string }) {
+  const { setInstancePropValue } = useEditor();
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [prop, value]);
+  return (
+    <input
+      className="text-input"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) setInstancePropValue(prop, draft);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          setDraft(value);
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      aria-label={`Property ${prop}`}
+    />
+  );
+}
+
 function InstanceSection({ obj, defName, sourceLive }: { obj: DesignObject; defName: string | null; sourceLive: boolean }) {
-  const { detachSelectedInstance, resetSelectedInstance, gotoComponentSource } = useEditor();
+  const { doc, detachSelectedInstance, resetSelectedInstance, gotoComponentSource, switchInstanceVariant, swapSelectedInstance, setInstancePropValue, resetInstancePropValue } = useEditor();
   const compId = obj.componentId as string;
+  const nested = obj.sourceId !== null && obj.sourceId !== undefined;
+  const def = (doc.components ?? []).find((d) => d.id === compId) ?? null;
+  const exposed = def ? exposedControls(doc, def) : [];
+  const set = obj.variant
+    ? (doc.variantSets ?? []).find((s) => s.id === obj.variant?.setId) ?? null
+    : null;
+  const defs = doc.components ?? [];
+  const defNameOf = (id: string): string => defs.find((d) => d.id === id)?.name ?? 'Variant';
   return (
     <div className="prop-section">
       <div className="prop-title">Component</div>
       <div className="prop-hint">
         {defName === null ? 'Component deleted — detach to keep editing.' : !sourceLive ? 'Source missing — instance is frozen.' : defName}
       </div>
+      {set && !nested && (
+        <>
+          <label className="prop-field full">
+            <span className="prop-label">Variant</span>
+            <select
+              className="text-input"
+              value={compId}
+              onChange={(e) => switchInstanceVariant(e.target.value)}
+              aria-label="Variant"
+            >
+              {set.variants.map((v) => (
+                <option key={v} value={v}>
+                  {defNameOf(v)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {set.properties.map((p) => {
+            const v = obj.variant?.values[p.name] ?? p.default;
+            const overridden = !Object.is(v, p.default);
+            const reset = overridden ? (
+              <button
+                className="mini-btn"
+                title={`Reset ${p.name} to default`}
+                onClick={() => resetInstancePropValue(p.name)}
+                aria-label={`Reset ${p.name}`}
+              >
+                <RotateCcw size={12} />
+              </button>
+            ) : null;
+            return p.kind === 'boolean' ? (
+              <div className="prop-value-row" key={p.name}>
+                <label className="check-row grow">
+                  <input
+                    type="checkbox"
+                    checked={v === true}
+                    onChange={(e) => setInstancePropValue(p.name, e.target.checked)}
+                  />
+                  <span>{p.name}</span>
+                </label>
+                {reset}
+              </div>
+            ) : (
+              <div className="prop-value-row end" key={p.name}>
+                <label className="prop-field full grow">
+                  <span className="prop-label">{p.name}</span>
+                  <PropTextInput prop={p.name} value={typeof v === 'string' ? v : ''} />
+                </label>
+                {reset}
+              </div>
+            );
+          })}
+        </>
+      )}
+      {!nested && defs.length > 1 && (
+        <label className="prop-field full">
+          <span className="prop-label">Swap</span>
+          <select
+            className="text-input"
+            value={compId}
+            onChange={(e) => swapSelectedInstance(e.target.value)}
+            aria-label="Swap component"
+          >
+            {defs.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {!nested &&
+        exposed.map((c) => {
+          const v = obj.exposedValues?.[c.alias] ?? c.default;
+          const overridden = !Object.is(v, c.default);
+          const reset = overridden ? (
+            <button
+              className="mini-btn"
+              title={`Reset ${c.alias} to default`}
+              onClick={() => resetInstancePropValue(c.alias)}
+              aria-label={`Reset ${c.alias}`}
+            >
+              <RotateCcw size={12} />
+            </button>
+          ) : null;
+          return c.kind === 'boolean' ? (
+            <div className="prop-value-row" key={c.alias}>
+              <label className="check-row grow">
+                <input
+                  type="checkbox"
+                  checked={v === true}
+                  onChange={(e) => setInstancePropValue(c.alias, e.target.checked)}
+                />
+                <span>{c.label}</span>
+              </label>
+              {reset}
+            </div>
+          ) : (
+            <div className="prop-value-row end" key={c.alias}>
+              <label className="prop-field full grow">
+                <span className="prop-label">{c.label}</span>
+                <PropTextInput prop={c.alias} value={typeof v === 'string' ? v : ''} />
+              </label>
+              {reset}
+            </div>
+          );
+        })}
+      {nested && (
+        <div className="prop-hint">Nested instance — switch and swap from its own source.</div>
+      )}
       <button
         className="btn secondary full"
         disabled={!sourceLive}
@@ -507,16 +927,119 @@ function InstanceSection({ obj, defName, sourceLive }: { obj: DesignObject; defN
         <Pen size={14} />
         <span>Go to source</span>
       </button>
-      <div className="row-2 comp-btn-row">
-        <button className="btn secondary" onClick={resetSelectedInstance} title="Drop all overrides back to the source">
-          <RotateCcw size={14} />
-          <span>Reset</span>
-        </button>
-        <button className="btn secondary" onClick={detachSelectedInstance} title="Turn into plain editable objects">
-          <Unlink size={14} />
-          <span>Detach</span>
-        </button>
-      </div>
+      {!nested && (
+        <div className="row-2 comp-btn-row">
+          <button className="btn secondary" onClick={resetSelectedInstance} title="Drop all overrides back to the source">
+            <RotateCcw size={14} />
+            <span>Reset</span>
+          </button>
+          <button className="btn secondary" onClick={detachSelectedInstance} title="Turn into plain editable objects">
+            <Unlink size={14} />
+            <span>Detach</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ComponentSourceSection({ defId }: { defId: string }) {
+  const { doc, addVariantProp, deleteVariantProp, bindVariantProp, exposeNestedProp, removeExposedAlias } = useEditor();
+  const set = (doc.variantSets ?? []).find((s) => s.variants.includes(defId)) ?? null;
+  const def = (doc.components ?? []).find((d) => d.id === defId) ?? null;
+  const src = def ? liveSource(doc, def) : null;
+  if (!def || !src) return null;
+  const layerNames = [...new Set(src.subtree.map((o) => o.name))];
+  const nested = src.subtree.filter((o) => o.componentId !== null && o.componentId !== undefined);
+  const taken = new Set([...(set?.properties.map((p) => p.name) ?? []), ...Object.keys(def.exposed ?? {})]);
+  const aliasOf = (nodeId: string, prop: string): string | null => {
+    for (const [a, t] of Object.entries(def.exposed ?? {})) {
+      if (t.instance === nodeId && t.prop === prop) return a;
+    }
+    return null;
+  };
+  if (!set && nested.length === 0) return null;
+  return (
+    <div className="prop-section">
+      <div className="prop-title">Properties</div>
+      {set && (
+        <>
+          <div className="prop-hint">Boolean drives visibility · text drives characters.</div>
+          {set.properties.map((p) => (
+            <div className="prop-field full" key={p.name}>
+              <span className="prop-label">
+                {p.name} <span className="dim small">({p.kind})</span>
+              </span>
+              <div className="field-row">
+                <select
+                  className="text-input"
+                  value={set.bindings[p.name] ?? ''}
+                  onChange={(e) => bindVariantProp(defId, p.name, e.target.value === '' ? null : e.target.value)}
+                  aria-label={`Bind ${p.name}`}
+                >
+                  <option value="">Not bound</option>
+                  {layerNames.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="mini-btn danger-hover"
+                  title={`Delete property ${p.name}`}
+                  onClick={() => deleteVariantProp(defId, p.name)}
+                  aria-label={`Delete property ${p.name}`}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <div className="row-2 comp-btn-row">
+            <button className="btn secondary" onClick={() => addVariantProp(defId, 'boolean')}>
+              <span>+ Boolean</span>
+            </button>
+            <button className="btn secondary" onClick={() => addVariantProp(defId, 'text')}>
+              <span>+ Text</span>
+            </button>
+          </div>
+        </>
+      )}
+      {nested.length > 0 && (
+        <>
+          <div className="prop-hint">Expose nested properties to drive them from instances.</div>
+          {nested.map((n) => {
+            const nset = n.componentId ? setContaining(doc, n.componentId) : null;
+            if (!nset || nset.properties.length === 0) return null;
+            return (
+              <div className="prop-field full" key={n.id}>
+                <span className="prop-label">{n.name}</span>
+                {nset.properties.map((p) => {
+                  const alias = aliasOf(n.id, p.name);
+                  const autoAlias = taken.has(p.name) ? `${n.name}.${p.name}` : p.name;
+                  const blocked = alias === null && taken.has(autoAlias);
+                  return (
+                    <label className="check-row" key={p.name} title={blocked ? 'Alias taken' : undefined}>
+                      <input
+                        type="checkbox"
+                        checked={alias !== null}
+                        disabled={blocked}
+                        onChange={(e) => {
+                          if (e.target.checked) exposeNestedProp(defId, n.id, p.name, autoAlias);
+                          else if (alias) removeExposedAlias(defId, alias);
+                        }}
+                      />
+                      <span>
+                        {p.name} <span className="dim small">({p.kind}{alias ? ` · ${alias}` : ''})</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 }
@@ -569,11 +1092,78 @@ function ImageSection({ obj }: { obj: DesignObject }) {
   );
 }
 
+/* ================= effects ================= */
+
+function EffectsSection({ obj }: { obj: DesignObject }) {
+  const { doc, updateObjects, detachEffectStyle } = useEditor();
+  const ids = [obj.id];
+  const linkedStyle = obj.effectStyleId
+    ? (doc.effectStyles ?? []).find((s) => s.id === obj.effectStyleId) ?? null
+    : null;
+  const s = obj.shadow;
+  const addShadow = () => {
+    updateObjects(ids, {
+      shadow: { offsetX: 0, offsetY: 4, blur: 12, spread: 0, color: '#000000', opacity: 0.25 },
+      effectStyleId: null,
+    });
+  };
+  return (
+    <div className="prop-section">
+      <div className="prop-title">Effects</div>
+      {linkedStyle && (
+        <div className="style-link">
+          <Link2 size={13} />
+          <span>{linkedStyle.name}</span>
+          <button
+            className="mini-btn"
+            title="Detach style (keep shadow)"
+            onClick={detachEffectStyle}
+            aria-label="Detach effect style"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+      {s === null || s === undefined ? (
+        <button className="btn secondary full" onClick={addShadow}>
+          <Plus size={14} />
+          <span>Add drop shadow</span>
+        </button>
+      ) : (
+        <>
+          <div className="prop-grid-2">
+            <NumField label="X" value={s.offsetX} ids={ids} patch={(v) => ({ shadow: { ...s, offsetX: round1(v) }, effectStyleId: null })} />
+            <NumField label="Y" value={s.offsetY} ids={ids} patch={(v) => ({ shadow: { ...s, offsetY: round1(v) }, effectStyleId: null })} />
+            <NumField label="Blur" value={s.blur} min={0} ids={ids} patch={(v) => ({ shadow: { ...s, blur: Math.max(0, v) }, effectStyleId: null })} />
+            <NumField label="Spread" value={s.spread ?? 0} min={0} ids={ids} patch={(v) => ({ shadow: { ...s, spread: Math.max(0, v) }, effectStyleId: null })} />
+            <NumField label="Opacity" value={s.opacity} min={0} step={0.05} ids={ids} patch={(v) => ({ shadow: { ...s, opacity: clamp(v, 0, 1) }, effectStyleId: null })} />
+          </div>
+          <ColorField
+            value={s.color}
+            ids={ids}
+            colorPatch={(color) => ({ shadow: { ...s, color }, effectStyleId: null })}
+          />
+          <button
+            className="btn secondary full"
+            onClick={() => updateObjects(ids, { shadow: null, effectStyleId: null })}
+          >
+            <X size={14} />
+            <span>Remove shadow</span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ================= text ================= */
 
 function TextSection({ obj }: { obj: DesignObject }) {
-  const { updateObjects, transientPatchObjects, endTransient, abortTransient } = useEditor();
+  const { doc, updateObjects, transientPatchObjects, endTransient, abortTransient, detachTextStyle } = useEditor();
   const ids = [obj.id];
+  const linkedStyle = obj.textStyleId
+    ? (doc.textStyles ?? []).find((s) => s.id === obj.textStyleId) ?? null
+    : null;
   const aligns: { id: TextAlign; label: string }[] = [
     { id: 'left', label: 'Left' },
     { id: 'center', label: 'Center' },
@@ -582,12 +1172,26 @@ function TextSection({ obj }: { obj: DesignObject }) {
   return (
     <div className="prop-section">
       <div className="prop-title">Typography</div>
+      {linkedStyle && (
+        <div className="style-link">
+          <Link2 size={13} />
+          <span>{linkedStyle.name}</span>
+          <button
+            className="mini-btn"
+            title="Detach style (keep formatting)"
+            onClick={detachTextStyle}
+            aria-label="Detach text style"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
       <label className="prop-field full">
         <span className="prop-label">Font</span>
         <select
           className="text-input"
           value={obj.fontFamily}
-          onChange={(e) => updateObjects(ids, { fontFamily: e.target.value })}
+          onChange={(e) => updateObjects(ids, { fontFamily: e.target.value, textStyleId: null })}
           aria-label="Font family"
         >
           {FONT_STACKS.map((f) => (
@@ -598,13 +1202,13 @@ function TextSection({ obj }: { obj: DesignObject }) {
         </select>
       </label>
       <div className="prop-grid-2">
-        <NumField label="Size" value={obj.fontSize} min={1} ids={ids} patch={(v) => ({ fontSize: Math.max(1, v) })} />
+        <NumField label="Size" value={obj.fontSize} min={1} ids={ids} patch={(v) => ({ fontSize: Math.max(1, v), textStyleId: null })} />
         <label className="prop-field">
           <span className="prop-label">Weight</span>
           <select
             className="text-input"
             value={obj.fontWeight}
-            onChange={(e) => updateObjects(ids, { fontWeight: Number(e.target.value) })}
+            onChange={(e) => updateObjects(ids, { fontWeight: Number(e.target.value), textStyleId: null })}
             aria-label="Font weight"
           >
             <option value={400}>Regular</option>
@@ -614,7 +1218,7 @@ function TextSection({ obj }: { obj: DesignObject }) {
             <option value={800}>Extra bold</option>
           </select>
         </label>
-        <NumField label="Line height" value={obj.lineHeight} min={0.5} step={0.05} ids={ids} patch={(v) => ({ lineHeight: clamp(v, 0.5, 4) })} />
+        <NumField label="Line height" value={obj.lineHeight} min={0.5} step={0.05} ids={ids} patch={(v) => ({ lineHeight: clamp(v, 0.5, 4), textStyleId: null })} />
         <div className="prop-field">
           <span className="prop-label">Align</span>
           <div className="seg">
@@ -623,7 +1227,7 @@ function TextSection({ obj }: { obj: DesignObject }) {
                 key={a.id}
                 className={`seg-btn${obj.textAlign === a.id ? ' active' : ''}`}
                 title={a.label}
-                onClick={() => updateObjects(ids, { textAlign: a.id })}
+                onClick={() => updateObjects(ids, { textAlign: a.id, textStyleId: null })}
                 aria-pressed={obj.textAlign === a.id}
               >
                 {a.label[0]}

@@ -33,11 +33,85 @@ export interface Constraints {
   vertical: 'top' | 'middle' | 'bottom' | 'stretch' | 'scale';
 }
 
+export type LayoutDirection = 'horizontal' | 'vertical';
+export type MainAlign = 'start' | 'center' | 'end' | 'space-between';
+export type CrossAlign = 'start' | 'center' | 'end';
+export type SizingMode = 'fixed' | 'hug' | 'fill';
+
+/**
+ * Auto-layout container (frames only). Flow children arrange along
+ * direction with gap/padding/alignment; absolute children skip flow and
+ * keep constraint behavior on parent resize.
+ */
+export interface FrameLayout {
+  direction: LayoutDirection;
+  gap: number;
+  paddingTop: number;
+  paddingRight: number;
+  paddingBottom: number;
+  paddingLeft: number;
+  alignMain: MainAlign;
+  alignCross: CrossAlign;
+}
+
+/**
+ * How a child behaves inside an auto-layout frame. Inert without a layout
+ * parent. min/max clamp hug+fill sizes (fixed sizes stay user-exact).
+ */
+export interface ChildSizing {
+  h: SizingMode;
+  v: SizingMode;
+  minW: number | null;
+  maxW: number | null;
+  minH: number | null;
+  maxH: number | null;
+  /** Absolute children skip flow and follow constraints instead. */
+  absolute: boolean;
+}
+
 /** Shared fill color: editing the style updates every linked object. */
 export interface ColorStyle {
   id: string;
   name: string;
   color: string;
+}
+
+/**
+ * Shared typography: editing the style updates every linked text object.
+ * Covers the type-only properties; fill color stays with color styles.
+ */
+export interface TextStyle {
+  id: string;
+  name: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  textAlign: TextAlign;
+  lineHeight: number;
+}
+
+/**
+ * Drop shadow. Rendered with an SVG drop-shadow filter on canvas and
+ * export (a dilate stage is added when spread > 0). v1 has no inner or
+ * layered shadows — one drop shadow per object.
+ */
+export interface DropShadow {
+  offsetX: number;
+  offsetY: number;
+  /** Blur radius in px, >= 0. */
+  blur: number;
+  /** Spread (choke expansion) in px, >= 0. */
+  spread: number;
+  color: string;
+  /** Shadow opacity 0..1. */
+  opacity: number;
+}
+
+/** Shared drop shadow: editing the style updates every linked object. */
+export interface EffectStyle {
+  id: string;
+  name: string;
+  shadow: DropShadow;
 }
 
 /**
@@ -60,6 +134,50 @@ export interface ComponentDef {
   name: string;
   pageId: string;
   rootId: string;
+  /**
+   * Exposed nested properties: alias -> nested target. Lets instances of
+   * this def drive a nested instance's property without opening the source.
+   */
+  exposed: Record<string, NestedExpose>;
+}
+
+/** One exposed nested property: which nested instance and which of its props. */
+export interface NestedExpose {
+  /** Source node id of the nested instance root within the def's subtree. */
+  instance: string;
+  /** Property name on the nested instance's set. */
+  prop: string;
+}
+
+/**
+ * A component property definition. v1 kinds only: boolean props bind to a
+ * layer's visibility, text props bind to a text layer's characters.
+ */
+export interface PropDef {
+  name: string;
+  kind: 'boolean' | 'text';
+  default: boolean | string;
+}
+
+/**
+ * A variant set groups component defs as switchable variants of one
+ * component. variants[0] is the default (new instances, Assets insert).
+ * bindings map a property name to the source layer name it drives; the
+ * property kind decides the field (boolean → visible, text → text).
+ */
+export interface VariantSet {
+  id: string;
+  name: string;
+  properties: PropDef[];
+  /** ComponentDef ids; first entry is the default variant. */
+  variants: string[];
+  bindings: Record<string, string>;
+}
+
+/** An instance's variant membership: its set plus current property values. */
+export interface InstanceVariant {
+  setId: string;
+  values: Record<string, boolean | string>;
 }
 
 export type Tool =
@@ -104,8 +222,18 @@ export interface DesignObject {
   fillGradient: FillGradient | null;
   /** Linked color style, or null. Direct fill edits detach the link. */
   fillStyleId: string | null;
+  /** Linked text style (text objects only), or null. Direct type edits detach. */
+  textStyleId: string | null;
+  /** Drop shadow, or null for none. */
+  shadow: DropShadow | null;
+  /** Linked effect style, or null. Direct shadow edits detach the link. */
+  effectStyleId: string | null;
   /** Responsive constraints within the parent frame, or null for defaults. */
   constraints: Constraints | null;
+  /** Auto-layout container block (frames only), or null for free layout. */
+  layout: FrameLayout | null;
+  /** Child sizing inside an auto-layout parent, or null for fixed/free. */
+  sizing: ChildSizing | null;
   /** Stroke paint as CSS color, or '' for none. */
   stroke: string;
   strokeWidth: number;
@@ -122,6 +250,10 @@ export interface DesignObject {
   componentId: string | null;
   sourceId: string | null;
   componentSnapshot: Record<string, DesignObject> | null;
+  /** Variant membership for instance roots (null on plain instances). */
+  variant: InstanceVariant | null;
+  /** Exposed nested-property values, keyed by alias (instance roots). */
+  exposedValues: Record<string, boolean | string> | null;
   // Image properties (image objects only). The pixels live in the local
   // asset store keyed by imageId; the document carries only the reference
   // so JSON stays small and localStorage-safe.
@@ -150,7 +282,10 @@ export interface UndesignDoc {
   pages: DocPage[];
   activePageId: string;
   components: ComponentDef[];
+  variantSets: VariantSet[];
   colorStyles: ColorStyle[];
+  textStyles: TextStyle[];
+  effectStyles: EffectStyle[];
   prototypeLinks: PrototypeLink[];
 }
 

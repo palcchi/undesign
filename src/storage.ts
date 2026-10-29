@@ -1,5 +1,6 @@
-import type { ColorStyle, ComponentDef, Constraints, CornerRadii, DesignObject, DocPage, FillGradient, PrototypeLink, UndesignDoc } from './types';
+import type { ChildSizing, ColorStyle, ComponentDef, Constraints, CornerRadii, DesignObject, DocPage, DropShadow, EffectStyle, FillGradient, FrameLayout, InstanceVariant, NestedExpose, PrototypeLink, PropDef, TextStyle, UndesignDoc, VariantSet } from './types';
 import { pruneLinks } from './prototype';
+import { breakComponentCycles } from './library';
 
 export const STORAGE_KEY = 'undesign.doc.v1';
 
@@ -57,7 +58,76 @@ function sanitizeComponent(raw: unknown): ComponentDef | null {
   if (!isObject(raw)) return null;
   if (typeof raw.id !== 'string' || raw.id === '') return null;
   if (typeof raw.pageId !== 'string' || typeof raw.rootId !== 'string') return null;
-  return { id: raw.id, name: str(raw.name, 'Component'), pageId: raw.pageId, rootId: raw.rootId };
+  const exposed: Record<string, NestedExpose> = {};
+  if (isObject(raw.exposed)) {
+    for (const [k, v] of Object.entries(raw.exposed)) {
+      if (isObject(v) && typeof v.instance === 'string' && v.instance !== '' && typeof v.prop === 'string' && v.prop !== '') {
+        exposed[k] = { instance: v.instance, prop: v.prop };
+      }
+    }
+  }
+  return { id: raw.id, name: str(raw.name, 'Component'), pageId: raw.pageId, rootId: raw.rootId, exposed };
+}
+
+function sanitizePropDef(raw: unknown): PropDef | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.name !== 'string' || raw.name === '') return null;
+  if (raw.kind === 'boolean') {
+    return { name: raw.name, kind: 'boolean', default: typeof raw.default === 'boolean' ? raw.default : true };
+  }
+  if (raw.kind === 'text') {
+    return { name: raw.name, kind: 'text', default: typeof raw.default === 'string' ? raw.default : '' };
+  }
+  return null;
+}
+
+function sanitizeVariantSet(raw: unknown, knownDefs: Set<string>): VariantSet | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.id !== 'string' || raw.id === '') return null;
+  const properties: PropDef[] = [];
+  if (Array.isArray(raw.properties)) {
+    const names = new Set<string>();
+    for (const p of raw.properties) {
+      const clean = sanitizePropDef(p);
+      if (clean && !names.has(clean.name)) {
+        names.add(clean.name);
+        properties.push(clean);
+      }
+    }
+  }
+  const propNames = new Set(properties.map((p) => p.name));
+  const variants = Array.isArray(raw.variants)
+    ? raw.variants.filter((v): v is string => typeof v === 'string' && knownDefs.has(v))
+    : [];
+  if (variants.length === 0) return null;
+  const bindings: Record<string, string> = {};
+  if (isObject(raw.bindings)) {
+    for (const [k, v] of Object.entries(raw.bindings)) {
+      if (propNames.has(k) && typeof v === 'string' && v !== '') bindings[k] = v;
+    }
+  }
+  return { id: raw.id, name: str(raw.name, 'Variant set'), properties, variants, bindings };
+}
+
+function sanitizeValuesRecord(raw: unknown): Record<string, boolean | string> | null {
+  if (!isObject(raw)) return null;
+  const out: Record<string, boolean | string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === 'boolean' || typeof v === 'string') out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function sanitizeInstanceVariant(raw: unknown): InstanceVariant | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.setId !== 'string' || raw.setId === '') return null;
+  const values: Record<string, boolean | string> = {};
+  if (isObject(raw.values)) {
+    for (const [k, v] of Object.entries(raw.values)) {
+      if (typeof v === 'boolean' || typeof v === 'string') values[k] = v;
+    }
+  }
+  return { setId: raw.setId, values };
 }
 
 const H_VALUES = new Set(['left', 'center', 'right', 'stretch', 'scale']);
@@ -72,11 +142,87 @@ function sanitizeConstraints(value: unknown): Constraints | null {
   };
 }
 
+const LAYOUT_DIRECTIONS = new Set(['horizontal', 'vertical']);
+const ALIGN_MAIN = new Set(['start', 'center', 'end', 'space-between']);
+const ALIGN_CROSS = new Set(['start', 'center', 'end']);
+const SIZING_MODES = new Set(['fixed', 'hug', 'fill']);
+
+function sanitizeFrameLayout(value: unknown): FrameLayout | null {
+  if (!isObject(value)) return null;
+  if (!LAYOUT_DIRECTIONS.has(value.direction as string)) return null;
+  if (!ALIGN_MAIN.has(value.alignMain as string) || !ALIGN_CROSS.has(value.alignCross as string)) return null;
+  return {
+    direction: value.direction as FrameLayout['direction'],
+    gap: Math.max(0, num(value.gap, 0)),
+    paddingTop: Math.max(0, num(value.paddingTop, 0)),
+    paddingRight: Math.max(0, num(value.paddingRight, 0)),
+    paddingBottom: Math.max(0, num(value.paddingBottom, 0)),
+    paddingLeft: Math.max(0, num(value.paddingLeft, 0)),
+    alignMain: value.alignMain as FrameLayout['alignMain'],
+    alignCross: value.alignCross as FrameLayout['alignCross'],
+  };
+}
+
+function optNum(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function sanitizeChildSizing(value: unknown): ChildSizing | null {
+  if (!isObject(value)) return null;
+  if (!SIZING_MODES.has(value.h as string) || !SIZING_MODES.has(value.v as string)) return null;
+  return {
+    h: value.h as ChildSizing['h'],
+    v: value.v as ChildSizing['v'],
+    minW: optNum(value.minW),
+    maxW: optNum(value.maxW),
+    minH: optNum(value.minH),
+    maxH: optNum(value.maxH),
+    absolute: bool(value.absolute, false),
+  };
+}
+
 function sanitizeColorStyle(raw: unknown): ColorStyle | null {
   if (!isObject(raw)) return null;
   if (typeof raw.id !== 'string' || raw.id === '') return null;
   if (typeof raw.color !== 'string' || raw.color === '') return null;
   return { id: raw.id, name: str(raw.name, 'Style'), color: raw.color };
+}
+
+function sanitizeTextStyle(raw: unknown): TextStyle | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.id !== 'string' || raw.id === '') return null;
+  const align = raw.textAlign === 'center' || raw.textAlign === 'right' ? raw.textAlign : 'left';
+  return {
+    id: raw.id,
+    name: str(raw.name, 'Style'),
+    fontFamily: str(raw.fontFamily, 'Inter, system-ui, sans-serif'),
+    fontSize: Math.max(1, num(raw.fontSize, 16)),
+    fontWeight: num(raw.fontWeight, 400),
+    textAlign: align,
+    lineHeight: num(raw.lineHeight, 1.4),
+  };
+}
+
+function sanitizeDropShadow(raw: unknown): DropShadow | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.color !== 'string' || raw.color === '') return null;
+  return {
+    offsetX: num(raw.offsetX, 0),
+    offsetY: num(raw.offsetY, 0),
+    blur: Math.max(0, num(raw.blur, 0)),
+    // Legacy documents predate spread; missing/hostile values hug at 0.
+    spread: Math.max(0, num(raw.spread, 0)),
+    color: raw.color,
+    opacity: Math.min(1, Math.max(0, num(raw.opacity, 1))),
+  };
+}
+
+function sanitizeEffectStyle(raw: unknown): EffectStyle | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.id !== 'string' || raw.id === '') return null;
+  const shadow = sanitizeDropShadow(raw.shadow);
+  if (!shadow) return null;
+  return { id: raw.id, name: str(raw.name, 'Style'), shadow };
 }
 
 function sanitizeLink(raw: unknown): PrototypeLink | null {
@@ -110,7 +256,12 @@ function sanitizeObject(raw: unknown): DesignObject | null {
     fillOpacity: Math.min(1, Math.max(0, num(raw.fillOpacity, 1))),
     fillGradient: sanitizeGradient(raw.fillGradient),
     fillStyleId: typeof raw.fillStyleId === 'string' && raw.fillStyleId !== '' ? raw.fillStyleId : null,
+    textStyleId: typeof raw.textStyleId === 'string' && raw.textStyleId !== '' ? raw.textStyleId : null,
+    shadow: sanitizeDropShadow(raw.shadow),
+    effectStyleId: typeof raw.effectStyleId === 'string' && raw.effectStyleId !== '' ? raw.effectStyleId : null,
     constraints: sanitizeConstraints(raw.constraints),
+    layout: sanitizeFrameLayout(raw.layout),
+    sizing: sanitizeChildSizing(raw.sizing),
     stroke: str(raw.stroke, ''),
     strokeWidth: Math.max(0, num(raw.strokeWidth, 0)),
     cornerRadius: Math.max(0, num(raw.cornerRadius, 0)),
@@ -118,6 +269,8 @@ function sanitizeObject(raw: unknown): DesignObject | null {
     componentId: typeof raw.componentId === 'string' && raw.componentId !== '' ? raw.componentId : null,
     sourceId: typeof raw.sourceId === 'string' && raw.sourceId !== '' ? raw.sourceId : null,
     componentSnapshot: sanitizeSnapshot(raw.componentSnapshot),
+    variant: sanitizeInstanceVariant(raw.variant),
+    exposedValues: sanitizeValuesRecord(raw.exposedValues),
     imageId: typeof raw.imageId === 'string' && raw.imageId !== '' ? raw.imageId : null,
     imageName: str(raw.imageName, ''),
     naturalW: Math.max(0, num(raw.naturalW, 0)),
@@ -183,6 +336,30 @@ export function validateDoc(data: unknown): UndesignDoc | null {
         if (clean) components.push(clean);
       }
     }
+    const knownDefs = new Set(components.map((c) => c.id));
+    const variantSets: VariantSet[] = [];
+    if (Array.isArray(data.variantSets)) {
+      for (const s of data.variantSets) {
+        const clean = sanitizeVariantSet(s, knownDefs);
+        if (clean) variantSets.push(clean);
+      }
+    }
+    // Break def reference cycles before membership checks (load-time repair).
+    const debroken = breakComponentCycles({
+      version: 1,
+      name: typeof data.name === 'string' ? data.name : 'Untitled',
+      pages,
+      activePageId,
+      components,
+      variantSets,
+      colorStyles: [],
+      textStyles: [],
+      effectStyles: [],
+      prototypeLinks: [],
+    });
+    for (let i = 0; i < pages.length; i++) {
+      if (debroken.pages[i] !== pages[i]) pages[i] = debroken.pages[i];
+    }
     const colorStyles: ColorStyle[] = [];
     if (Array.isArray(data.colorStyles)) {
       for (const s of data.colorStyles) {
@@ -190,11 +367,56 @@ export function validateDoc(data: unknown): UndesignDoc | null {
         if (clean) colorStyles.push(clean);
       }
     }
-    // Dangling style references (e.g. hand-edited JSON) detach to plain fills.
+    const textStyles: TextStyle[] = [];
+    if (Array.isArray(data.textStyles)) {
+      for (const s of data.textStyles) {
+        const clean = sanitizeTextStyle(s);
+        if (clean) textStyles.push(clean);
+      }
+    }
+    const effectStyles: EffectStyle[] = [];
+    if (Array.isArray(data.effectStyles)) {
+      for (const s of data.effectStyles) {
+        const clean = sanitizeEffectStyle(s);
+        if (clean) effectStyles.push(clean);
+      }
+    }
+    // Dangling style references (e.g. hand-edited JSON) detach to plain values.
     const styleIds = new Set(colorStyles.map((s) => s.id));
+    const textStyleIds = new Set(textStyles.map((s) => s.id));
+    const effectStyleIds = new Set(effectStyles.map((s) => s.id));
+    const setById = new Map(variantSets.map((s) => [s.id, s]));
+    const defById = new Map(components.map((c) => [c.id, c]));
     for (const p of pages) {
       for (const o of p.objects) {
         if (o.fillStyleId !== null && !styleIds.has(o.fillStyleId)) o.fillStyleId = null;
+        if (o.textStyleId !== null && !textStyleIds.has(o.textStyleId)) o.textStyleId = null;
+        if (o.effectStyleId !== null && !effectStyleIds.has(o.effectStyleId)) o.effectStyleId = null;
+        // Variant membership must name a live set containing the instance's
+        // def; anything else degrades to a plain instance of the same def.
+        if (o.variant !== null) {
+          const s = setById.get(o.variant.setId);
+          const propNames = s ? new Set(s.properties.map((pr) => pr.name)) : new Set<string>();
+          if (o.componentId === null || !s || !s.variants.includes(o.componentId)) {
+            o.variant = null;
+          } else {
+            const values: Record<string, boolean | string> = {};
+            for (const [k, v] of Object.entries(o.variant.values)) {
+              if (propNames.has(k)) values[k] = v;
+            }
+            o.variant = { setId: s.id, values };
+          }
+        }
+        // Exposed values keep only aliases the instance's def actually exposes.
+        if (o.exposedValues !== null) {
+          const def = o.componentId ? defById.get(o.componentId) : undefined;
+          const aliases = def ? new Set(Object.keys(def.exposed ?? {})) : new Set<string>();
+          const kept: Record<string, boolean | string> = {};
+          for (const [k, v] of Object.entries(o.exposedValues)) {
+            if (aliases.has(k)) kept[k] = v;
+          }
+          o.exposedValues = Object.keys(kept).length > 0 ? kept : null;
+        }
       }
     }
     const rawLinks: PrototypeLink[] = [];
@@ -210,7 +432,10 @@ export function validateDoc(data: unknown): UndesignDoc | null {
       pages,
       activePageId,
       components,
+      variantSets,
       colorStyles,
+      textStyles,
+      effectStyles,
       prototypeLinks: pruneLinks(pages, rawLinks),
     };
   } catch {
