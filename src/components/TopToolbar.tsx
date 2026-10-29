@@ -9,6 +9,7 @@ import {
   Play,
   Redo2,
   Share2,
+  Sparkles,
   Square,
   Type,
   Undo2,
@@ -17,7 +18,18 @@ import {
 } from 'lucide-react';
 import { useEditor } from '../store';
 import type { Tool } from '../types';
-import { downloadFile, pageToSvg } from '../utils';
+import { downloadFile } from '../utils';
+import { docImageIds, exportPageSvg } from '../assets';
+import { downloadBlob, svgToPngBlob } from '../exportPng';
+import {
+  aiConfigured,
+  generateAiPlan,
+  loadAiConfig,
+  saveAiConfig,
+  summarizeAiPlan,
+  validateAiPlan,
+} from '../ai';
+import type { AiConfig, AiEditOp } from '../ai';
 import { validateDoc } from '../storage';
 import { Modal, useEnterEscape } from './ui';
 
@@ -54,20 +66,23 @@ export function TopToolbar({
 }) {
   const editor = useEditor();
   const {
-    doc, selectedIds, tool, setTool, viewport, canUndo, canRedo,
+    doc, selectedIds, selected, tool, setTool, viewport, canUndo, canRedo,
     undo, redo, zoomIn, zoomOut, zoomReset, zoomTo, newBlankDoc, resetSample,
     replaceDoc, copySelected, cutSelected, paste, hasClipboard, duplicateSelected,
     deleteSelected, selectAll, reorder, align, distribute, toggleGrid, gridVisible,
+    snapObjects, snapGrid, toggleSnapObjects, toggleSnapGrid,
+    groupSelected, ungroupSelected, importImageFiles,
   } = editor;
 
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(doc.name);
-  const [dialog, setDialog] = useState<'export' | 'share' | 'shortcuts' | 'about' | null>(null);
+  const [dialog, setDialog] = useState<'export' | 'share' | 'shortcuts' | 'about' | 'ai' | null>(null);
   const [zoomMenu, setZoomMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; action: () => void } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLInputElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,13 +94,16 @@ export function TopToolbar({
   useEffect(() => {
     const onExport = () => setDialog('export');
     const onShortcuts = () => setDialog('shortcuts');
+    const onNew = () => setConfirm({ title: 'New document', message: 'Start a blank document? Unsaved changes are kept in the undo history of this session only until you edit.', action: newBlankDoc });
     window.addEventListener('undesign:open-export', onExport);
     window.addEventListener('undesign:open-shortcuts', onShortcuts);
+    window.addEventListener('undesign:new-document', onNew);
     return () => {
       window.removeEventListener('undesign:open-export', onExport);
       window.removeEventListener('undesign:open-shortcuts', onShortcuts);
+      window.removeEventListener('undesign:new-document', onNew);
     };
-  }, []);
+  }, [newBlankDoc]);
 
   useEffect(() => {
     if (!openMenu && !zoomMenu) return;
@@ -130,7 +148,7 @@ export function TopToolbar({
 
   const menus: Record<string, MenuItem[]> = {
     File: [
-      { label: 'New document', shortcut: 'Ctrl+N', onSelect: () => setConfirm({ title: 'New document', message: 'Start a blank document? Unsaved changes are kept in the undo history of this session only until you edit.', action: newBlankDoc }) },
+      { label: 'New document', shortcut: 'Ctrl+Alt+N', onSelect: () => setConfirm({ title: 'New document', message: 'Start a blank document? Unsaved changes are kept in the undo history of this session only until you edit.', action: newBlankDoc }) },
       { label: 'Restore sample document', onSelect: () => setConfirm({ title: 'Restore sample', message: 'Replace the current document with the original sample?', action: resetSample }) },
       { divider: true },
       { label: 'Export…', shortcut: 'Ctrl+E', onSelect: () => setDialog('export') },
@@ -143,6 +161,7 @@ export function TopToolbar({
         },
       },
       { label: 'Import JSON…', onSelect: () => fileRef.current?.click() },
+      { label: 'Import image…', onSelect: () => imgRef.current?.click() },
       { divider: true },
       { label: 'Rename document', onSelect: () => { setNameDraft(doc.name); setEditingName(true); } },
     ],
@@ -163,8 +182,11 @@ export function TopToolbar({
       { label: 'Zoom out', shortcut: 'Ctrl+−', onSelect: zoomOut },
       { label: 'Reset to 100%', shortcut: 'Ctrl+0', onSelect: zoomReset },
       { label: 'Fit canvas', shortcut: 'Shift+1', onSelect: () => window.dispatchEvent(new CustomEvent('undesign:fit')) },
+      { label: 'Fit selection', shortcut: 'Shift+2', disabled: selectedIds.length === 0, onSelect: () => window.dispatchEvent(new CustomEvent('undesign:fit-selection')) },
       { divider: true },
       { label: gridVisible ? 'Hide grid' : 'Show grid', shortcut: 'Ctrl+.', onSelect: toggleGrid },
+      { label: snapObjects ? 'Disable object snapping' : 'Enable object snapping', onSelect: toggleSnapObjects },
+      { label: snapGrid ? 'Disable grid snapping' : 'Enable grid snapping', onSelect: toggleSnapGrid },
       { label: leftVisible ? 'Hide left sidebar' : 'Show left sidebar', onSelect: onToggleLeft },
       { label: rightVisible ? 'Hide right sidebar' : 'Show right sidebar', onSelect: onToggleRight },
     ],
@@ -183,6 +205,9 @@ export function TopToolbar({
       { divider: true },
       { label: 'Distribute horizontally', disabled: selectedIds.length < 3, onSelect: () => distribute('horizontal') },
       { label: 'Distribute vertically', disabled: selectedIds.length < 3, onSelect: () => distribute('vertical') },
+      { divider: true },
+      { label: 'Group selection', shortcut: 'Ctrl+G', disabled: selectedIds.length === 0, onSelect: groupSelected },
+      { label: 'Ungroup selection', shortcut: 'Ctrl+Shift+G', disabled: !selected.some((o) => o.type === 'frame'), onSelect: ungroupSelected },
     ],
     Help: [
       { label: 'Keyboard shortcuts', shortcut: '?', onSelect: () => setDialog('shortcuts') },
@@ -330,6 +355,17 @@ export function TopToolbar({
                 </button>
                 <button
                   className="menu-item"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('undesign:fit-selection'));
+                    setZoomMenu(false);
+                  }}
+                >
+                  <span>Fit selection</span>
+                  <span className="menu-shortcut">Shift+2</span>
+                </button>
+                <button
+                  className="menu-item"
                   onClick={() => {
                     zoomReset();
                     setZoomMenu(false);
@@ -351,6 +387,10 @@ export function TopToolbar({
         <button className="btn ghost" data-tip="Present this page fullscreen (Esc to exit)" onClick={onPreview}>
           <Play size={14} />
           <span>Preview</span>
+        </button>
+        <button className="btn ghost" data-tip="Generate editable objects from a text brief" onClick={() => setDialog('ai')}>
+          <Sparkles size={14} />
+          <span>AI</span>
         </button>
         <button className="btn secondary" data-tip="Share via link or portable JSON" onClick={() => setDialog('share')}>
           <Share2 size={14} />
@@ -374,6 +414,19 @@ export function TopToolbar({
         }}
       />
 
+      <input
+        ref={imgRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        hidden
+        onChange={(e) => {
+          if (e.target.files) importImageFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+
+      {dialog === 'ai' && <AiDialog onClose={() => setDialog(null)} notify={showToast} />}
       {dialog === 'export' && <ExportDialog onClose={() => setDialog(null)} notify={showToast} />}
       {dialog === 'share' && <ShareDialog onClose={() => setDialog(null)} notify={showToast} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
@@ -414,25 +467,173 @@ export function TopToolbar({
   );
 }
 
+function AiDialog({ onClose, notify }: { onClose: () => void; notify: (m: string) => void }) {
+  const { selected, applyAiOps } = useEditor();
+  const [cfg, setCfg] = useState<AiConfig>(() => loadAiConfig());
+  const [brief, setBrief] = useState('');
+  const [phase, setPhase] = useState<'idle' | 'busy' | 'preview'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<AiEditOp[] | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
+  const ready = aiConfigured(cfg);
+
+  const generate = () => {
+    if (!ready || brief.trim() === '' || phase === 'busy') return;
+    saveAiConfig(cfg);
+    setError(null);
+    setPlan(null);
+    setPhase('busy');
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    const timer = window.setTimeout(() => ctrl.abort(), 60000);
+    const summary =
+      selected.length === 0
+        ? 'none'
+        : selected.map((o) => `${o.type} “${o.name}”`).join(', ');
+    generateAiPlan(cfg, brief.trim(), summary, ctrl.signal).then(
+      (raw) => {
+        window.clearTimeout(timer);
+        const checked = validateAiPlan(raw);
+        if (!checked.ok) {
+          setPhase('idle');
+          setError(`The plan failed validation and was not applied: ${checked.error}`);
+          return;
+        }
+        setPlan(checked.ops);
+        setPhase('preview');
+      },
+      (e: Error) => {
+        window.clearTimeout(timer);
+        setPhase('idle');
+        setError(e.message);
+      },
+    );
+  };
+
+  const apply = () => {
+    if (!plan) return;
+    applyAiOps(plan);
+    notify('AI plan applied — Undo reverts it in one step.');
+    onClose();
+  };
+
+  const field = (key: keyof AiConfig, label: string, placeholder: string, secret = false) => (
+    <div className="field-row">
+      <span className="field-label">{label}</span>
+      <input
+        className="text-input"
+        type={secret ? 'password' : 'text'}
+        value={cfg[key]}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(e) => setCfg({ ...cfg, [key]: e.target.value })}
+        aria-label={label}
+      />
+    </div>
+  );
+
+  return (
+    <Modal title="AI design assistant" onClose={onClose} width={460}>
+      {!ready && (
+        <p className="dialog-text dim">
+          No provider configured. Enter an OpenAI-compatible endpoint, model, and API key — the key
+          stays in this tab’s session storage and is never saved into the document.
+        </p>
+      )}
+      {field('baseUrl', 'Endpoint', 'https://api.openai.com/v1')}
+      {field('model', 'Model', 'gpt-4o-mini')}
+      {field('apiKey', 'API key', 'sk-…', true)}
+      <div className="field-row">
+        <span className="field-label">Brief</span>
+        <textarea
+          className="text-input"
+          rows={3}
+          value={brief}
+          placeholder="A hero card: cream frame, headline text, and a coral button…"
+          onChange={(e) => setBrief(e.target.value)}
+          aria-label="Design brief"
+        />
+      </div>
+      {phase === 'preview' && plan && (
+        <p className="dialog-text">
+          Plan ready: {summarizeAiPlan(plan)}. New objects land at the canvas center as editable
+          shapes and text — nothing is applied until you confirm.
+        </p>
+      )}
+      {error && <p className="dialog-text error">{error}</p>}
+      <div className="dialog-actions">
+        <button className="btn secondary" onClick={onClose}>
+          {phase === 'preview' ? 'Discard' : 'Close'}
+        </button>
+        {phase === 'preview' ? (
+          <button className="btn primary" onClick={apply}>
+            <Sparkles size={14} />
+            <span>Apply plan</span>
+          </button>
+        ) : phase === 'busy' ? (
+          <button className="btn secondary" onClick={() => abortRef.current?.abort()}>
+            Cancel
+          </button>
+        ) : (
+          <button
+            className="btn primary"
+            onClick={generate}
+            disabled={!ready || brief.trim() === ''}
+            title={!ready ? 'Configure the endpoint, model, and API key first' : undefined}
+          >
+            <Sparkles size={14} />
+            <span>Generate</span>
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 function ExportDialog({ onClose, notify }: { onClose: () => void; notify: (m: string) => void }) {
   const { doc, page, selectedIds } = useEditor();
-  const [format, setFormat] = useState<'svg' | 'json'>('svg');
+  const [format, setFormat] = useState<'svg' | 'png' | 'json'>('svg');
   const [scope, setScope] = useState<'page' | 'selection'>('page');
+  const [scale, setScale] = useState<1 | 2 | 3>(2);
+  const [busy, setBusy] = useState(false);
 
   const doExport = () => {
     const stamp = new Date().toISOString().slice(0, 10);
     if (format === 'json') {
       downloadFile(`${doc.name}-${stamp}.json`, JSON.stringify(doc, null, 2), 'application/json');
       notify('Document JSON downloaded.');
-    } else {
+      onClose();
+      return;
+    }
+    if (format === 'svg') {
       const ids = scope === 'selection' ? selectedIds : undefined;
-      const svg = pageToSvg(page, ids);
+      const svg = exportPageSvg(page, ids);
       const name = scope === 'selection' ? `${page.name}-selection` : page.name;
       downloadFile(`${name}-${stamp}.svg`, svg, 'image/svg+xml');
       notify('SVG downloaded.');
+      onClose();
+      return;
     }
-    onClose();
+    setBusy(true);
+    const ids = scope === 'selection' ? selectedIds : undefined;
+    const name = scope === 'selection' ? `${page.name}-selection` : page.name;
+    svgToPngBlob(exportPageSvg(page, ids), scale).then(
+      (blob) => {
+        downloadBlob(`${name}-${stamp}@${scale}x.png`, blob);
+        notify(`PNG downloaded at ${scale}x.`);
+        onClose();
+      },
+      (e: Error) => {
+        setBusy(false);
+        notify(e.message || 'PNG export failed.');
+      },
+    );
   };
+
+  const raster = format !== 'json';
 
   return (
     <Modal title="Export" onClose={onClose} width={400}>
@@ -442,12 +643,15 @@ function ExportDialog({ onClose, notify }: { onClose: () => void; notify: (m: st
           <button className={`seg-btn${format === 'svg' ? ' active' : ''}`} onClick={() => setFormat('svg')}>
             SVG
           </button>
+          <button className={`seg-btn${format === 'png' ? ' active' : ''}`} onClick={() => setFormat('png')}>
+            PNG
+          </button>
           <button className={`seg-btn${format === 'json' ? ' active' : ''}`} onClick={() => setFormat('json')}>
             JSON
           </button>
         </div>
       </div>
-      {format === 'svg' && (
+      {raster && (
         <div className="field-row">
           <span className="field-label">Scope</span>
           <div className="seg">
@@ -465,18 +669,46 @@ function ExportDialog({ onClose, notify }: { onClose: () => void; notify: (m: st
           </div>
         </div>
       )}
+      {format === 'png' && (
+        <div className="field-row">
+          <span className="field-label">Scale</span>
+          <div className="seg">
+            {([1, 2, 3] as const).map((s) => (
+              <button
+                key={s}
+                className={`seg-btn${scale === s ? ' active' : ''}`}
+                onClick={() => setScale(s)}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <p className="dialog-text dim">
         {format === 'svg'
           ? 'Vector SVG of the current page — opens in any browser or design tool.'
-          : 'Full portable document. Re-import it later with File → Import JSON.'}
+          : format === 'png'
+            ? 'Raster PNG with a transparent background, rendered from the same vector output.'
+            : 'Full portable document. Re-import it later with File → Import JSON.'}
       </p>
+      {docImageIds(doc).length > 0 && format !== 'json' && (
+        <p className="dialog-text dim">
+          Imported images embed from this browser session; missing assets export as placeholders.
+        </p>
+      )}
+      {docImageIds(doc).length > 0 && format === 'json' && (
+        <p className="dialog-text dim">
+          Image pixels stay in this browser’s local asset store — JSON carries references only.
+        </p>
+      )}
       <div className="dialog-actions">
-        <button className="btn secondary" onClick={onClose}>
+        <button className="btn secondary" onClick={onClose} disabled={busy}>
           Cancel
         </button>
-        <button className="btn primary" onClick={doExport}>
+        <button className="btn primary" onClick={doExport} disabled={busy}>
           <Download size={14} />
-          <span>Download</span>
+          <span>{busy ? 'Rendering…' : 'Download'}</span>
         </button>
       </div>
     </Modal>
@@ -534,10 +766,14 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl+A', 'Select all on page'],
   ['Arrow keys', 'Nudge 1px (Shift: 10px)'],
   ['Ctrl+E', 'Export'],
+  ['Ctrl+Alt+N', 'New document (with confirmation)'],
   ['Ctrl++ / Ctrl+− / Ctrl+0', 'Zoom in / out / reset'],
   ['Shift+1', 'Fit canvas'],
+  ['Shift+2', 'Fit selection'],
   ['Ctrl+.', 'Toggle grid'],
   ['Ctrl+] / Ctrl+[', 'Bring forward / send backward'],
+  ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup selection'],
+  ['Ctrl+Alt+K', 'Create component from selection'],
   ['Space + drag', 'Pan canvas'],
   ['Double-click text', 'Edit text content'],
   ['Esc', 'Deselect / cancel edit / close dialog'],

@@ -48,8 +48,10 @@ function mkLine(id: string, x: number, y: number, w: number, h: number): DesignO
   return {
     id, type: 'line', name: id, parentId: null, x, y, w, h,
     rotation: 0, visible: true, locked: false, opacity: 1,
-    fill: '', fillOpacity: 1, stroke: '#111111', strokeWidth: 2,
-    cornerRadius: 0, clip: false, text: '', fontFamily: 'sans',
+    fill: '', fillOpacity: 1, fillGradient: null, fillStyleId: null, constraints: null, stroke: '#111111', strokeWidth: 2,
+    cornerRadius: 0, cornerRadii: null,
+    imageId: null, imageName: '', naturalW: 0, naturalH: 0,
+    componentId: null, sourceId: null, componentSnapshot: null, clip: false, text: '', fontFamily: 'sans',
     fontSize: 16, fontWeight: 400, textAlign: 'left', lineHeight: 1.4,
   };
 }
@@ -169,10 +171,15 @@ test('SVG export preserves all four diagonal directions', () => {
       mkLine('d', 5, 0, 0, 100),
     ]),
   );
-  assert(svg.includes('x1="10" y1="20" x2="110" y2="70"'), 'down-right diagonal kept');
-  assert(svg.includes('x1="10" y1="70" x2="110" y2="20"'), 'up-right diagonal kept');
-  assert(svg.includes('x1="0" y1="5" x2="100" y2="5"'), 'horizontal kept');
-  assert(svg.includes('x1="5" y1="0" x2="5" y2="100"'), 'vertical kept');
+  // Local endpoints nested in positioned groups: same absolute segments.
+  assert(svg.includes('translate(10 20)'), 'down-right positioned');
+  assert(svg.includes('x1="0" y1="0" x2="100" y2="50"'), 'down-right diagonal kept');
+  assert(svg.includes('translate(10 70)'), 'up-right positioned');
+  assert(svg.includes('x1="0" y1="0" x2="100" y2="-50"'), 'up-right diagonal kept');
+  assert(svg.includes('translate(0 5)'), 'horizontal positioned');
+  assert(svg.includes('x1="0" y1="0" x2="100" y2="0"'), 'horizontal kept');
+  assert(svg.includes('translate(5 0)'), 'vertical positioned');
+  assert(svg.includes('x1="0" y1="0" x2="0" y2="100"'), 'vertical kept');
 });
 
 if (failures > 0) {

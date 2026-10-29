@@ -1,8 +1,9 @@
-import type { DesignObject, DocPage, UndesignDoc } from './types';
+import type { ColorStyle, ComponentDef, Constraints, CornerRadii, DesignObject, DocPage, FillGradient, PrototypeLink, UndesignDoc } from './types';
+import { pruneLinks } from './prototype';
 
 export const STORAGE_KEY = 'undesign.doc.v1';
 
-const TYPES = new Set(['frame', 'rectangle', 'ellipse', 'text', 'line']);
+const TYPES = new Set(['frame', 'rectangle', 'ellipse', 'text', 'line', 'image']);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -18,6 +19,71 @@ function str(value: unknown, fallback: string): string {
 
 function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function sanitizeGradient(value: unknown): FillGradient | null {
+  if (!isObject(value)) return null;
+  if (!Array.isArray(value.stops)) return null;
+  const stops = value.stops
+    .filter(isObject)
+    .map((s) => ({
+      offset: Math.min(1, Math.max(0, num(s.offset, 0))),
+      color: str(s.color, ''),
+    }))
+    .filter((s) => s.color !== '')
+    .slice(0, 8)
+    .sort((a, b) => a.offset - b.offset);
+  if (stops.length < 2) return null;
+  return { angle: num(value.angle, 90), stops };
+}
+
+function sanitizeRadii(value: unknown): CornerRadii | null {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  if (!value.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0)) return null;
+  return [value[0], value[1], value[2], value[3]];
+}
+
+function sanitizeSnapshot(value: unknown): Record<string, DesignObject> | null {
+  if (!isObject(value)) return null;
+  const out: Record<string, DesignObject> = {};
+  for (const [k, v] of Object.entries(value)) {
+    const clean = sanitizeObject(v);
+    if (clean) out[k] = clean;
+  }
+  return out;
+}
+
+function sanitizeComponent(raw: unknown): ComponentDef | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.id !== 'string' || raw.id === '') return null;
+  if (typeof raw.pageId !== 'string' || typeof raw.rootId !== 'string') return null;
+  return { id: raw.id, name: str(raw.name, 'Component'), pageId: raw.pageId, rootId: raw.rootId };
+}
+
+const H_VALUES = new Set(['left', 'center', 'right', 'stretch', 'scale']);
+const V_VALUES = new Set(['top', 'middle', 'bottom', 'stretch', 'scale']);
+
+function sanitizeConstraints(value: unknown): Constraints | null {
+  if (!isObject(value)) return null;
+  if (!H_VALUES.has(value.horizontal as string) || !V_VALUES.has(value.vertical as string)) return null;
+  return {
+    horizontal: value.horizontal as Constraints['horizontal'],
+    vertical: value.vertical as Constraints['vertical'],
+  };
+}
+
+function sanitizeColorStyle(raw: unknown): ColorStyle | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.id !== 'string' || raw.id === '') return null;
+  if (typeof raw.color !== 'string' || raw.color === '') return null;
+  return { id: raw.id, name: str(raw.name, 'Style'), color: raw.color };
+}
+
+function sanitizeLink(raw: unknown): PrototypeLink | null {
+  if (!isObject(raw)) return null;
+  if (typeof raw.id !== 'string' || raw.id === '') return null;
+  if (typeof raw.sourceId !== 'string' || typeof raw.targetFrameId !== 'string') return null;
+  return { id: raw.id, sourceId: raw.sourceId, targetFrameId: raw.targetFrameId };
 }
 
 function sanitizeObject(raw: unknown): DesignObject | null {
@@ -39,9 +105,20 @@ function sanitizeObject(raw: unknown): DesignObject | null {
     opacity: Math.min(1, Math.max(0, num(raw.opacity, 1))),
     fill: str(raw.fill, ''),
     fillOpacity: Math.min(1, Math.max(0, num(raw.fillOpacity, 1))),
+    fillGradient: sanitizeGradient(raw.fillGradient),
+    fillStyleId: typeof raw.fillStyleId === 'string' && raw.fillStyleId !== '' ? raw.fillStyleId : null,
+    constraints: sanitizeConstraints(raw.constraints),
     stroke: str(raw.stroke, ''),
     strokeWidth: Math.max(0, num(raw.strokeWidth, 0)),
     cornerRadius: Math.max(0, num(raw.cornerRadius, 0)),
+    cornerRadii: sanitizeRadii(raw.cornerRadii),
+    componentId: typeof raw.componentId === 'string' && raw.componentId !== '' ? raw.componentId : null,
+    sourceId: typeof raw.sourceId === 'string' && raw.sourceId !== '' ? raw.sourceId : null,
+    componentSnapshot: sanitizeSnapshot(raw.componentSnapshot),
+    imageId: typeof raw.imageId === 'string' && raw.imageId !== '' ? raw.imageId : null,
+    imageName: str(raw.imageName, ''),
+    naturalW: Math.max(0, num(raw.naturalW, 0)),
+    naturalH: Math.max(0, num(raw.naturalH, 0)),
     clip: bool(raw.clip, false),
     text: str(raw.text, ''),
     fontFamily: str(raw.fontFamily, 'Inter, system-ui, sans-serif'),
@@ -84,11 +161,42 @@ export function validateDoc(data: unknown): UndesignDoc | null {
       pages.some((p) => p.id === data.activePageId)
         ? (data.activePageId as string)
         : pages[0].id;
+    const components: ComponentDef[] = [];
+    if (Array.isArray(data.components)) {
+      for (const c of data.components) {
+        const clean = sanitizeComponent(c);
+        if (clean) components.push(clean);
+      }
+    }
+    const colorStyles: ColorStyle[] = [];
+    if (Array.isArray(data.colorStyles)) {
+      for (const s of data.colorStyles) {
+        const clean = sanitizeColorStyle(s);
+        if (clean) colorStyles.push(clean);
+      }
+    }
+    // Dangling style references (e.g. hand-edited JSON) detach to plain fills.
+    const styleIds = new Set(colorStyles.map((s) => s.id));
+    for (const p of pages) {
+      for (const o of p.objects) {
+        if (o.fillStyleId !== null && !styleIds.has(o.fillStyleId)) o.fillStyleId = null;
+      }
+    }
+    const rawLinks: PrototypeLink[] = [];
+    if (Array.isArray(data.prototypeLinks)) {
+      for (const l of data.prototypeLinks) {
+        const clean = sanitizeLink(l);
+        if (clean) rawLinks.push(clean);
+      }
+    }
     return {
       version: 1,
       name: str(data.name, 'Untitled'),
       pages,
       activePageId,
+      components,
+      colorStyles,
+      prototypeLinks: pruneLinks(pages, rawLinks),
     };
   } catch {
     return null;
