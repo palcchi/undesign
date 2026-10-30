@@ -1,0 +1,66 @@
+name: Web preview
+
+# Build the browser app and publish it to GitHub Pages on every push to main:
+# https://palcchi.github.io/undesign/
+# One-time setup: Settings ▸ Pages ▸ Build and deployment ▸ Source: GitHub Actions.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A newer push replaces its older preview build.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Undesign
+        uses: actions/checkout@v4
+        with:
+          path: undesign
+      - name: Check out craft-fonts next to it
+        uses: actions/checkout@v4
+        with:
+          # Same pin as ci.yml/release.yml: needs fonts/latin-manifest.txt (Inter),
+          # without which the web build can't draw text.
+          repository: storytold/craft-fonts
+          ref: 43913056ce82a3fdad0ef69f6b88d1dc922a8104
+          path: craft-fonts
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: undesign
+      - name: Install trunk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: trunk
+      - name: Build the web app
+        working-directory: undesign/apps/undesign-web
+        run: trunk build --release
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: undesign/dist/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
