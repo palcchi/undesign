@@ -141,7 +141,7 @@ pub fn left_panel(app: &mut FigApp, ui: &mut Ui) {
     }
     let t = Tokens::get(ui.ctx());
     let full = ui.max_rect();
-    // Header: file name (or "Assets") + drafts + collapse.
+    // Header: file name (or "Assets") + the file's kind + collapse.
     let (head, _) = ui.allocate_exact_size(vec2(full.width(), 64.0), Sense::hover());
     if app.ui.left_tab == LeftTab::Assets {
         ui.painter().text(pos2(head.min.x + 16.0, head.min.y + 24.0), Align2::LEFT_CENTER, tr("Assets"), semibold(13.0), t.text);
@@ -152,7 +152,11 @@ pub fn left_panel(app: &mut FigApp, ui: &mut Ui) {
         if let (Some(new), _) = crate::widgets::rename_field(ui, Id::new("filename"), &name, nr, semibold(13.0), start) {
             app.run("file.rename", json!({"name": new}));
         }
-        ui.painter().text(pos2(head.min.x + 16.0, head.min.y + 46.0), Align2::LEFT_CENTER, tr("Drafts"), regular(11.0), t.text_secondary);
+        // Figma names the project under the file; Undesign has no projects, so it names
+        // the file's kind instead.
+        let board = app.session.doc().is_ok_and(|d| !d.kind.is_design());
+        let kind = if board { tr("Board") } else { tr("Design") };
+        ui.painter().text(pos2(head.min.x + 16.0, head.min.y + 46.0), Align2::LEFT_CENTER, kind, regular(11.0), t.text_secondary);
     }
     let hr = Rect::from_center_size(pos2(head.max.x - 24.0, head.min.y + 24.0), vec2(24.0, 24.0));
     let hresp = ui.interact(hr, ui.id().with("hideui"), Sense::click()).tip(tr("Collapse panel"));
