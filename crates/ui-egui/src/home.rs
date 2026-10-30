@@ -1,13 +1,8 @@
 //! The home screen: Recents (new file, open, join with a code, the Getting started tips, open and
-//! recent files ([`crate::home_recents`]), and templates to start from on a first run), Online (your online files:
-//! [`crate::online`]) and Templates (the starter templates as cards with thumbnails rendered from
-//! the documents themselves, searched and filtered by kind).
-
-use std::collections::BTreeMap;
+//! recent files ([`crate::home_recents`])) and Online (your online files: [`crate::online`]).
 
 use egui::{Align2, Color32, CornerRadius, Id, Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 use serde_json::json;
-use undesign_engine::templates::{Kind, TEMPLATES, Template};
 
 use crate::FigApp;
 use crate::a11y;
@@ -22,15 +17,13 @@ pub enum Section {
     #[default]
     Recents,
     Online,
-    Templates,
 }
 
 impl Section {
     /// The sidebar, top to bottom.
-    const ALL: [(Section, Icon, &str); 3] = [
+    const ALL: [(Section, Icon, &str); 2] = [
         (Section::Recents, Icon::Home, tr_noop("Recents")),
         (Section::Online, Icon::Online, tr_noop("Online")),
-        (Section::Templates, Icon::Assets, tr_noop("Templates")),
     ];
 
     /// The id `ui.set {homeSection}` and `ui.inspect` use.
@@ -38,7 +31,6 @@ impl Section {
         match self {
             Section::Recents => "recents",
             Section::Online => "online",
-            Section::Templates => "templates",
         }
     }
 
@@ -51,22 +43,15 @@ impl Section {
 #[derive(Default)]
 pub struct Home {
     pub section: Section,
-    /// Searches known files and starter templates together from the home sidebar.
+    /// Searches known files from the home sidebar.
     pub file_query: String,
-    /// The Templates search text and kind filter.
-    pub query: String,
-    pub kind: Option<Kind>,
     /// The recent files: what is known about each, and the selection.
     pub recents: crate::home_recents::Recents,
 }
 
 const SIDEBAR: f32 = 240.0;
 const CARD_W: f32 = 248.0;
-const THUMB_H: f32 = 148.0;
-const CARD_H: f32 = THUMB_H + 86.0;
 const GAP: f32 = 20.0;
-/// Templates offered on a first run.
-const FIRST_RUN: usize = 4;
 
 /// The Getting started tips: (title, what to do, the command whose shortcut shows).
 const TIPS: [(&str, &str, &str); 6] = [
@@ -158,10 +143,7 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
                 egui::Frame::NONE.inner_margin(egui::Margin::symmetric(40, 24)).show(ui, |ui| {
                     ui.spacing_mut().item_spacing = vec2(GAP, 0.0);
                     if app.ui.home_view.file_query.trim().is_empty() {
-                        match app.ui.home_view.section {
-                            Section::Templates => templates(app, ui, &t),
-                            _ => recents(app, ui, &t),
-                        }
+                        recents(app, ui, &t);
                     } else {
                         search_results(app, ui, &t);
                         opened_join(app);
@@ -196,8 +178,8 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
     let search = Rect::from_min_size(pos2(left.min.x + 8.0, y), vec2(SIDEBAR - 16.0, widgets::FIELD_H));
     ui.scope_builder(egui::UiBuilder::new().max_rect(search), |ui| {
         let response =
-            widgets::text_input(ui, Id::new("home_file_search"), &mut app.ui.home_view.file_query, search.width(), tr("Search files and templates"));
-        a11y::text(&response, tr("Search files and templates"), &app.ui.home_view.file_query);
+            widgets::text_input(ui, Id::new("home_file_search"), &mut app.ui.home_view.file_query, search.width(), tr("Search files"));
+        a11y::text(&response, tr("Search files"), &app.ui.home_view.file_query);
         if (response.has_focus() || response.lost_focus()) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             app.ui.home_view.file_query.clear();
         }
@@ -226,8 +208,8 @@ fn file_matches(name: &str, location: &str, query: &str) -> bool {
     name.to_lowercase().contains(query) || location.to_lowercase().contains(query)
 }
 
-/// One search over known files and starter templates. It never sends a query or owner token to a
-/// server; online files are opened through their existing owner-token command only on click.
+/// One search over known files. It never sends a query or owner token to a server; online
+/// files are opened through their existing owner-token command only on click.
 fn search_results(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
     heading(ui, t, tr("Search results"));
     let query = app.ui.home_view.file_query.trim().to_lowercase();
@@ -255,20 +237,8 @@ fn search_results(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
             }
         }
     }
-    let templates: Vec<&Template> = TEMPLATES.iter().filter(|template| matches(template, &query, None)).collect();
-    if !templates.is_empty() {
-        subheading(ui, t, tr("Templates"));
-        template_grid(app, ui, t, &templates);
-    }
-    if count == 0 && templates.is_empty() {
-        ui.label(egui::RichText::new(tr("No files or templates match your search")).font(semibold(13.0)).color(t.text));
-        ui.add_space(6.0);
-        widgets::label(ui, tr("Try another search, or browse templates."), t.text_secondary);
-        ui.add_space(16.0);
-        if widgets::button(ui, tr("Show all templates"), false, true).clicked() {
-            app.ui.home_view.file_query.clear();
-            app.ui.home_view.section = Section::Templates;
-        }
+    if count == 0 {
+        ui.label(egui::RichText::new(tr("No files match your search")).font(semibold(13.0)).color(t.text));
     }
     if let Some(file) = open_online {
         crate::online::open(app, &file);
@@ -351,17 +321,6 @@ fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
         getting_started(app, ui, t);
     }
     open_files(app, ui, t, "");
-    if crate::home_recents::listed(&app.session.prefs.recent_files).next().is_none() {
-        // A first run: nothing to reopen yet, so offer something to start from.
-        subheading(ui, t, tr("Start from a template"));
-        let shown: Vec<&Template> = TEMPLATES.iter().take(FIRST_RUN).collect();
-        template_grid(app, ui, t, &shown);
-        ui.add_space(12.0);
-        if widgets::button(ui, tr("See all templates"), false, true).clicked() {
-            app.ui.home_view.section = Section::Templates;
-        }
-        return;
-    }
     crate::home_recents::section(app, ui, t, "");
 }
 
@@ -459,148 +418,4 @@ fn lines(ui: &Ui, text: &str, font: egui::FontId, color: Color32, width: f32, ro
     let mut job = egui::text::LayoutJob::simple(text.to_string(), font, color, width.max(1.0));
     job.wrap.max_rows = rows;
     ui.fonts_mut(|f| f.layout_job(job))
-}
-
-fn matches(template: &Template, query: &str, kind: Option<Kind>) -> bool {
-    let q = query.trim().to_lowercase();
-    let has = |s: &str| s.to_lowercase().contains(&q);
-    kind.is_none_or(|k| k == template.kind)
-        && (q.is_empty()
-            || [template.name, template.description, template.kind.label()].into_iter().any(|s| has(s) || has(tr(s)))
-            || has(template.size))
-}
-
-fn templates(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
-    heading(ui, t, tr("Templates"));
-    ui.horizontal(|ui| {
-        let search = widgets::text_input(ui, Id::new("home_template_search"), &mut app.ui.home_view.query, 260.0, tr("Search templates"));
-        a11y::text(&search, tr("Search templates"), &app.ui.home_view.query);
-        let labels: Vec<&str> = std::iter::once(tr("All")).chain(Kind::ALL.iter().map(|k| tr(k.label()))).collect();
-        let active = app.ui.home_view.kind.and_then(|k| Kind::ALL.iter().position(|x| *x == k)).map_or(0, |i| i + 1);
-        ui.scope(|ui| {
-            ui.set_max_width((labels.len() as f32 * 124.0).min(ui.available_width()));
-            if let Some(i) = widgets::segmented_text(ui, &labels, active) {
-                app.ui.home_view.kind = i.checked_sub(1).and_then(|i| Kind::ALL.get(i).copied());
-            }
-        });
-    });
-    ui.add_space(24.0);
-    let (query, kind) = (app.ui.home_view.query.clone(), app.ui.home_view.kind);
-    let shown: Vec<&Template> = TEMPLATES.iter().filter(|x| matches(x, &query, kind)).collect();
-    if shown.is_empty() {
-        ui.add_space(24.0);
-        ui.label(egui::RichText::new(tr("No templates match your search")).font(semibold(13.0)).color(t.text));
-        ui.add_space(6.0);
-        ui.label(egui::RichText::new(tr("Try another word, or look at every kind.")).font(regular(12.0)).color(t.text_secondary));
-        ui.add_space(14.0);
-        if widgets::button(ui, tr("Show all templates"), false, true).clicked() {
-            app.ui.home_view.query.clear();
-            app.ui.home_view.kind = None;
-        }
-        return;
-    }
-    template_grid(app, ui, t, &shown);
-}
-
-/// Template cards in as many columns as fit; choosing one opens a new document made from it.
-fn template_grid(app: &mut FigApp, ui: &mut Ui, t: &Tokens, list: &[&Template]) {
-    let columns = (((ui.available_width() + GAP) / (CARD_W + GAP)).floor() as usize).max(1);
-    let dark = ui.visuals().dark_mode;
-    let mut thumbs: Thumbs = ui.data(|d| d.get_temp(Id::new("template_thumbs"))).unwrap_or_default();
-    let mut chosen = None;
-    let mut rendered = false;
-    for row in list.chunks(columns) {
-        ui.horizontal(|ui| {
-            for template in row {
-                let key = (template.id, dark);
-                if !thumbs.0.contains_key(&key) && ui.is_rect_visible(Rect::from_min_size(ui.cursor().min, vec2(CARD_W, CARD_H))) {
-                    if rendered {
-                        // One a frame keeps the screen moving; the rest follow.
-                        ui.ctx().request_repaint();
-                    } else {
-                        thumbs.0.insert(key, thumbnail(ui.ctx(), template, app.session.new_page_background()));
-                        rendered = true;
-                    }
-                }
-                if template_card(ui, t, template, thumbs.0.get(&key).and_then(Option::as_ref)) {
-                    chosen = Some(*template);
-                }
-            }
-        });
-        ui.add_space(GAP);
-    }
-    ui.data_mut(|d| d.insert_temp(Id::new("template_thumbs"), thumbs));
-    if let Some(template) = chosen
-        && app.run("file.newFromTemplate", json!({"template": template.id, "name": tr(template.name)})).is_some()
-    {
-        app.ui.home = false;
-    }
-}
-
-fn template_card(ui: &mut Ui, t: &Tokens, template: &Template, thumb: Option<&Thumb>) -> bool {
-    let (r, resp) = ui.allocate_exact_size(vec2(CARD_W, CARD_H), Sense::click());
-    let (name, description) = (tr(template.name), tr(template.description));
-    a11y::button(&resp, &format!("{name}: {description}"));
-    card_frame(ui, t, r, &resp);
-    let picture = Rect::from_min_size(r.min, vec2(CARD_W, THUMB_H)).shrink(1.0);
-    let top = CornerRadius { nw: 7, ne: 7, sw: 0, se: 0 };
-    match thumb {
-        Some(thumb) => {
-            ui.painter().rect_filled(picture, top, thumb.page);
-            let size = thumb.texture.size_vec2();
-            let inner = picture.shrink(10.0);
-            let fit = (inner.width() / size.x).min(inner.height() / size.y);
-            let image = Rect::from_center_size(inner.center(), size * fit);
-            ui.painter().image(thumb.texture.id(), image, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-        }
-        None => {
-            ui.painter().rect_filled(picture, top, t.field);
-            icons::paint(ui.painter(), Rect::from_center_size(picture.center(), vec2(20.0, 20.0)), Icon::Frame, t.icon_secondary);
-        }
-    }
-    ui.painter().line_segment([picture.left_bottom(), picture.right_bottom()], Stroke::new(1.0, t.border));
-    let (x, w) = (r.min.x + 14.0, CARD_W - 28.0);
-    let y = picture.max.y + 20.0;
-    ui.painter().text(pos2(x, y), Align2::LEFT_CENTER, widgets::elide_font(ui, name, w, semibold(12.0)), semibold(12.0), t.text);
-    let galley = lines(ui, description, regular(11.0), t.text_secondary, w, 2);
-    ui.painter().galley(pos2(x, y + 11.0), galley, t.text_secondary);
-    let tag = format!("{} · {}", tr(template.kind.label()), template.size);
-    ui.painter().text(pos2(x, r.max.y - 15.0), Align2::LEFT_CENTER, widgets::elide_font(ui, &tag, w, regular(10.0)), regular(10.0), t.text_tertiary);
-    resp.clicked()
-}
-
-/// A template's picture: its first page's frames, and the page colour they sit on.
-#[derive(Clone)]
-struct Thumb {
-    texture: egui::TextureHandle,
-    page: Color32,
-}
-
-/// Pictures by template and theme (the page colour follows the theme); `None`: nothing to show.
-#[derive(Clone, Default)]
-struct Thumbs(BTreeMap<(&'static str, bool), Option<Thumb>>);
-
-/// Build `template` and render the top of its first page to fit a card.
-fn thumbnail(ctx: &egui::Context, template: &Template, background: undesign_color::Color) -> Option<Thumb> {
-    let doc = template.build(background).ok()?;
-    let frames = doc.node(doc.first_page()?)?.children.clone();
-    let bounds = frames.iter().filter_map(|id| undesign_render::export_bounds(&doc, *id)).reduce(|a, b| a.union(b))?;
-    if !(bounds.width() > 0.0 && bounds.height() > 0.0) {
-        return None;
-    }
-    // A page much taller than a card shows its top, as wide as the card.
-    let (w, h) = (f64::from(CARD_W - 22.0), f64::from(THUMB_H - 22.0));
-    let area = undesign_geom::Rect::new(bounds.x0, bounds.y0, bounds.x1, bounds.y1.min(bounds.y0 + bounds.width() * h / w * 1.5));
-    let scale = (w / area.width()).min(h / area.height()) * f64::from(ctx.pixels_per_point());
-    let pix = undesign_render::render_area(&doc, &frames, area, scale.min(1.0))?;
-    let image = crate::render_worker::screen_image(&pix, doc.color_profile);
-    let texture = ctx.load_texture(format!("template-thumb-{}", template.id), image, egui::TextureOptions::LINEAR);
-    Some(Thumb { texture, page: crate::theme::c32(background) })
-}
-
-/// Tests: the templates whose pictures are cached for the light or dark theme.
-#[cfg(test)]
-pub(crate) fn cached_thumbnails(ctx: &egui::Context, dark: bool) -> Vec<&'static str> {
-    let thumbs: Thumbs = ctx.data(|d| d.get_temp(Id::new("template_thumbs"))).unwrap_or_default();
-    thumbs.0.iter().filter(|((_, d), thumb)| *d == dark && thumb.is_some()).map(|((id, _), _)| *id).collect()
 }

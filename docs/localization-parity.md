@@ -1,6 +1,6 @@
 # Localization parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-30 · **Change:** minor (Indonesian UI keys caught up to 100% with a terminology pass; a missing translation fails no check: `cargo xtask i18n-report` lists them; Russian and Turkish catalogs reviewed by native speakers, Russian one/few/many plurals; Czech and Indonesian drafts; the Japanese draft completed; counts re-measured; Windows UI language from the first preferred language; draft catalogs catch up: every draft translates every string again; Simplified Chinese draft catalog; macOS finds its downloadable CJK system fonts (#406); string counts re-measured: 2,272 entries, the drafts at 95–99%; Swedish command labels and menu wordings; Russian, Swedish, Turkish, Czech and Indonesian listed; a duplicated paragraph removed; draft catalogs catch up: every draft translates every string again; Simplified Chinese draft catalog) · **Target:** Figma Design (desktop app 126.10.7)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-30 · **Change:** minor (home Templates removal: ten UI keys removed, two added (`Search files`, `No files match your search`), UI-key total 1,795 → 1,787; eight more drafts' UI keys to 100% (es, fr, de, pt-BR, cs, nl, pl, ru); Indonesian UI keys caught up to 100% with a terminology pass; a missing translation fails no check: `cargo xtask i18n-report` lists them; Russian and Turkish catalogs reviewed by native speakers, Russian one/few/many plurals; Czech and Indonesian drafts; the Japanese draft completed; counts re-measured; Windows UI language from the first preferred language; draft catalogs catch up: every draft translates every string again; Simplified Chinese draft catalog; macOS finds its downloadable CJK system fonts (#406); string counts re-measured: 2,272 entries, the drafts at 95–99%; Swedish command labels and menu wordings; Russian, Swedish, Turkish, Czech and Indonesian listed; a duplicated paragraph removed; draft catalogs catch up: every draft translates every string again; Simplified Chinese draft catalog) · **Target:** Figma Design (desktop app 126.10.7)
 
 Undesign's interface has a localization layer with an English catalog, a Russian catalog reviewed
 by a native speaker, and Spanish (with a Latin American overlay), French, German, Brazilian
@@ -94,7 +94,7 @@ supported by both apps (CJK, Arabic and Devanagari shaping, IME); Figma has no v
 | Arabic | ar | 0 (0%) | no | Bidi, shaping and RTL names work; the UI does not mirror | no | none | 9–15 |
 | French | fr | 2,167 / 2,272 (95.4%, draft) | yes | Latin | no | draft | 1–2 (after native review) |
 | Portuguese | pt-BR | 2,167 / 2,272 (95.4%, draft) | yes | Latin | no | draft | 1–2 (after native review) |
-| Indonesian | id | UI keys 1,795 / 1,795 (100%, draft; totals to re-measure) | yes | Latin | no | draft | 1 (native confirm) |
+| Indonesian | id | UI keys 1,787 / 1,787 (100%, draft; totals to re-measure) | yes | Latin | no | draft | 1 (native confirm) |
 | Japanese | ja | 2,254 / 2,272 (99.2%, draft) | yes | CJK text and IME in documents; UI text in an installed Japanese face (web: the `UNDESIGN_EMBED_CJK` build) | no | draft | 1–2 (after native review) |
 | German | de | 2,176 / 2,272 (95.8%, draft) | yes | Latin; long words elide in narrow fields | no | draft | 1–2 (after native review) |
 | Korean | ko | 2,166 / 2,272 (95.3%, draft) | yes | Hangul text and IME in documents; UI text in an installed Korean face (web: the `UNDESIGN_EMBED_CJK` build) | no | draft | 1–2 (after native review) |
@@ -104,7 +104,10 @@ Other languages (measured 2026-10-17): Russian (`ru`) 2,244 / 2,272 (98.8%), rev
 by VanTan, one/few/many integer plurals; Swedish (`sv`) 2,264 (99.6%), its command labels and menu
 wordings added 2026-10-17 (#599), native review welcome; Turkish (`tr`) 2,243 (98.7%), whose header
 says it was machine-drafted and reviewed by a native speaker; Czech (`cs`) 2,244 (98.8%), a draft
-with one/few/other plurals. Figma ships none beyond the eight above.
+with one/few/other plurals. Since 2026-10-30 the Russian (24 added), Czech (74), Dutch (38) and
+Polish (39) UI keys, like the Spanish (11), French (35), German (118), Brazilian Portuguese (17) and
+Indonesian (74) ones, are 1,795 / 1,795; Russian's additions welcome native re-confirm. Totals to
+re-measure with `cargo xtask i18n-report`. Figma ships none beyond the eight above.
 
 The layer is done. Per-language hours above are developer hours for a catalog of ~1,800 entries
 (a machine draft, then a pass over the panels for overflow), plus each language's plural rule where
@@ -122,6 +125,8 @@ Hindi, Vietnamese and Arabic. Traditional Chinese is not planned (no catalog; it
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-30 | minor | Home Templates removal: ten home UI keys removed from every catalog, two added (`Search files`, `No files match your search`, translated in es, id, fr, de, pt-BR, cs, nl, pl, ru); UI-key total 1,795 → 1,787, the nine complete catalogs at 1,787/1,787. Totals to re-measure with `cargo xtask i18n-report`. Grade unchanged |
+| 2026-10-30 | minor | Draft catch-up (gap 5): Spanish (11), French (35), German (118), Brazilian Portuguese (17), Czech (74), Dutch (38), Polish (39) and Russian (24) UI keys to 1,795/1,795; drafted in each file's conventions (registers and plural forms as each catalog has them), still drafts; Russian's additions welcome native re-confirm. Bengali, Finnish, Japanese, Georgian, Korean, Swedish, Turkish and Simplified Chinese still show English for their missing keys. Totals to re-measure with `cargo xtask i18n-report`. Grade unchanged |
 | 2026-10-30 | minor | Indonesian UI keys caught up to 100% (1,795/1,795; 74 added) with a terminology pass: pronouns unified to Anda, loanwords kept (Frame, Stroke, component), Papan for board; menus and common surfaces sampled, no changes needed. Totals to re-measure with `cargo xtask i18n-report`; native-speaker confirm still pending. Grade unchanged |
 | 2026-10-23 | minor | A missing translation fails no check: Spanish is no longer held to full coverage, and the tests of one language's wording, names and plural forms are gone (the plural rules and language-tag tests stay). `cargo xtask i18n-report`, run by `cargo xtask ci`, lists each language's missing UI strings, command labels and menu wordings. Grade unchanged |
 | 2026-10-15 | minor | Community catalogs (#257, #263, #469, #477, #288): Russian (`ru`, Русский, reviewed and approved by VanTan) and Turkish (`tr`, Türkçe, reviewed by a native speaker), Czech (`cs`, Čeština) and Indonesian (`id`, Bahasa Indonesia) drafts, and the Japanese draft caught up; Preferences ▸ Language lists them and System maps their regional tags. Catalogs may give few and many plural forms; Russian picks one, few or many by its integer rule (11–14 take many), the catalog supplying the text choosing the rule. Only Spanish is held to completeness. Counts re-measured: 1,587 UI keys (38 plural), 559 command labels and 31 menu wordings, 2,177 entries; Spanish 100%, Japanese 2,176, Czech and Indonesian 2,166, Russian and Turkish 2,165, the five older drafts 2,088–2,089 (95%). Localization 39% and 29–51 h unchanged at this rounding |
