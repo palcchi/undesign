@@ -278,13 +278,13 @@ impl Kit {
     }
 }
 
-/// The colours every template starts from, as paint styles.
+/// The colours every template starts from, as paint styles (Undesign's own greens).
 const COLORS: &[(&str, &str)] = &[
-    ("Brand/Primary", "#1F6F5C"),
-    ("Brand/Soft", "#DDEFE8"),
+    ("Brand/Primary", "#00875F"),
+    ("Brand/Soft", "#D8F2E6"),
     ("Brand/Accent", "#F2A541"),
-    ("Text/Primary", "#14201C"),
-    ("Text/Secondary", "#5C6B66"),
+    ("Text/Primary", "#0E1512"),
+    ("Text/Secondary", "#5A6B64"),
     ("Text/On brand", "#FFFFFF"),
     ("Surface/Page", "#F5F7F6"),
     ("Surface/Card", "#FFFFFF"),
@@ -309,7 +309,7 @@ pub(super) const PRIMARY: &str = "Brand/Primary";
 pub(super) const SOFT: &str = "Brand/Soft";
 pub(super) const ACCENT: &str = "Brand/Accent";
 /// A darker green than the brand colour, for full-bleed backgrounds (not a style).
-pub(super) const DEEP: &str = "#174F41";
+pub(super) const DEEP: &str = "#07352A";
 pub(super) const INK: &str = "Text/Primary";
 pub(super) const MUTED: &str = "Text/Secondary";
 pub(super) const ON_BRAND: &str = "Text/On brand";
@@ -325,7 +325,7 @@ pub(super) const RIGHT_EDGE: [f64; 4] = [0.0, 1.0, 0.0, 0.0];
 
 /// A soft shadow under cards.
 pub(super) fn shadow() -> Value {
-    json!([{"type": "dropShadow", "color": "#14201C14", "offset": [0, 4], "radius": 16}])
+    json!([{"type": "dropShadow", "color": "#0E151214", "offset": [0, 4], "radius": 16}])
 }
 
 /// A top-to-bottom gradient fill.

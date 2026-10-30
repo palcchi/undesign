@@ -1,6 +1,6 @@
 //! Wireframe kit: greyscale components (buttons, an input, an image placeholder, a paragraph, an
 //! avatar, a list item, a card, a navigation bar and a tab bar) and two screens sketched with
-//! instances of them, a phone and a desktop one.
+//! instances of them: a phone cart and a desktop checkout.
 
 use serde_json::{Value, json};
 use undesign_doc::NodeId;
@@ -159,34 +159,34 @@ fn screen(k: &mut Kit, page: NodeId, name: &str, [x, w, h]: [f64; 3]) -> Result<
 }
 
 fn phone(k: &mut Kit, page: NodeId, p: &Parts) -> Result<()> {
-    let s = screen(k, page, "Phone · List", [0.0, 390.0, 844.0])?;
+    let s = screen(k, page, "Phone · Cart", [0.0, 390.0, 844.0])?;
     let body = k.stack(s, "Content", V, 20.0, json!([56, 24, 24, 24]), json!({"sizingH": "fill", "sizingV": "fill"}))?;
     let header = k.stack(body, "Header", H, 12.0, json!(0), json!({"sizingH": "fill", "mainAlign": "spaceBetween", "crossAlign": "center"}))?;
-    k.text(header, "Screen title", "Heading/M", WIRE_INK)?;
+    k.text(header, "Your cart", "Heading/M", WIRE_INK)?;
     k.instance(p.avatar, header, json!({}), json!({}))?;
-    k.instance(p.input, body, json!({"Label": "Search", "Placeholder": "Type to search"}), fill())?;
+    k.instance(p.input, body, json!({"Label": "Promo code", "Placeholder": "Enter a code"}), fill())?;
     let list = k.stack(body, "List", V, 0.0, json!(0), fill())?;
-    for title in ["First item", "Second item", "Third item"] {
+    for title in ["Seed loaf × 2", "Miso paste", "Brown butter"] {
         k.instance(p.item, list, json!({"Title": title}), fill())?;
     }
-    k.instance(p.card, body, json!({"Title": "Featured"}), fill())?;
+    k.instance(p.card, body, json!({"Title": "Add gift wrap"}), fill())?;
     k.instance(p.tabs, s, json!({}), fill()).map(drop)
 }
 
 fn desktop(k: &mut Kit, page: NodeId, p: &Parts) -> Result<()> {
-    let s = screen(k, page, "Desktop · Home", [470.0, 1280.0, 900.0])?;
+    let s = screen(k, page, "Desktop · Checkout", [470.0, 1280.0, 900.0])?;
     k.instance(p.nav, s, json!({}), fill())?;
     let body = k.stack(s, "Content", V, 48.0, json!([56, 80, 56, 80]), json!({"sizingH": "fill", "sizingV": "fill"}))?;
     let hero = k.stack(body, "Hero", H, 64.0, json!(0), json!({"sizingH": "fill", "crossAlign": "center"}))?;
     let words = k.stack(hero, "Words", V, 24.0, json!(0), fill())?;
-    k.text_with(words, "Headline goes here", "Display", WIRE_INK, json!({"sizingH": "fill", "textAutoResize": "height"}))?;
+    k.text_with(words, "Checkout", "Display", WIRE_INK, json!({"sizingH": "fill", "textAutoResize": "height"}))?;
     k.instance(p.paragraph, words, json!({}), fill())?;
     let actions = k.stack(words, "Actions", H, 12.0, json!(0), json!({}))?;
-    k.instance(p.button, actions, json!({"Label": "Primary action"}), json!({}))?;
-    k.instance(p.button, actions, json!({"Kind": "Secondary", "Label": "Secondary"}), json!({}))?;
+    k.instance(p.button, actions, json!({"Label": "Pay now"}), json!({}))?;
+    k.instance(p.button, actions, json!({"Kind": "Secondary", "Label": "Back to cart"}), json!({}))?;
     k.instance(p.image, hero, json!({}), json!({"width": 520, "height": 300}))?;
     let cards = k.stack(body, "Cards", H, 24.0, json!(0), fill())?;
-    for title in ["First card", "Second card", "Third card", "Fourth card"] {
+    for title in ["Contact", "Shipping", "Payment", "Review"] {
         k.instance(p.card, cards, json!({"Title": title}), fill())?;
     }
     Ok(())
