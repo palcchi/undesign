@@ -1,0 +1,14 @@
+[package]
+name = "undesign-pathops"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Undesign path operations: booleans (union, subtract, intersect, exclude), outline stroke with inside/center/outside alignment, arrowheads"
+
+[lints]
+workspace = true
+
+[dependencies]
+undesign-geom = { workspace = true }
+undesign-doc = { workspace = true }
+linesweeper = { workspace = true }

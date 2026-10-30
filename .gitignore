@@ -1,4 +1,10 @@
-node_modules
-dist
-*.local
+*~
+plan/
+plans/
+/target/
+/target-*/
+/dist/
+/corpus/
+/log/
 .DS_Store
+*.profraw

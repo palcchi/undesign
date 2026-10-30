@@ -1,3 +1,0 @@
-# Generated build outputs (Rust target dir + wasm-pack package).
-/target
-/pkg
