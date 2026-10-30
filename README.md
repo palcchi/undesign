@@ -1,165 +1,280 @@
-# Undesign — Visual Design Editor
+<p align="center">
+  <img src="assets/app-icon/hicolor/256x256/apps/io.github.palcchi.undesign.png" width="128" height="128" alt="Undesign icon: a white U on a green tile">
+</p>
 
-A web-based visual design editor with a Figma-inspired workflow: pages, frames,
-shapes, text, layers, contextual properties, and SVG/JSON export.
+<h1 align="center">Undesign</h1>
 
-## Run it
+<p align="center">
+  <b>Interface design and prototyping: open source, collaborative and built in pure Rust.</b><br>
+  Frames, auto layout, components and variants, vector networks, styles, variables and prototypes,<br>
+  in a native app that opens instantly and works offline. Open source, and yours.
+</p>
 
-Requires Node 18+. The WASM engine build additionally requires a Rust
-toolchain (`cargo`, `wasm-pack`, and the `wasm32-unknown-unknown` target —
-`npm run build:wasm` fails with setup instructions when any piece is missing).
+<p align="center">
+  <img alt="100% Rust" src="https://img.shields.io/badge/100%25-Rust-b7410e?style=flat-square&logo=rust">
+  <img alt="macOS · Windows · Linux · FreeBSD · Web" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20FreeBSD%20%C2%B7%20Web-native-0EA5C6?style=flat-square">
+  <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-3a3a3a?style=flat-square">
+  <img alt="Status: early alpha" src="https://img.shields.io/badge/status-early%20alpha-d69e2e?style=flat-square">
+</p>
 
-```bash
-npm install
-npm run dev
+<br>
+
+<p align="center">
+  <img src="docs/images/shot-1-hero.png" alt="Undesign in its dark theme editing the Ridgeline hiking app: three phone screens (Home in light mode, a trail detail page and Home in dark mode) on the canvas, the Featured trail card instance selected, the layers panel showing the screen's auto layout tree, and the Design panel showing the instance's Fill and Hug auto layout sizing, its Theme variable mode and a fill bound to the surface colour variable" width="100%">
+  <br><sub><b>Ridgeline</b>: auto layout screens built from components, with Light and Dark modes from one set of colour variables · <code>examples/ridgeline-app.undesign</code></sub>
+</p>
+
+<br>
+
+<p align="center">
+  <a href="#a-look-around">A look around</a> ·
+  <a href="#made-in-undesign">Made in Undesign</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#scriptable-to-the-core">Automation</a> ·
+  <a href="#under-the-hood">Under the hood</a> ·
+  <a href="#get-started">Get started</a>
+</p>
+
+<br>
+
+<table>
+  <tr>
+    <td width="25%" valign="top">
+      <h3>🎛️ Familiar by design</h3>
+      The toolbar, layers panel, Design panel, menus and shortcuts sit right where your hands expect them.
+    </td>
+    <td width="25%" valign="top">
+      <h3>⚡ Native and fast</h3>
+      A Rust engine with a persistent document model: edits touch only what changed, so creating a node in a 20,000-node file takes a fraction of a millisecond. No Electron, no web view.
+    </td>
+    <td width="25%" valign="top">
+      <h3>🔌 Offline and private</h3>
+      Your files are plain <code>.undesign</code> archives on your own disk. No account, no telemetry, and nothing leaves your computer unless you share a file (<a href="#privacy-and-online-sharing">what sharing sends where</a>). SVG, PNG, JPG, WebP and PDF in and out; <code>.fig</code> files open (best effort), and so do designs exported as the public REST API file JSON, with their prototypes and variables.
+    </td>
+    <td width="25%" valign="top">
+      <h3>⌨️ Script-ready</h3>
+      Every menu item, tool and drag is a command, so the same engine runs from the UI, the CLI or a JSON control channel.
+    </td>
+  </tr>
+</table>
+
+<br>
+
+## A look around
+
+<table>
+<tr>
+<td width="50%" valign="top">
+  <img src="docs/images/shot-2-components.png" alt="The Ridgeline UI design system open with the Assets panel on the left showing live thumbnails of the Button, Difficulty, Search field, Toggle and icon components; a Button component set of nine variants laid out in a three-by-three grid auto layout is selected, and the Design panel lists its Style (Primary, Tonal, Outline) and State (Default, Hover, Disabled) variant properties" width="100%">
+  <p align="center"><sub><b>Components and variants</b>: component sets, variant properties and the Assets panel · <code>examples/ridgeline-design-system.undesign</code></sub></p>
+</td>
+<td width="50%" valign="top">
+  <img src="docs/images/shot-3-prototype.png" alt="Four onboarding phone screens in the Prototype tab, joined by blue connection curves from the Get started, Continue, Allow location and Not now buttons to the next screens; the Get started button is selected and the Prototype panel shows its On click, Navigate to 2 Interests interaction" width="100%">
+  <p align="center"><sub><b>Prototyping</b>: connections, transitions, back actions and a flow · <code>examples/ridgeline-onboarding.undesign</code></sub></p>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+  <img src="docs/images/shot-4-devmode.png" alt="Dev Mode on the Ridgeline home screen: the frame carries a Ready for dev badge, a Development annotation callout points at the featured trail card, a trail row instance is selected and the Inspect panel shows generated React code with a TrailRow props interface and the instance's title and details values" width="100%">
+  <p align="center"><sub><b>Dev Mode</b>: ready-for-dev status, annotations and React code where component properties become props · <code>examples/ridgeline-app.undesign</code></sub></p>
+</td>
+<td width="50%" valign="top">
+  <img src="docs/images/shot-5-vector.png" alt="Vector edit mode on a wave path with a gradient, tapered variable-width stroke: its anchor points, Bezier handles and the transform box of the selected points are visible, with the vector edit toolbar at the bottom; above it are a boolean-built mountain mark and an angular-gradient knot of excluded rings" width="100%">
+  <p align="center"><sub><b>Vector networks</b>: points and handles, variable-width strokes, booleans that stay editable · <code>examples/glass-and-vectors.undesign</code></sub></p>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+  <img src="docs/images/shot-6-dashboard-light.png" alt="The light UI theme with a web analytics dashboard for a fictional trail operator: a dark sidebar, KPI cards with sparklines, a grouped bar chart, a donut chart, a table of top trails and an area chart, with the frame's 12-column layout grid showing as tinted columns and its fill linked to a paint style" width="100%">
+  <p align="center"><sub><b>Layout grids and styles, light theme</b>: a 12-column grid, paint, text, effect and grid styles, charts drawn from shapes · <code>examples/ridgeline-studio-dashboard.undesign</code></sub></p>
+</td>
+<td width="50%" valign="top">
+  <img src="docs/images/shot-7-collab.png" alt="A live session seen from one participant's window: avatars of three people in the top right, a Priya Nair is spotlighting banner with a Follow button, Priya's green cursor and selection outline on the dark home screen's trail card, and Jonas Ortiz's purple cursor and selection on the Start hike button with his cursor chat bubble asking whether the button should stay pinned while scrolling" width="100%">
+  <p align="center"><sub><b>Live sessions</b>: three apps on one <code>undesign-server</code> file, with cursors, selections, cursor chat and spotlight</sub></p>
+</td>
+</tr>
+</table>
+
+## Made in Undesign
+
+Every design below was built entirely through Undesign's command API, the same one scripts use,
+and exported at 2x by Undesign's own renderer. The source files are in
+[`examples/`](examples).
+
+<table>
+<tr>
+<td width="33%" valign="top">
+  <img src="docs/images/art-app-home.png" alt="Ridgeline home screen in light mode: a greeting, a search field, filter chips, a featured trail card with an illustrated mountain landscape, a list of nearby trails and a translucent tab bar" width="100%">
+  <p align="center"><sub><b>Home, light</b></sub></p>
+</td>
+<td width="33%" valign="top">
+  <img src="docs/images/art-app-trail.png" alt="Ridgeline trail detail screen: a dusk mountain illustration with glass buttons, a sheet with difficulty tags, the trail name, distance, elevation and duration stats, an elevation profile chart and a Start hike button" width="100%">
+  <p align="center"><sub><b>Trail detail</b></sub></p>
+</td>
+<td width="33%" valign="top">
+  <img src="docs/images/art-app-home-dark.png" alt="The same Ridgeline home screen in dark mode, its colours switched by the Theme variable collection's Dark mode" width="100%">
+  <p align="center"><sub><b>Home, dark</b>: the same frame in the Dark mode</sub></p>
+</td>
+</tr>
+<tr>
+<td colspan="3" valign="top">
+  <img src="docs/images/art-dashboard.png" alt="Ridgeline Studio dashboard: a dark navy sidebar with navigation, KPI cards for active hikers, check-ins, average rating and open incidents with sparklines, a hikes-per-day grouped bar chart with a tooltip, a difficulty donut chart, a top trails table with condition badges and a visitors area chart" width="100%">
+  <p align="center"><sub><b>Ridgeline Studio</b>: a desktop dashboard on a 12-column grid, every chart made of shapes and vectors</sub></p>
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+  <img src="docs/images/art-glass-weather.png" alt="A glass weather widget over blurred teal, violet, rose and orange colour fields: a frosted card for Lake Louise showing 14 degrees and partly cloudy with a gradient sun behind a boolean-union cloud, an hourly forecast row, and smaller glass cards for air quality, wind and humidity" width="100%">
+  <p align="center"><sub><b>Glass weather</b>: glass and background blur, layer-blurred colour fields, a boolean cloud</sub></p>
+</td>
+<td width="33%" valign="top">
+  <img src="docs/images/art-vector-marks.png" alt="Three tiles on a cream background: a gradient mountain mark made by unioning two peaks and subtracting a sun, a knot of three excluded rings with an angular gradient, and a tapered gradient wave with a leaf and a glowing four-point star" width="100%">
+  <p align="center"><sub><b>Vector marks</b>: union, subtract and exclude, an angular gradient, a variable-width stroke</sub></p>
+</td>
+</tr>
+<tr>
+<td colspan="3" valign="top">
+  <img src="docs/images/art-ds-colour.png" alt="Ridgeline UI colour ramps: six swatches each of Pine greens, Sunset oranges and Slate greys, each labelled with its name and hex value" width="100%">
+  <p align="center"><sub><b>Ridgeline UI</b>: colour ramps where every swatch is a paint style, exported through a slice</sub></p>
+</td>
+</tr>
+</table>
+
+## Features
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Layouts that build themselves</h3>
+      Auto layout in both directions, with wrap and grid (fixed, hug and `fr` tracks, cells that span), padding, gaps, alignment including text baselines, Hug / Fill / Fixed sizing, min and max sizes, absolute positioning, drag handles for padding and spacing right on the canvas, and arrow keys that move children through the flow, grid cells and nested frames. Constraints and layout grids for everything else.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Components that scale</h3>
+      Main components, instances with overrides that survive edits, component sets with variants, properties, swap instance, detach, reset overrides and go to main component, and an Assets panel with live thumbnails, search and drag-to-canvas into frames and auto layout. Local styles and variables (colour, number, string, boolean) with modes, aliases and scopes, edited in a Variables table and bound to fills, strokes, effects, layout grids and instance properties. Fills, strokes, effects and layout grids reorder by dragging their rows.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Vectors without compromise</h3>
+      Real vector networks: the Pen and Pencil tools, vector edit mode with its own tools (pen that extends and branches paths, bend, paint bucket fills for any closed area, lasso, cut), point panel with handle mirroring and per-point corner radius, join, split and heal-on-delete, the shape builder (click or drag across the regions of overlapping shapes, strokes and open paths to merge them, Alt to remove them), boolean groups (union, subtract, intersect, exclude) whose operands stay editable on the canvas with the result following every drag, an operation per operand, flatten, outline stroke, arrowheads, dashes, per-side strokes and variable width strokes (width profile presets, and a Variable width tool that drags width points along the path, one side at a time with Alt). Rectangles with smooth (squircle) corners, polygons, stars, and arcs and rings shaped with on-canvas sweep, start and ratio handles or the Design panel's Arc fields.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Paints and effects</h3>
+      Solid, linear, radial, angular and diamond gradients with on-canvas handles, image fills (fill, fit, crop, tile) with adjustments and presets, multiple fills and strokes, every blend mode, drop and inner shadows (spread offsets the outline exactly), layer and background blur (uniform or progressive), noise (mono, duo, multi), texture and glass (refraction, dispersion, frost, light), masks. Files are sRGB or Display P3, with exports tagged with the file's colour profile.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Type that sets beautifully</h3>
+      Text edited in place on the canvas (with inline IME composition), mixed styles within a paragraph, auto width and auto height, line height, letter and paragraph spacing, decoration, case, lists, OpenType features, variable font axes and text styles, right-to-left and mixed-direction text (Arabic, Hebrew) with the Unicode bidi algorithm, shaped with HarfRust and the open fonts from craft-fonts plus your system fonts.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Prototype and hand off</h3>
+      Connections, triggers, actions and Smart Animate-style transitions, variables with conditionals (if / else if / else built in the interaction editor, expressions like <code>count + 1</code>), flows, a presentation view with device frames, hotspot hints and an Inspect panel, and a live preview pane. Alt to measure distances and padding on the canvas, Inspect mode with measurements, annotations in colour-coded categories, a ready-for-dev list with a focus view and Compare changes (before / after with property-level diffs since a frame was marked ready), and code (CSS, HTML, React, Leptos, SwiftUI, Compose) where components take their properties as parameters, comment threads pinned to frames (replies, @mentions, reactions, read state) and named version history. Export any layer at any scale to PNG, JPG, WebP, SVG or PDF.
+    </td>
+  </tr>
+</table>
+
+<br>
+
+## Scriptable to the core
+
+Every menu item, tool and gesture runs a command from one registry of 400+ commands. The UI, the CLI and the JSON control channel all call the same commands, so anything you can click, a script can do too.
+
+```sh
+# Headless: render and export
+undesign-cli render landing.undesign -o landing.png --scale 2
+undesign-cli export landing.undesign -o out/ --format svg
+
+# Run a script of commands without a window
+undesign-cli run build-card.json --out card.undesign
+
+# Every command, with its parameters
+undesign-cli commands --filter autoLayout
 ```
 
-Then open **http://localhost:5173** in your browser.
+The desktop app also offers a loopback-only control channel (`undesign --control <port>`) for inspecting UI state, driving tools with pointer and key events, and taking screenshots. See [`docs/control-protocol.md`](docs/control-protocol.md) and [`docs/cli.md`](docs/cli.md).
 
-Other commands:
+## Under the hood
 
-- `npm run build` — build the WASM engine, type-check, and bundle to `dist/`
-- `npm run build:wasm` — compile the Rust engine to `src/wasm/pkg/` only
-- `npm run preview` — serve the production build locally
-- `npm run typecheck` — TypeScript check only
-- `npm test` — bundle and run the TypeScript regression suite with node
-- `npm run test:rust` — run the Rust engine-bridge tests with cargo
-- `npm run test:e2e` — run the adapter + converter against the real built
-  WASM engine in node (no browser needed)
+- **Engine first:** a pure-data document model and a command engine, with a thin, swappable egui UI on top. Layering is checked at build time across the workspace crates (`cargo xtask layers`).
+- **Persistent data:** the document lives in an immutable ordered map, so undo snapshots are cheap and layout, component sync and text measurement only revisit what changed.
+- **Its own renderer:** tiny-skia on every core for the canvas and exports, with layer blending, effects and masks; booleans from linesweeper, geometry from kurbo, text from skrifa and HarfRust.
+- **Runs in the browser:** the whole engine and UI compile to WebAssembly.
+- **Accessible:** screen readers get names, roles, values and states for the tools, layer rows, fields, dropdowns, tabs and menus (AccessKit on desktop), F6 moves the keyboard between the toolbar, layers, canvas and properties (Tab within them, Escape back to the canvas), the system's reduce-motion setting is honoured, and panel text meets WCAG AA contrast in both themes.
+- **Languages:** English, Russian and Turkish (reviewed by native speakers), and Spanish, French, German, Brazilian Portuguese, Japanese, Korean, Simplified Chinese, Czech, Indonesian and Georgian drafts, picked in Preferences or taken from the system or browser and switched live; adding a language is one catalog file ([`docs/translating.md`](docs/translating.md)).
+- **Plugins:** sandboxed WebAssembly plugins (a metered, pure-Rust interpreter with a memory cap and no file or network access, in the browser too) that act through the same commands, each run one undo step, within the permissions their manifest asks for. A Rust SDK and three example plugins are in [`plugins/`](plugins); see [`docs/plugins.md`](docs/plugins.md).
+- **Live sessions (preview):** share the open file from the app (Share ▸ Start sharing: online through a server, or on your local network), give the others the short join code it shows (or the invite link), and edit it together: everyone's changes sync live, with cursors, selections, avatars and follow, and undo takes back only your own changes. Others join from the desktop app (invite links open it) or from the browser build. See [`docs/collab-protocol.md`](docs/collab-protocol.md).
+- **A server of your own (preview):** `undesign-server` keeps a team's files, publishes them from the app (File ▸ Publish to server…, or Share ▸ Online with your server in Preferences) and hands out share links and join codes that let people edit or only view; files survive restarts and apps reconnect where they were. No accounts yet: links are the access. Releases ship it for Linux, and the desktop app joins over `wss://`; [hosting it on a rented Linux server](docs/server.md#deploy-on-a-linux-server) takes a systemd unit and Caddy or nginx (or Docker). See [`docs/server.md`](docs/server.md).
+- **Never crashes:** no `unwrap`, `expect` or `panic` in shipped code, enforced by clippy; commands run behind a guard so a bug fails one action, not your session.
+- **Clean-room:** implemented from public documentation and observed behaviour only. No proprietary code, file formats, icons or images.
 
-In GitHub Codespaces the port forwards automatically; use the forwarded
-address for port 5173 if `localhost` is unreachable.
+## Get started
 
-## What works
-
-Everything below runs on the FigCraft engine (compiled to WASM) through the
-typed `EngineAdapter`; the React app keeps no parallel editable document.
-
-- **Canvas** — pan (space/middle-mouse/hand/scroll), zoom (Ctrl+scroll,
-  buttons, presets, fit, reset), marquee selection, engine-rendered SVG with
-  a selection/handle overlay
-- **Objects** — frames, rectangles, ellipses, polygons, stars, lines, arrows,
-  text, placed images; move, resize (8 handles), rotate handle,
-  auto-parenting into frames
-- **Structure** — group/ungroup, frame selection, masks, boolean
-  union/subtract/intersect/exclude + flatten, rasterize, swap orientation
-- **Layers** — hierarchy tree, expand/collapse, select, rename, visibility,
-  lock, drag reorder + reparenting
-- **Pages** — add, select, rename, duplicate, delete, move selection to page
-- **Assets** — engine shared styles (create from selection, apply, delete)
-  and components (create, insert instances, detach, reset)
-- **Auto layout** — add/remove on frames; gap, padding, alignment, Fixed/Hug
-  (frames/text) /Fill sizing, absolute children, min/max clamps migrate from
-  legacy documents where the engine accepts them
-- **Text** — content, font, size, alignment, bold/italic/underline/
-  strikethrough toggles, size stepping, case
-- **Properties** — contextual X/Y/W/H, rotation, radius, fill/stroke,
-  opacity, clip, alignment/distribution
-- **Document** — engine undo/redo, cut/copy/paste, duplicate, localStorage
-  persistence, import/export (engine JSON, UND JSON, SVG, PNG), fullscreen
-  page preview, keyboard shortcuts (`?` lists them, suppressed while typing
-  or while a dialog is open)
-
-## Architecture
-
-```
-src/
-  App.tsx                   Product shell, layout, global shortcuts, preview
-  main.tsx                  React entry point
-  types.ts                  Legacy UND document model (import/export format)
-  storage.ts                UND validation + legacy localStorage migration
-  sample.ts                 Sample document seed
-  utils.ts                  Zoom/viewport math, ids, downloads (+ legacy SVG)
-  transform.ts              Overlay matrix math for canvas interactions
-  exportPng.ts              PNG rasterization of exported SVG
-  engine/
-    adapter.ts              Typed boundary over engine commands (the only
-                            JSON-boundary crosser for editor operations)
-    store.tsx               React snapshot over the engine-owned document
-    convert.ts              UND→FC migration (explicit warnings, no silent loss)
-    readback.ts             FC→UND round-trip for export
-    geometry.ts             Engine-space geometry for the canvas overlay
-    tree.ts                 Layer-tree flattening + drag math
-  components/
-    TopToolbar.tsx          Menus, history, zoom, import/export/share dialogs
-    ToolPalette.tsx         Floating bottom tool palette (FigCraft grouping)
-    EngineSidebar.tsx       Layers / Pages / Assets panels
-    EngineCanvas.tsx        Engine SVG + selection overlay + pointer tools
-    EngineInspector.tsx     Single/multi-selection property controls
-    EngineLab.tsx           Diagnostic view over a separate engine session
-    ui.tsx                  Modal + context-menu primitives
-  wasm/
-    engine.ts               Lazy WASM loader + typed engine handle
-    pkg/                    Committed wasm-pack output (rebuilt by build:wasm)
-rust/
-  Cargo.toml                undesign-wasm crate (pinned FigCraft git deps)
-  src/lib.rs                JSON-boundary bridge + real-engine unit tests
-third-party/figcraft/       Upstream license texts, NOTICE, reuse notes
-docs/
-  FIGCRAFT_REUSE_MAP.md     Source-level upstream→Undesign reuse mapping
-tests/
-  run.mjs                   Bundles *.test.ts with esbuild, runs with node
-scripts/
-  e2e-engine.mjs            Real-WASM E2E runner (node, needs built glue)
-  e2e-driver.ts             Migration-triangle + command checks vs real engine
+```sh
+git clone https://github.com/palcchi/undesign
+cd undesign
+cargo run --release -p undesign            # the desktop app
+cargo run --release -p undesign-server     # the collaboration server (docs/server.md)
+cargo test --workspace                     # the test suite
+cargo xtask ci                             # fmt, clippy, tests, layering and asset checks
 ```
 
-The engine owns the document, selection, and history exclusively. Every edit
-flows through `EngineAdapter` into `Session::execute`, then the store
-re-reads the snapshot (pages, tree, selection, SVG, undo depths) and
-persists it — canvas, layers, and inspector stay synchronized with one undo
-step per edit. The legacy TypeScript modules (`history.ts`, `layout.ts`,
-`library.ts`, `system.ts`, `assets.ts`, `ai.ts`, `docpatch.ts`) are not used
-by the live editor; they remain only as committed, tested reference
-implementations of the UND format.
+Fonts for the UI and the Text tool come from [craft-fonts](https://github.com/storytold/craft-fonts), cloned next to this repository (`../craft-fonts`); without it Undesign falls back to your system fonts.
 
-## Scope notes
+```sh
+git clone https://github.com/storytold/craft-fonts ../craft-fonts
+```
 
-This milestone intentionally excludes accounts, real-time collaboration,
-billing, and deployment. Sharing works through portable JSON
-(File → Import/Export) until cloud features are added.
+If you clone it after a first build, run `cargo clean -p undesign-text` once so the next build embeds the fonts.
 
-## WASM engine (FigCraft integration)
+**Start from a template.** The home screen's Templates tab has eight starter files (a mobile app, a landing page, a dashboard, a design system starter, a wireframe kit, social post sizes, presentation slides and an icon set starter), also under File ▸ New from template…. They are built in code from original, synthetic content, so scripts can open them too: `file.newFromTemplate {template}`.
 
-Undesign embeds the FigCraft editor engine, compiled to WebAssembly, behind a
-documented JSON boundary. The **main editor** runs on the engine: canvas,
-selection, layers, properties, persistence, and export all operate on one
-engine-owned document through the typed `EngineAdapter`
-(`src/engine/adapter.ts`). The **Engine** button in the top toolbar opens the
-Engine Lab, kept as a diagnostic view over a separate engine session.
+For the web build, install [trunk](https://trunkrs.dev/) and run `cargo xtask wasm`.
 
-- Upstream: [brydanforge/figcraft](https://github.com/brydanforge/figcraft),
-  revision `92682728e9d6a3a97ea25a99395be7a34a8db993`
-- License: MIT OR Apache-2.0 (texts and NOTICE in `third-party/figcraft/`);
-  © 2026 ArtCraft Team and the FigCraft contributors
-- Reuse: the `figcraft-engine`, `figcraft-doc`, `figcraft-svg`, and
-  `figcraft-geom` crates, **unmodified**, via pinned Cargo git dependencies
-  (`rust/Cargo.toml`, `rust/Cargo.lock`). No upstream files are vendored or
-  patched; the bridge in `rust/src/`, the loader in `src/wasm/`, the adapter
-  and converter in `src/engine/`, and the editor UI are original Undesign
-  code. The adapter wraps the engine's real command registry — pages,
-  shapes, text, transforms, alignment, booleans, frames, masks, rasterize,
-  auto-layout, shared styles, components/instances, prototype flows, text
-  styling, and image placement — with every command name verified against
-  upstream source at the pinned revision
-  (see `docs/FIGCRAFT_REUSE_MAP.md`).
-- Boundary: the engine owns its document exclusively. The React app crosses
-  into it only through `execute` / `undo` / `redo` / selection / tree
-  describe / hit-test / SVG export / save+load (see `rust/src/lib.rs`). There
-  is no second editable TypeScript document model.
-- Migration: legacy JSON documents convert explicitly via
-  `src/engine/convert.ts` (UND→FC) and read back via
-  `src/engine/readback.ts` (FC→UND). Auto-layout, child sizing (where the
-  engine accepts it: fill needs a layout parent, hug needs layout or text),
-  and constraints migrate; still-unsupported properties (component defs,
-  variant sets, shared style defs, prototype links, images, gradients beyond
-  their solid fallback, shadows) produce recorded warnings and safe
-  placeholders, never silent data loss. Rotation is clockwise in UND/SVG and
-  counter-clockwise in the engine; the boundary negates it.
-- Not reused: the upstream `ui-egui` editor shell (Rust-only, no React
-  equivalent — Undesign keeps its own product shell and panels), the
-  `mcp`/headless crates, and brand/separately licensed material (ArtCraft
-  trademarks, OFL fonts).
+New contributors: start with [`AGENTS.md`](AGENTS.md), then [`docs/`](docs/).
 
-If a future change patches or vendors upstream files, the modification must be
-recorded in `third-party/figcraft/README.md` with the file list.
+Installers for macOS (universal, signed and notarized), Windows (x64, x86 and arm64), Linux (AppImage, `.deb`, `.rpm`, Flatpak and tarball), FreeBSD and the web are attached to each [GitHub release](https://github.com/palcchi/undesign/releases). Maintainers: [`docs/releasing.md`](docs/releasing.md) explains how releases are built, signed and published.
+
+> [!IMPORTANT]
+> **Status:** Undesign is in **alpha**: about 49% of the way to replacing proprietary tools for real work, by our own estimate. Nearly all tracked interface design actions in the menu checklist are wired ([`docs/parity-checklist.md`](docs/parity-checklist.md)) and the core editor works end to end, but Undesign opens `.fig` files only best effort, has only a first preview of multiplayer (live sessions hosted from the app or a self-hosted server, with per-person undo and share links to edit or to view; no accounts, teams or cloud yet), runs its own WebAssembly plugins, and hasn't been checked against real design documents. The honest, area-by-area picture is in the [roadmap](ROADMAP.md) and [`docs/target-app-parity.md`](docs/target-app-parity.md). Expect rough edges and please file issues.
+
+## Privacy and online sharing
+
+Undesign works offline: it has no account and no telemetry, and it contacts no server until you
+share or join a file. Live sessions are a **preview**. Before you share anything that matters,
+know what sharing does:
+
+- **Share ▸ Online uploads the file to a server.** There is no built-in server: you enter yours in
+  Preferences (or run your own: [`docs/server.md`](docs/server.md)). The file stays on
+  the server after you stop sharing, until you remove it (Share ▸ Advanced ▸ Remove from server…).
+- **It is not end-to-end encrypted.** The connection to the server is encrypted (TLS), but the
+  server stores the file unencrypted and whoever runs the server can read it. Don't share
+  confidential work through a server you don't trust; run your own
+  ([`docs/server.md`](docs/server.md)) or share on the local network instead.
+- **The code or link is the access.** There are no accounts: anyone who has an edit code or link
+  can open and change the file, anyone with a view code or link can open it. Stop sharing revokes
+  them and disconnects everyone else.
+- **Share ▸ Local network involves no server**, but it is not encrypted either: your app hosts
+  the session and others connect to it directly, so use it on networks you trust.
+- **No guarantees.** Keep your own saved copy of anything you share.
+
+---
+
+## License and credits
+
+Undesign is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
+Required notices are in [NOTICE](NOTICE).
+
+Undesign is a modification of the open-source FigCraft editor
+([brydanforge/figcraft](https://github.com/brydanforge/figcraft), MIT OR Apache-2.0,
+© 2026 ArtCraft Team and the FigCraft contributors). Every local change against the imported
+upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
+
+Every icon in Undesign is drawn in code or made for this project, and bundled fonts, images and other
+assets keep their own open licenses; each one is listed with its author, source and license in
+[ATTRIBUTION.md](ATTRIBUTION.md).
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=palcchi/undesign&type=Date&legend=top-left)](https://www.star-history.com/?repos=palcchi%2Fundesign&type=date&legend=top-left)

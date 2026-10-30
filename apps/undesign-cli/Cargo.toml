@@ -1,0 +1,24 @@
+[package]
+name = "undesign-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Undesign command line: info, export, convert, render, scripted commands, perf"
+
+[[bin]]
+name = "undesign-cli"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+undesign-engine = { workspace = true }
+undesign-doc = { workspace = true }
+undesign-render = { workspace = true }
+undesign-text = { workspace = true }
+undesign-svg = { workspace = true }
+undesign-format = { workspace = true }
+undesign-collab-net = { workspace = true }
+serde_json = { workspace = true }

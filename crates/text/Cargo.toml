@@ -1,0 +1,20 @@
+[package]
+name = "undesign-text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Undesign text: font database (embedded craft-fonts + system fonts), shaping, line layout, glyph outlines"
+
+[lints]
+workspace = true
+
+[dependencies]
+undesign-geom = { workspace = true }
+undesign-doc = { workspace = true }
+skrifa = { workspace = true }
+harfrust = { workspace = true }
+# Colour emoji: sbix/CBDT strikes are PNG images the text layer decodes for the renderer.
+png = { workspace = true }
+unicode-bidi = { workspace = true }
+unicode-segmentation = { workspace = true }
+log = { workspace = true }

@@ -1,0 +1,35 @@
+[package]
+name = "undesign-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Undesign engine: sessions, undo history, the command registry every surface (UI, CLI, control channel) dispatches through, pointer tools, components and the Figma menu catalog"
+
+[lints]
+workspace = true
+
+[dependencies]
+undesign-geom = { workspace = true }
+undesign-color = { workspace = true }
+undesign-doc = { workspace = true }
+undesign-collab = { workspace = true }
+undesign-layout = { workspace = true }
+undesign-text = { workspace = true }
+undesign-pathops = { workspace = true }
+undesign-render = { workspace = true }
+undesign-format = { workspace = true }
+undesign-svg = { workspace = true }
+undesign-pdf = { workspace = true }
+craft-docpath = { workspace = true }
+undesign-plugin = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+base64 = { workspace = true }
+regex = { workspace = true }
+web-time = "1.1.0"
+
+[dev-dependencies]
+wat = { workspace = true }
+image = { workspace = true }

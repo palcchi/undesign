@@ -1,0 +1,21 @@
+[package]
+name = "undesign-svg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Undesign SVG export (shapes, gradients, images, strokes, effects as filters, text as outlines) and import (via usvg)"
+
+[lints]
+workspace = true
+
+[dependencies]
+undesign-geom = { workspace = true }
+undesign-color = { workspace = true }
+undesign-doc = { workspace = true }
+undesign-render = { workspace = true }
+undesign-text = { workspace = true }
+undesign-pathops = { workspace = true }
+usvg = { workspace = true }
+base64 = { workspace = true }
+flate2 = { workspace = true }
+thiserror = { workspace = true }

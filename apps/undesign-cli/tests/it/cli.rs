@@ -1,0 +1,254 @@
+//! The binary end to end.
+
+use std::process::{Command, Stdio};
+
+fn bin() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_undesign-cli"))
+}
+
+fn tmp(name: &str) -> std::path::PathBuf {
+    let d = std::env::temp_dir().join(format!("undesign-cli-test-{}-{name}", std::process::id()));
+    std::fs::create_dir_all(&d).unwrap();
+    d
+}
+
+#[test]
+fn bad_arguments_exit_2_without_panicking() {
+    for args in [
+        &[][..],
+        &["bogus"],
+        &["export"],
+        &["export", "x.undesign"],
+        &["info", "--nope"],
+        &["render", "a", "-o"],
+        &["perf", "--shapes", "lots"],
+        &["convert", "a"],
+    ] {
+        let out = bin().args(args).output().unwrap();
+        assert_eq!(out.status.code(), Some(2), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(err.contains("USAGE"), "{args:?}");
+        assert!(!err.contains("panicked"));
+    }
+    let out = bin().args(["info", "/no/such/file.undesign"]).output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+}
+
+/// `--help` / `-h` after a subcommand prints the usage on stdout and exits 0, as it does first
+/// (#1155), whatever else is on the line; nothing runs.
+#[test]
+fn help_after_a_subcommand_prints_the_usage() {
+    for args in [
+        &["--help"][..],
+        &["-h"],
+        &["help"],
+        &["info", "--help"],
+        &["export", "--help"],
+        &["export", "x.undesign", "-o", "out", "--help"],
+        &["convert", "-h"],
+        &["render", "--help"],
+        &["run", "--help"],
+        &["commands", "--help"],
+        &["plugin", "publish", "--help"],
+        &["perf", "--help"],
+        &["info", "--bogus", "--help"],
+    ] {
+        let out = bin().args(args).stdin(Stdio::null()).output().unwrap();
+        assert_eq!(out.status.code(), Some(0), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(text.contains("USAGE") && text.contains("undesign-cli render"), "{args:?}: {text}");
+        assert!(out.stderr.is_empty(), "{args:?}: nothing on stderr, got {}", String::from_utf8_lossy(&out.stderr));
+    }
+    // A value that happens to be `-h` is still a value, not a request for help.
+    let out = bin().args(["commands", "--filter", "--help"]).output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("USAGE"), "--filter took `--help` as its text");
+}
+
+#[test]
+fn run_export_info_convert() {
+    let d = tmp("run");
+    let script = d.join("s.jsonl");
+    std::fs::write(&script, "{\"command\":\"frame.create\",\"params\":{\"x\":0,\"y\":0,\"width\":100,\"height\":50,\"name\":\"A\",\"props\":{\"fill\":\"#ff0000\"}}}\n{\"command\":\"frame.create\",\"params\":{\"x\":200,\"y\":0,\"width\":30,\"height\":30,\"name\":\"B\"}}\n").unwrap();
+    let file = d.join("doc.undesign");
+    let out = bin().arg("run").arg(&script).arg("--out").arg(&file).output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let lines: Vec<serde_json::Value> = String::from_utf8_lossy(&out.stdout).lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    assert_eq!(lines.len(), 2);
+    assert!(lines.iter().all(|l| l["ok"] == true));
+
+    let info = bin().args(["info", "--json"]).arg(&file).output().unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&info.stdout).unwrap();
+    assert_eq!(v["pages"][0]["frames"].as_array().unwrap().len(), 2);
+
+    let dir = d.join("png");
+    assert!(bin().arg("export").arg(&file).arg("-o").arg(&dir).args(["--scale", "2"]).status().unwrap().success());
+    let a = std::fs::read(dir.join("A.png")).unwrap();
+    assert_eq!(&a[16..24], &[0, 0, 0, 200, 0, 0, 0, 100]);
+    assert!(dir.join("B.png").exists());
+
+    let svg = d.join("b.svg");
+    assert!(bin().arg("export").arg(&file).arg("-o").arg(&svg).args(["--node", "B"]).status().unwrap().success());
+    assert!(std::fs::read_to_string(&svg).unwrap().contains("<svg"));
+
+    let json = d.join("doc.json");
+    assert!(bin().arg("convert").arg(&file).arg(&json).status().unwrap().success());
+    let png = d.join("doc.png");
+    assert!(bin().arg("convert").arg(&json).arg(&png).status().unwrap().success());
+    assert!(std::fs::read(&png).unwrap().starts_with(b"\x89PNG"));
+
+    // A failing step: nonzero exit, error line printed.
+    let bad = d.join("bad.json");
+    std::fs::write(&bad, r#"[{"command":"select.all"},{"command":"nope"}]"#).unwrap();
+    let out = bin().arg("run").arg(&bad).output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("\"ok\":false"));
+    std::fs::remove_dir_all(&d).ok();
+}
+
+/// `export` into a folder names the files as the app's export does (#1154): brackets, `+`, `&`,
+/// `%`, `#` and commas stay, what file systems refuse becomes `_`.
+#[test]
+fn export_file_names_keep_what_the_app_keeps() {
+    let d = tmp("names");
+    let script = d.join("s.json");
+    let names = ["Homepage - desktop (live + verbeteringen)", "Q&A, 50% #1 [v2]", "a:b*c?d|e"];
+    let steps: Vec<serde_json::Value> = names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| serde_json::json!({"command": "frame.create", "params": {"x": i * 200, "y": 0, "width": 20, "height": 20, "name": n}}))
+        .collect();
+    std::fs::write(&script, serde_json::to_string(&steps).unwrap()).unwrap();
+    let file = d.join("doc.undesign");
+    assert!(bin().arg("run").arg(&script).arg("--out").arg(&file).output().unwrap().status.success());
+    let dir = d.join("out");
+    let out = bin().arg("export").arg(&file).arg("-o").arg(&dir).output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    for want in ["Homepage - desktop (live + verbeteringen).png", "Q&A, 50% #1 [v2].png", "a_b_c_d_e.png"] {
+        assert!(dir.join(want).is_file(), "{want} in {:?}", std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name()).collect::<Vec<_>>());
+    }
+    std::fs::remove_dir_all(&d).ok();
+}
+
+#[test]
+fn run_takes_the_documented_gradient_shorthand() {
+    // #252: `run` accepts the documented gradient shorthand, like every route into the engine.
+    let d = tmp("gradient");
+    let script = d.join("s.json");
+    std::fs::write(
+        &script,
+        r##"[{"command":"shape.rectangle","params":{"x":0,"y":0,"width":200,"height":100}},
+            {"command":"node.set","params":{"ids":[2],"fills":[{"type":"linearGradient","stops":["#ff0000","#0000ff"],"from":[0,0.5],"to":[1,0.5]}]}}]"##,
+    )
+    .unwrap();
+    let file = d.join("g.undesign");
+    let out = bin().arg("run").arg(&script).arg("--out").arg(&file).output().unwrap();
+    assert!(out.status.success(), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    let json = d.join("g.json");
+    assert!(bin().arg("convert").arg(&file).arg(&json).status().unwrap().success());
+    let doc = std::fs::read_to_string(&json).unwrap();
+    assert!(doc.contains("\"kind\":\"linear\"") || doc.contains("\"kind\": \"linear\""), "{doc}");
+    std::fs::remove_dir_all(&d).ok();
+}
+
+#[test]
+fn commands_json_lists_everything() {
+    let out = bin().args(["commands", "--json"]).output().unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(v.as_array().unwrap().len() > 200);
+}
+
+/// The automation roots confine the file subcommands (#833): a read outside a root, and a
+/// write outside a write root, are refused and leave no file behind. Without the flags
+/// the same commands behave as they always did.
+#[test]
+fn file_subcommands_are_confined_to_automation_roots() {
+    let d = tmp("file-roots");
+    let _ = std::fs::remove_dir_all(&d);
+    for sub in ["in", "out"] {
+        std::fs::create_dir_all(d.join(sub)).unwrap();
+    }
+    let p = |rel: &str| d.join(rel).to_string_lossy().into_owned();
+    let out_of = |o: &std::process::Output| String::from_utf8_lossy(&o.stderr).into_owned();
+
+    // A document to work on, made unconfined.
+    std::fs::write(d.join("in/make.json"), br#"[{"command":"shape.rectangle","params":{"x":0,"y":0,"width":40,"height":20}}]"#).unwrap();
+    let made = bin().args(["run", &p("in/make.json"), "--out", &p("in/doc.undesign")]).output().unwrap();
+    assert!(made.status.success(), "{}", out_of(&made));
+
+    // Inside the roots: renders as usual.
+    let ok = bin()
+        .args(["render", &p("in/doc.undesign"), "-o", &p("out/ok.png"), "--automation-read-root", &p("in"), "--automation-write-root", &p("out")])
+        .output()
+        .unwrap();
+    assert!(ok.status.success(), "{}", out_of(&ok));
+    assert!(d.join("out/ok.png").is_file());
+
+    // A write outside the write root is refused, and nothing is written.
+    let escaped = d.join("escaped.png");
+    let refused = bin()
+        .args([
+            "render",
+            &p("in/doc.undesign"),
+            "-o",
+            &escaped.to_string_lossy(),
+            "--automation-read-root",
+            &p("in"),
+            "--automation-write-root",
+            &p("out"),
+        ])
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+    assert!(out_of(&refused).contains("may be written"), "{}", out_of(&refused));
+    assert!(!escaped.exists(), "the refused render wrote a file anyway");
+
+    // No write root at all: writing is refused outright, reading still works.
+    let no_write = bin().args(["render", &p("in/doc.undesign"), "-o", &p("out/no.png"), "--automation-read-root", &p("in")]).output().unwrap();
+    assert!(!no_write.status.success());
+    assert!(out_of(&no_write).contains("no folder may be written"), "{}", out_of(&no_write));
+
+    // A read outside every root is refused: `info` on the document with only `out` readable.
+    let read_refused = bin().args(["info", &p("in/doc.undesign"), "--automation-read-root", &p("out")]).output().unwrap();
+    assert!(!read_refused.status.success());
+    assert!(out_of(&read_refused).contains("may be read"), "{}", out_of(&read_refused));
+
+    // `convert` and `run` take them as well, and a root that is not a folder is refused.
+    let missing = bin().args(["convert", &p("in/doc.undesign"), &p("out/c.svg"), "--automation-read-root", &p("missing")]).output().unwrap();
+    assert!(!missing.status.success());
+    assert!(out_of(&missing).contains("automation-read-root"), "{}", out_of(&missing));
+
+    // Unconfined, the same render still writes wherever it is told.
+    let plain = bin().args(["render", &p("in/doc.undesign"), "-o", &escaped.to_string_lossy()]).output().unwrap();
+    assert!(plain.status.success(), "{}", out_of(&plain));
+    assert!(escaped.is_file());
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+/// An output path that is a symbolic link is written through, to its target, as `std::fs::write`
+/// always did. Routing the CLI's writes through `file_access` for #833 would otherwise have
+/// replaced the link with a regular file, because that write stages the bytes and renames them
+/// into place.
+#[cfg(unix)]
+#[test]
+fn an_unconfined_write_follows_a_symbolic_link() {
+    let d = tmp("symlink-out");
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(d.join("real")).unwrap();
+    let p = |rel: &str| d.join(rel).to_string_lossy().into_owned();
+    std::fs::write(d.join("in.json"), br#"[{"command":"shape.rectangle","params":{"x":0,"y":0,"width":40,"height":20}}]"#).unwrap();
+    let made = bin().args(["run", &p("in.json"), "--out", &p("doc.undesign")]).output().unwrap();
+    assert!(made.status.success(), "{}", String::from_utf8_lossy(&made.stderr));
+
+    let target = d.join("real/target.png");
+    std::fs::write(&target, b"placeholder").unwrap();
+    let link = d.join("link.png");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+
+    let out = bin().args(["render", &p("doc.undesign"), "-o", &link.to_string_lossy()]).output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink(), "the link is still a link");
+    let written = std::fs::read(&target).unwrap();
+    assert!(written.starts_with(b"\x89PNG"), "the target holds the render, not the placeholder");
+    let _ = std::fs::remove_dir_all(&d);
+}

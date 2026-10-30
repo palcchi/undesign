@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Undesign
+GenericName=Interface Design Tool
+Comment=Design and prototype user interfaces
+Exec=undesign %U
+TryExec=undesign
+Icon=io.github.palcchi.undesign
+Terminal=false
+StartupNotify=true
+StartupWMClass=io.github.palcchi.undesign
+Categories=Graphics;2DGraphics;VectorGraphics;X-Design;
+Keywords=design;interface;ui;ux;prototype;wireframe;mockup;vector;layout;components;
+MimeType=application/x-undesign;image/svg+xml;image/png;image/jpeg;x-scheme-handler/undesign;

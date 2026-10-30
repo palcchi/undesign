@@ -1,0 +1,10 @@
+Undesign app icon (undesign.svg, undesign-small.svg and every file derived from them in this
+directory: undesign-<size>.png, undesign.ico, hicolor/).
+
+Original placeholder artwork made for this project: a U mark on a green tile.
+No third-party material. Licensed like the rest of Undesign, under either of
+
+  * Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+  * MIT license (https://opensource.org/licenses/MIT)
+
+at your option.

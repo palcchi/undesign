@@ -1,0 +1,13 @@
+[package]
+name = "undesign-layout"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Undesign layout: auto layout (horizontal, vertical, wrap, grid; hug/fill/fixed), constraints, layout grid geometry"
+
+[lints]
+workspace = true
+
+[dependencies]
+undesign-geom = { workspace = true }
+undesign-doc = { workspace = true }
