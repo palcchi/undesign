@@ -93,3 +93,19 @@ upstream revision so future syncs stay auditable.
   (stale keys removed from 13 locale files).
 - Not re-graded: percentages, hours and estimates are unchanged by this
   re-skin (it adds no Figma behaviour).
+
+## 2026-10-30 — Figma-look pass from reference screenshots (change #5)
+
+- The left panel's header names the file's kind (Design/Board) under the file
+  name instead of the stale "Drafts" (`crates/ui-egui/src/layers.rs`; "Board"
+  is a new catalog key in English and Spanish, other drafts read English for
+  it; the "Drafts" key is removed from all 18 catalogs that had it).
+- The zoom readout in the Design/Prototype tabs row carries the accent, as
+  Figma's blue zoom does (`crates/ui-egui/src/right.rs`).
+- Guard test: every code-drawn icon stays on the 16-unit grid and keeps
+  painting (`every_icon_stays_on_the_grid_and_paints` in
+  `crates/ui-egui/src/icons.rs`), plus a header kind-label test
+  (`board_ui_tests.rs`).
+- Reference screenshots stay local under `plan/figma/screenshots/` (gitignored,
+  never committed); only layout, density, theme and behaviour were matched, no
+  Figma artwork was copied or traced. Not re-graded: numbers unchanged.

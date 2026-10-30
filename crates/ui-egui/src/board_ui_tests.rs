@@ -210,3 +210,15 @@ fn the_next_sticky_from_the_keyboard_goes_on_typing() {
     let owner = undesign_engine::board::owner_of_text(doc, te.id).unwrap();
     assert_eq!(doc.node(owner).unwrap().transform.translation().x, 224.0);
 }
+
+/// The left panel's header names the file's kind under its name (Figma names the project
+/// there; Undesign has none), never the old "Drafts".
+#[test]
+fn the_left_header_names_the_files_kind() {
+    let mut u = Ui::new(Session::new());
+    let shapes = flat(&u.frame_output(vec![]).shapes);
+    assert!(has_text(&shapes, "Design") && !has_text(&shapes, "Drafts"), "a design file");
+    let mut u = board();
+    let shapes = flat(&u.frame_output(vec![]).shapes);
+    assert!(has_text(&shapes, "Board") && !has_text(&shapes, "Drafts"), "a board file");
+}

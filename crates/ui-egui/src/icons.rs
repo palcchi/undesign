@@ -1393,6 +1393,39 @@ mod tests {
         out.shapes.into_iter().map(|c| c.shape).collect()
     }
 
+    /// Every painted point of `shapes`: vertices, centres and rect corners.
+    fn mark_points(shapes: &[Shape]) -> Vec<Pos2> {
+        fn walk(shape: &Shape, out: &mut Vec<Pos2>) {
+            match shape {
+                Shape::Vec(v) => v.iter().for_each(|s| walk(s, out)),
+                Shape::LineSegment { points, .. } => out.extend(points),
+                Shape::Path(p) => out.extend(&p.points),
+                Shape::Circle(c) => out.push(c.center),
+                Shape::Rect(r) => out.extend([r.rect.min, r.rect.max]),
+                Shape::Mesh(m) => out.extend(m.vertices.iter().map(|v| v.pos)),
+                Shape::ConvexPolygon(p) => out.extend(&p.points),
+                _ => {}
+            }
+        }
+        let mut pts = Vec::new();
+        shapes.iter().for_each(|s| walk(s, &mut pts));
+        pts
+    }
+
+    /// Every icon stays on the 16-unit grid (a unit of slack at 32 points for stroke
+    /// overhang) and paints something: the set keeps one optical size and no icon
+    /// silently goes blank.
+    #[test]
+    fn every_icon_stays_on_the_grid_and_paints() {
+        for &icon in Icon::ALL {
+            let pts = mark_points(&shapes_at_32(icon));
+            assert!(!pts.is_empty(), "{icon:?} paints nothing");
+            for p in pts {
+                assert!((-2.0..=34.0).contains(&p.x) && (-2.0..=34.0).contains(&p.y), "{icon:?} reaches {p:?}");
+            }
+        }
+    }
+
     /// Frame and Text stay a grid unit inside the box, so their long hinted strokes don't
     /// outweigh the outlines beside them in the toolbar (#737).
     #[test]

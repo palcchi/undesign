@@ -152,7 +152,9 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
     if zresp.hovered() {
         ui.painter().rect_filled(zr, CornerRadius::same(5), t.hover);
     }
-    ui.painter().text(pos2(zr.min.x + 6.0, zr.center().y), Align2::LEFT_CENTER, format!("{}%", (zoom * 100.0).round()), regular(11.0), t.text);
+    // The readout carries the accent, as Figma's blue zoom does.
+    ui.painter()
+        .text(pos2(zr.min.x + 6.0, zr.center().y), Align2::LEFT_CENTER, format!("{}%", (zoom * 100.0).round()), regular(11.0), t.accent_text);
     icons::paint(ui.painter(), Rect::from_center_size(pos2(zr.max.x - 9.0, zr.center().y), vec2(10.0, 10.0)), Icon::Chevron, t.icon_secondary);
     menu_popup(&zresp).width(200.0).show(|ui| {
         for (label, cmd) in [
