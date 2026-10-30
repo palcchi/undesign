@@ -74,7 +74,6 @@ The release workflow leaves it unset.
 | Linux riscv64 | `undesign-<v>-linux-riscv64.tar.gz` (CLI smoke-tested under QEMU; needs glibc ≥ 2.39) | cross-compiled on `ubuntu-24.04` against ports.ubuntu.com riscv64 libraries |
 | FreeBSD 14 x86_64 | `undesign-<v>-freebsd-x86_64.tar.gz` | FreeBSD 14.3 VM on `ubuntu-latest` |
 | Web | `undesign-web-<v>.zip` (static site; [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
-| Server, Linux x86_64 / aarch64 | `undesign-server-<v>-linux-<arch>.tar.gz` (the collaboration server; [`server.md`](server.md)) | `ubuntu-22.04` / `ubuntu-22.04-arm` |
 
 `undesign-cli` ships in every desktop package (and its own macOS zip) when `apps/undesign-cli`
 is in the workspace: `packaging/env.sh` sets `BINS`/`HAS_CLI` from that, and `package.ps1`,
@@ -82,14 +81,6 @@ is in the workspace: `packaging/env.sh` sets `BINS`/`HAS_CLI` from that, and `pa
 
 `undesign --version` prints the version and, in CI builds, the commit (`UNDESIGN_BUILD_SHA`,
 read by `apps/undesign/build.rs`).
-
-**The collaboration server** (`apps/undesign-server`, binary `undesign-server`, see
-[`server.md`](server.md)) is built by the `server` job with `packaging/server/package.sh`: a
-headless binary, so not part of `BINS` (which every desktop package installs) and no installer,
-desktop file or fonts. Its archive holds the binary, the licences, `server.md` and the deployment
-examples from `packaging/server/` (systemd unit, Caddyfile, nginx; the Dockerfile builds from
-the sources). Linux only for now; elsewhere operators build it with
-`cargo build --release -p undesign-server`.
 
 **Fonts.** Every build job, the web one included (`web-craft-fonts`), checks out
 [craft-fonts](https://github.com/storytold/craft-fonts) at `craft-fonts-ref` (in `release.yml`) and

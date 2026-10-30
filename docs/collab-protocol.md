@@ -10,10 +10,12 @@ handling and offline queueing with reconnect (`crates/collab`, wired into the en
 session and the transport). **Step 4 is implemented**: the browser build joins sessions a desktop
 app hosts, and `undesign://` invite links open the app and join. Styles, variables, collections,
 modes and comments created in a session take ids from their creator's id space, and others' text
-carets, cursor chat and spotlights show live (see Presence). **Step 5 is implemented**: the
-standalone `undesign-server` (`apps/undesign-server`, running it: [`server.md`](server.md)) keeps
-many files with persistence and compaction, and share links that let people edit or only view;
-the app publishes to it, and a file's team library lives there for other files to use. Files are
+carets, cursor chat and spotlights show live (see Presence). **Step 5 was implemented and removed
+again**: a standalone server kept many files with persistence and compaction, and share links that
+let people edit or only view; the app published to it, and a file's team library lived there for
+other files to use (the `undesign-server` implementation, `apps/undesign-server` with
+`packaging/server` and `docs/server.md`, was removed 2026-10-30; the protocol below still
+describes app-hosted sessions and any compatible server). Files are
 shared with **join codes** (see *Sharing with a join code*): online through a server that names
 its links with short codes, or on the local network with a code that carries the host's address.
 A file put on a server stays its owner's: the app records it with its owner token and lists
@@ -36,7 +38,7 @@ resolve **last-writer-wins in server order**. Clients apply their own edits imme
 (optimistically) and reconcile when the server echoes or overrides them. Cursors, selections and
 viewports are **ephemeral presence** messages that are never stored. The desktop app can **host a
 session itself** (LAN or a forwarded port), so no public server is needed to start; the same
-server code also builds as a standalone `undesign-server` binary for self-hosting.
+server code used to also build as a standalone `undesign-server` binary for self-hosting (removed 2026-10-30).
 
 ## Why this shape
 
@@ -452,9 +454,10 @@ resuming with its offline edits, and leaving the session going back to snapshot 
   `ws://`/`wss://` URL). Others on the same network (or through a forwarded port / VPN such as a
   mesh VPN) join with "File ▸ Join live session" or by opening the link. When the host leaves, the
   session ends; everyone keeps a local copy.
-- **Self-hosted server**: the same server as a `undesign-server` binary that keeps many files,
-  persists them (a snapshot plus an append-only log of accepted batches, compacted into new
-  snapshots), and survives restarts. TLS comes from a reverse proxy (`wss://`). *Built*, below.
+- **Self-hosted server** (removed 2026-10-30): the same server as a standalone binary that kept
+  many files, persisted them (a snapshot plus an append-only log of accepted batches, compacted
+  into new snapshots), and survived restarts. TLS came from a reverse proxy (`wss://`).
+  *Built, then removed*, below.
 - **Auth**: an unguessable per-session token in the invite link (hosting from the app); per-file
   share links that let people edit or only view, and a server key that manages files (the
   standalone server). User accounts come later.
@@ -670,11 +673,11 @@ resuming with its offline edits, and leaving the session going back to snapshot 
   page refuses other hosts up front with a message instead of failing obscurely. To join from
   other machines, serve the web build over `http://` on a trusted network (locally:
   `python3 -m http.server 8767` in the built site, then `http://localhost:8767/` or the machine's
-  LAN address), or use `wss://` links of a `undesign-server` behind a TLS reverse proxy (the
-  browser opens them; see *Built (the standalone server)*). Some browsers also ask before a public
+  LAN address), or use `wss://` links of a standalone server behind a TLS reverse proxy (the
+  browser opens them; see *Built, then removed*). Some browsers also ask before a public
   site may reach private network addresses.
 
-*Built* (the standalone server, `apps/undesign-server`; running it: [`server.md`](server.md)):
+*Built, then removed* (the standalone server shipped until 2026-10-30 as `apps/undesign-server`; what follows still describes the protocol app-hosted sessions use):
 
 - **One hub for both hosts.** The app's session host and the server run the same hub
   (`crates/collab-net/src/hub.rs`): the listener, a reader and a writer thread per connection,
@@ -700,9 +703,9 @@ resuming with its offline edits, and leaving the session going back to snapshot 
 - **Managing files.** A connection that opens with `Manage {key}` instead of `Hello` sends
   `Admin` requests: publish a document (its snapshot) as a new file, which returns an edit link
   and a view link; list files and links; make and revoke links; remove a file. The server key is
-  128 bits in the data directory. The server's command line (`undesign-server files|links|key`)
-  uses the same requests when a server is running on the directory, else it changes the directory
-  itself (one process holds it at a time: an OS file lock).
+  128 bits in the data directory. The removed server's command line (`undesign-server files|links|key`)
+  used the same requests when a server was running on the directory, else it changed the directory
+  itself (one process held it at a time: an OS file lock).
 - **Publishing from the app.** `collab.publish {server, name?}` (File ▸ Publish to server…)
   uploads the open document over a managing connection, then joins the new file with its edit
   link on the same connection thread; the tab becomes the session's synced document (read-only
@@ -724,7 +727,7 @@ resuming with its offline edits, and leaving the session going back to snapshot 
   same clients (the session id, client ids and log come back with the file), sending what they
   made meanwhile. The app's session ending (code 1001) stays final.
 
-*Built* (team libraries on the server; using them: [`server.md`](server.md#team-libraries)):
+*Built, then removed* (team libraries on the server; the usage guide is gone with `docs/server.md`):
 
 - **A library connection.** A connection that opens with `OpenLibrary {file, token}` (checked like a
   hello's token, so any share link of the file opens it with that link's access) sends `Library`
@@ -751,8 +754,8 @@ resuming with its offline edits, and leaving the session going back to snapshot 
   the server keeps the latest report per file name (`usage.json`, rewritten only when it changes,
   capped) and answers `usage` with them. `library.usage` adds them up with the components' names.
 
-*Built* (the plugin directory; operating it: [`server.md`](server.md#plugin-directory), publishing and
-installing: [`plugins.md`](plugins.md#plugin-directories)):
+*Built, then removed* (the plugin directory; the operator guide is gone with `docs/server.md`;
+publishing and installing: [`plugins.md`](plugins.md#plugin-directories)):
 
 - **A plugin directory connection.** A connection that opens with `OpenPlugins {key}` lists and
   fetches plugins with no credential at all, and publishes or unpublishes them when `key` is the
@@ -769,7 +772,7 @@ installing: [`plugins.md`](plugins.md#plugin-directories)):
   checks the asset names; the app checks the same again after the hash. Fetches share a budget of
   bytes per second on the server, so many downloads at once are turned away instead of queued.
 
-*Built* (open hosting: a server open to the public; running one: [`server.md`](server.md#running-a-public-server)):
+*Built, then removed* (open hosting: a server open to the public; the guide is gone with `docs/server.md`):
 
 - **Who the client is.** The hub knows each connection by its client's address: the socket's peer,
   or behind the configured reverse proxy (`trusted_proxy`) the last address of its
@@ -903,7 +906,7 @@ chooses to share on the network; the default is the invite link with a random to
   request (the path is `/`), so proxies don't log it; Undesign never logs it (logs name addresses
   and ports only), and errors about links never echo the link. Traffic is not encrypted (`ws://`):
   on a shared network, others on the path could read presence and the token. Use a trusted LAN
-  or a VPN; TLS (`wss://`) comes from a reverse proxy in front of a `undesign-server`.
+  or a VPN; TLS (`wss://`) comes from a reverse proxy in front of a standalone server.
 - **Limits.** At most 64 open sockets (joined or not) and the core's 256 people; a connection must
   finish the WebSocket handshake and say hello within 10 s, and one silent for 45 s is dropped
   (clients ping every 15 s); client messages are at most 16 MiB (what the host sends keeps the
@@ -916,8 +919,8 @@ chooses to share on the network; the default is the invite link with a random to
 - **Malformed input.** Anything that isn't a binary message of the current wire version that
   decodes in full is answered with `Refused` and a close; the first message must be `Hello` (for
   this file) or, on a server, `Manage`. The invite parser and the host's reader are fuzzed
-  (`crates/collab-net`), and so are the server's readers of its own files and its port
-  (`apps/undesign-server`).
+  (`crates/collab-net`); the removed standalone server's readers of its own files and its port
+  (`apps/undesign-server`) were fuzzed too.
 
 *Built* (the standalone server), and what it adds to the threat model:
 
@@ -951,9 +954,8 @@ chooses to share on the network; the default is the invite link with a random to
   takes connections (see *Sharing with a join code*). A code is never stored, logged or sent back
   after it is handed out; it travels only in the first message of a connection, never in the
   WebSocket request. Anything that needs a stronger secret shares the link.
-- **TLS.** None in the server: a reverse proxy terminates it (Caddy and nginx examples in
-  `packaging/server/`, deployment in [`server.md`](server.md#deploy-on-a-linux-server)); clients
-  speak `wss://` to the proxy. Tokens and keys are never in the
+- **TLS.** None in the server: a reverse proxy terminates it (the removed server's Caddy
+  and nginx examples lived in `packaging/server/`); clients speak `wss://` to the proxy. Tokens and keys are never in the
   WebSocket request (only in the first message), so proxies don't log them, and the server logs
   file and link ids, never secrets.
 - **Not yet**: accounts and per-person permissions, audit logs, encryption at rest, end-to-end
@@ -978,9 +980,9 @@ chooses to share on the network; the default is the invite link with a random to
    carets on the canvas.
 4. **Browser client** (WebSocket through `web-sys`). **Done** (the web build joins
    desktop-hosted sessions; `undesign://` links open the desktop app and join).
-5. **Standalone `undesign-server`** with persistence, compaction, share links and permissions.
-   **Done** (`apps/undesign-server` on the shared hub; edit and view links, the server key,
-   publishing from the app; see [`server.md`](server.md)), followed by open hosting for a public
+5. **Standalone server** with persistence, compaction, share links and permissions.
+   **Removed** (shipped until 2026-10-30 as `apps/undesign-server` on the shared hub; edit and
+   view links, the server key, publishing from the app), followed by open hosting for a public
    server (owner tokens, limits per address, idle expiry, reports and blocks), by sharing with
    join codes (online through the server, or carrying the host's address on the local network)
    and by your online files (the app remembers what it owns and opens it again as its owner).

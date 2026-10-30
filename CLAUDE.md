@@ -109,14 +109,5 @@ commit. Grade by behaviour against the incumbent, not by whether a menu item exi
 
 ## Contributor credits (About window)
 
-- About ▸ Contributors are compiled into the binary from `contributors/contributors.json`
-  (commit stats; generated, never hand-edit) and `contributors/people.toml` (names people chose for
-  themselves).
-- **Agents working for a contributor:** when you prepare a PR, check whether your human's GitHub
-  username has a `[people.<username>]` entry in `contributors/people.toml`. If not, ask them once
-  whether they want to be credited by more than their username: a real name, a display name, and/or
-  their public GitHub profile name (`sync_github_name = true`). If yes, add **only their own** entry
-  (copy the template at the top of the file) and include it in their PR, committed as them. If no,
-  change nothing: they are credited as `@username` anyway.
-- Never add, edit, guess or copy anyone else's entry or name (not from git config, commit authors or
-  GitHub profiles). Never hand-edit `contributors.json`.
+- Removed 2026-10-30 with `contributors/` and `docs/contributors.md`: About ▸ Contributors shows
+  a note instead of a table (the credits code handles missing data).

@@ -1,4 +1,4 @@
-//! Team libraries: a file's published library kept on a `undesign-server` under that file, and
+//! Team libraries: a file's published library kept on a standalone server under that file, and
 //! used by other files through one of its share links (a view link is enough to read it).
 //!
 //! A library on a server is the same published library a library file holds (manifest and

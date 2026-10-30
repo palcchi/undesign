@@ -1,6 +1,6 @@
-//! Plugins from a server's plugin directory (`undesign-server`): listing it, installing and updating
-//! plugins from it, and publishing and unpublishing them with the server's key. See
-//! `docs/plugins.md` and `docs/server.md`.
+//! Plugins from a server's plugin directory (a standalone server, no longer shipped): listing
+//! it, installing and updating plugins from it, and publishing and unpublishing them with the
+//! server's key. See `docs/plugins.md` and `docs/collab-protocol.md`.
 //!
 //! Everything a server sends is untrusted. An install needs the user's say-so (`confirm: true`,
 //! which the app passes only from its confirmation step; nothing here opens a dialog), and the
@@ -247,7 +247,7 @@ fn bundle_from_disk(cmd: &str, _path: &str) -> Result<Bundle> {
 /// Publish a plugin folder (or an installed plugin) as a new version (needs the server's key).
 fn publish(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "plugin.directory.publish";
-    let server = string(p, "server").ok_or_else(|| bad(cmd, "`server` required: ws://host:port/?key=… (`undesign-server key` prints it)"))?;
+    let server = string(p, "server").ok_or_else(|| bad(cmd, "`server` required: ws://host:port/?key=… (ask the server's operator for it)"))?;
     let bundle = match (string(p, "path"), string(p, "plugin")) {
         (Some(path), _) => bundle_from_disk(cmd, &path)?,
         (None, Some(id)) => {

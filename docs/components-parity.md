@@ -50,7 +50,7 @@ updates with overrides kept: `library_tests.rs`, `components_scale_tests.rs`.
 | Publish a file's components, sets, styles and variables (per-asset versions) | done | as local library files |
 | Enable a library in a file; read-only linked copies | done | |
 | Library updates available; overrides kept | done | a library file saved again within two seconds of being read, at the same length, is read again (its time stamp can't prove it unchanged; #652) |
-| Team libraries: publish to a `undesign-server` under the file, enable by a share link (a view link reads it), background update checks | done | [server.md](server.md#team-libraries); no team-wide library list or accounts ([gaps](gaps.md) #10) |
+| Team libraries: publish to a standalone server (removed 2026-10-30) under the file, enable by a share link (a view link reads it), background update checks | done | no team-wide library list or accounts ([gaps](gaps.md) #10) |
 | Library analytics | partial | instances per component and the files using them, as apps report them; nothing over time, no detach counts |
 | Swap library (instances, styles and variables to another library's of the same names, overrides kept) | done | what has no match stays and is listed; one undo step |
 

@@ -113,11 +113,11 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
   own); files are shared with a short join code (online through the server in Preferences, or on
   the local network with a code that carries the host's address) and joined by typing it; the app
   remembers the files it put online and lists them on the home screen (open again as owner, stop
-  and start sharing, rename, remove, forget), per computer; a standalone
-  `undesign-server` keeps many files (snapshot plus log, compacted; restarts lose nothing
-  confirmed), takes files published from the app and hands out share links that let people edit
-  or only view; the desktop app and the browser reach it over `wss://` through a TLS reverse
-  proxy, and releases ship it with a deployment guide (`docs/server.md`); server message limits
+  and start sharing, rename, remove, forget), per computer; a standalone server kept many files
+  (snapshot plus log, compacted; restarts lost nothing confirmed), took files published from the
+  app and handed out share links that let people edit or view (the `undesign-server`
+  implementation was removed 2026-10-30; app-hosted sessions remain); the desktop app and the
+  browser still open `wss://` links through a TLS reverse proxy; server message limits
   follow `max_file_mb`, so files above 64 MiB publish and open (#705), a damaged generation field
   no longer drops a log's flushed edits (#687), and the browser build joins from a `#join=` link
   (#712: unit-tested, not run in a browser). But there are no accounts (a link is the access)
@@ -289,10 +289,10 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
   its link), accounts and per-person library permissions, analytics beyond instance counts per
   component and file (insertions and detaches over time), update notices pushed by the server
   (apps ask every 30 seconds while the Assets panel shows).
-- **Evidence:** a file's library is published to `undesign-server` under the file and enabled in
-  other files by a share link, with per-asset versions, updates with overrides kept, usage counts
-  and swapping a whole library by names ([`server.md`](server.md#team-libraries),
-  [`components-parity.md`](components-parity.md)).
+- **Evidence:** a file's library was published to the standalone server (removed 2026-10-30)
+  under the file and enabled in other files by a share link, with per-asset versions, updates
+  with overrides kept, usage counts and swapping a whole library by names
+  ([`components-parity.md`](components-parity.md)).
 - **Impact:** design-system teams.
 - **Estimate:** 4–8 h, the accounts part after gap 2.
 

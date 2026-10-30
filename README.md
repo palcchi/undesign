@@ -90,7 +90,7 @@
 </td>
 <td width="50%" valign="top">
   <img src="docs/images/shot-7-collab.png" alt="A live session seen from one participant's window: avatars of three people in the top right, a Priya Nair is spotlighting banner with a Follow button, Priya's green cursor and selection outline on the dark home screen's trail card, and Jonas Ortiz's purple cursor and selection on the Start hike button with his cursor chat bubble asking whether the button should stay pinned while scrolling" width="100%">
-  <p align="center"><sub><b>Live sessions</b>: three apps on one <code>undesign-server</code> file, with cursors, selections, cursor chat and spotlight</sub></p>
+  <p align="center"><sub><b>Live sessions</b>: three apps on one shared file, with cursors, selections, cursor chat and spotlight</sub></p>
 </td>
 </tr>
 </table>
@@ -205,7 +205,6 @@ The desktop app also offers a loopback-only control channel (`undesign --control
 - **Languages:** English, Russian and Turkish (reviewed by native speakers), and Spanish, French, German, Brazilian Portuguese, Japanese, Korean, Simplified Chinese, Czech, Indonesian and Georgian drafts, picked in Preferences or taken from the system or browser and switched live; adding a language is one catalog file ([`docs/translating.md`](docs/translating.md)).
 - **Plugins:** sandboxed WebAssembly plugins (a metered, pure-Rust interpreter with a memory cap and no file or network access, in the browser too) that act through the same commands, each run one undo step, within the permissions their manifest asks for. A Rust SDK and three example plugins are in [`plugins/`](plugins); see [`docs/plugins.md`](docs/plugins.md).
 - **Live sessions (preview):** share the open file from the app (Share ▸ Start sharing: online through a server, or on your local network), give the others the short join code it shows (or the invite link), and edit it together: everyone's changes sync live, with cursors, selections, avatars and follow, and undo takes back only your own changes. Others join from the desktop app (invite links open it) or from the browser build. See [`docs/collab-protocol.md`](docs/collab-protocol.md).
-- **A server of your own (preview):** `undesign-server` keeps a team's files, publishes them from the app (File ▸ Publish to server…, or Share ▸ Online with your server in Preferences) and hands out share links and join codes that let people edit or only view; files survive restarts and apps reconnect where they were. No accounts yet: links are the access. Releases ship it for Linux, and the desktop app joins over `wss://`; [hosting it on a rented Linux server](docs/server.md#deploy-on-a-linux-server) takes a systemd unit and Caddy or nginx (or Docker). See [`docs/server.md`](docs/server.md).
 - **Never crashes:** no `unwrap`, `expect` or `panic` in shipped code, enforced by clippy; commands run behind a guard so a bug fails one action, not your session.
 - **Clean-room:** implemented from public documentation and observed behaviour only. No proprietary code, file formats, icons or images.
 
@@ -215,7 +214,6 @@ The desktop app also offers a loopback-only control channel (`undesign --control
 git clone https://github.com/palcchi/undesign
 cd undesign
 cargo run --release -p undesign            # the desktop app
-cargo run --release -p undesign-server     # the collaboration server (docs/server.md)
 cargo test --workspace                     # the test suite
 cargo xtask ci                             # fmt, clippy, tests, layering and asset checks
 ```
@@ -237,7 +235,7 @@ New contributors: start with [`AGENTS.md`](AGENTS.md), then [`docs/`](docs/).
 Installers for macOS (universal, signed and notarized), Windows (x64, x86 and arm64), Linux (AppImage, `.deb`, `.rpm`, Flatpak and tarball), FreeBSD and the web are attached to each [GitHub release](https://github.com/palcchi/undesign/releases). Maintainers: [`docs/releasing.md`](docs/releasing.md) explains how releases are built, signed and published.
 
 > [!IMPORTANT]
-> **Status:** Undesign is in **alpha**: about 49% of the way to replacing proprietary tools for real work, by our own estimate. Nearly all tracked interface design actions in the menu checklist are wired ([`docs/parity-checklist.md`](docs/parity-checklist.md)) and the core editor works end to end, but Undesign opens `.fig` files only best effort, has only a first preview of multiplayer (live sessions hosted from the app or a self-hosted server, with per-person undo and share links to edit or to view; no accounts, teams or cloud yet), runs its own WebAssembly plugins, and hasn't been checked against real design documents. The honest, area-by-area picture is in the [roadmap](ROADMAP.md) and [`docs/target-app-parity.md`](docs/target-app-parity.md). Expect rough edges and please file issues.
+> **Status:** Undesign is in **alpha**: about 49% of the way to replacing proprietary tools for real work, by our own estimate. Nearly all tracked interface design actions in the menu checklist are wired ([`docs/parity-checklist.md`](docs/parity-checklist.md)) and the core editor works end to end, but Undesign opens `.fig` files only best effort, has only a first preview of multiplayer (live sessions hosted from the app — the self-hosted server was removed 2026-10-30 — with per-person undo and share links to edit or to view; no accounts, teams or cloud yet), runs its own WebAssembly plugins, and hasn't been checked against real design documents. The honest, area-by-area picture is in the [roadmap](ROADMAP.md) and [`docs/target-app-parity.md`](docs/target-app-parity.md). Expect rough edges and please file issues.
 
 ## Privacy and online sharing
 
@@ -245,13 +243,12 @@ Undesign works offline: it has no account and no telemetry, and it contacts no s
 share or join a file. Live sessions are a **preview**. Before you share anything that matters,
 know what sharing does:
 
-- **Share ▸ Online uploads the file to a server.** There is no built-in server: you enter yours in
-  Preferences (or run your own: [`docs/server.md`](docs/server.md)). The file stays on
+- **Share ▸ Online uploads the file to a server.** There is no built-in server (Undesign ships none
+  of its own): you enter a compatible server's address in Preferences. The file stays on
   the server after you stop sharing, until you remove it (Share ▸ Advanced ▸ Remove from server…).
 - **It is not end-to-end encrypted.** The connection to the server is encrypted (TLS), but the
   server stores the file unencrypted and whoever runs the server can read it. Don't share
-  confidential work through a server you don't trust; run your own
-  ([`docs/server.md`](docs/server.md)) or share on the local network instead.
+  confidential work through a server you don't trust; share on the local network instead.
 - **The code or link is the access.** There are no accounts: anyone who has an edit code or link
   can open and change the file, anyone with a view code or link can open it. Stop sharing revokes
   them and disconnects everyone else.

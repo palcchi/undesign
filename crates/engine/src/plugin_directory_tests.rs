@@ -1,5 +1,5 @@
-//! Installing from and publishing to a plugin directory, against a scripted directory (the real
-//! server, over the network, is tested in `undesign-server`): nothing is fetched without
+//! Installing from and publishing to a plugin directory, against a scripted directory (no live
+//! server ships anymore; the scripted directory is the network coverage): nothing is fetched without
 //! `confirm: true`, a download that doesn't match its SHA-256 or its entry is never installed,
 //! installed plugins run in the sandbox, update and are removed with their folder, and publishing
 //! sends a plugin folder as a checked bundle.

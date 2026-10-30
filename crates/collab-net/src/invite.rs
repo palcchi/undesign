@@ -3,7 +3,7 @@
 //! An invite (or share) link names a session's endpoint, its file and a token:
 //! `undesign://join?host=<host:port>&file=<id>&token=<secret>` for a plain `ws://` endpoint at `/`
 //! (what the desktop app hosts), `undesign://join?server=<ws(s)://host[:port][/path]>&file=…&token=…`
-//! for any endpoint (a `undesign-server` behind a TLS reverse proxy, under a path), or the same
+//! for any endpoint (a standalone server behind a TLS reverse proxy, under a path), or the same
 //! session as a WebSocket URL `ws(s)://host[:port][/path]?file=<id>&token=<secret>`.
 //!
 //! The token never travels in the WebSocket request (a proxy's logs would keep it): the client

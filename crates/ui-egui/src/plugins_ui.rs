@@ -347,7 +347,7 @@ fn browse_tab(app: &mut FigApp, ui: &mut Ui, t: &Tokens) -> Option<Manage> {
     }
     let Some(listing) = app.session.plugins.directory.as_ref() else {
         ui.add_space(8.0);
-        widgets::label(ui, tr("Enter the address of a undesign-server and press Browse to see the plugins it offers."), t.text_secondary);
+        widgets::label(ui, tr("Enter the address of a standalone server and press Browse to see the plugins it offers."), t.text_secondary);
         return asked;
     };
     ui.add_space(8.0);
