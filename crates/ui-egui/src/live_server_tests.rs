@@ -69,7 +69,7 @@ fn the_publish_dialog() {
     let shapes = h.frames(2);
     assert!(has_text(
         &shapes,
-        "Give the address of a server open to the public, or a server's address with its key (`undesign-server key` prints it)."
+        "Give the address of a server open to the public, or a server's address with its key (ask the server's operator for it)."
     ));
     h.frame(vec![Event::Text("ws://127.0.0.1:47900/?key=KeyKeyKeyKeyKeyKeyKey0".into())]);
     let shapes = h.frames(1);

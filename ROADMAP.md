@@ -59,7 +59,7 @@ native speakers' reviews of the nine language drafts need people.
 | Features (depth) | 63% (core editor 72%) | 28–67 | [target-app-parity](docs/target-app-parity.md) |
 | UI/UX fidelity | 58% | 40–60 | [ui-parity](docs/ui-parity.md) |
 | File formats | 60% (`.fig` read best effort with editable vectors; experimental write, round trips through our own importer and written files opened in other software) | 5–10 | [file-format-parity](docs/file-format-parity.md) |
-| Collaboration | 13% (core in; live sessions with document sync, cursors and text carets, cursor chat and spotlight, the browser joins, invite links open the app; a self-hosted server with edit and view links and team libraries; preview) | 46–92 | [collaboration-parity](docs/collaboration-parity.md) |
+| Collaboration | 13% (core in; live sessions with document sync, cursors and text carets, cursor chat and spotlight, the browser joins, invite links open the app; a self-hosted server (removed 2026-10-30) with edit and view links and team libraries; preview) | 46–92 | [collaboration-parity](docs/collaboration-parity.md) |
 | Stability | 55% | 20–40 | [gaps](docs/gaps.md) |
 | Performance | 60% | 30–60 | [hardware-parity](docs/hardware-parity.md) |
 | Hardware | 60% | 10–21 | [hardware-parity](docs/hardware-parity.md) |
@@ -128,7 +128,7 @@ Ranked; detail and milestones in [`docs/roadmap.md`](docs/roadmap.md).
 2. Real-file corpus and measured fidelity: 15–30 h.
 3. Tool-by-tool interaction pass against Figma: 40–60 h.
 4. Languages: native reviews of the es (with es-419), fr, de, pt-BR, ja, ko, zh-Hans, id and cs drafts (people), the entries added since each catalog was written, then Hindi, Vietnamese and Arabic ([localization-parity](docs/localization-parity.md)).
-5. Multiplayer (M9): accounts and teams on top of the live sessions and the standalone server (transport, hosting, invite links that open the app, document sync, presence with remote text carets, cursor chat and spotlight, per-user undo, reconnect with offline edits, collision-free ids for styles, variables and comments, the browser client, `undesign-server` with persistence and share links to edit or view, team libraries on the server landed): 42–84 h.
+5. Multiplayer (M9): accounts and teams on top of the live sessions and the standalone server (transport, hosting, invite links that open the app, document sync, presence with remote text carets, cursor chat and spotlight, per-user undo, reconnect with offline edits, collision-free ids for styles, variables and comments, the browser client, a standalone server with persistence and share links to edit or view (removed 2026-10-30), team libraries on the server landed): 42–84 h.
 
 ## Progress log
 

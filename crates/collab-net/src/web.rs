@@ -1,5 +1,5 @@
 //! The browser client (step 4 of `docs/collab-protocol.md`): the web build joins a session a
-//! desktop app hosts, or a file on a `undesign-server` (also over `wss://` behind a TLS reverse
+//! desktop app hosts, or a file on a standalone server (also over `wss://` behind a TLS reverse
 //! proxy), through the browser's WebSocket API (`web-sys`), with the same messages as the native
 //! guest. The connection logic is the [`Driver`]'s; this file feeds it the socket's
 //! events and wakes it with a timer. Hosting needs the desktop app (a page can't listen on a

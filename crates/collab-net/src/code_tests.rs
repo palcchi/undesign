@@ -1,7 +1,7 @@
 //! Join codes over the network: a file shared on the local network joined by its code (two
 //! engine sessions over loopback), what the browser's driver does with an online code, a server
-//! older than join codes, and the links that name a code. (A `undesign-server` handing codes out
-//! and resolving them is tested in its own crate, with the same link.)
+//! older than join codes, and the links that name a code. (A standalone server handing codes out
+//! and resolving them is no longer shipped; the link shape is tested here.)
 
 use std::net::{Ipv4Addr, TcpListener};
 use std::sync::Arc;

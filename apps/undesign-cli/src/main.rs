@@ -40,7 +40,7 @@ not open every file); PDFs take print options (a bleed like 3mm or 0.125in,
 crop and bleed marks, CMYK colour). `run` executes a JSON array (or JSON lines) of
 {\"command\": id, \"params\": {...}} in a headless session and prints one JSON result line per step.
 `plugin publish` sends a plugin folder (undesign-plugin.json, its module, an optional assets/ folder)
-to a undesign-server's plugin directory as a new version; the server's key comes from the address or
+to a standalone server's plugin directory as a new version; the server's key comes from the address or
 the UNDESIGN_SERVER_KEY environment variable (which keeps it out of the shell history).
 `--automation-read-root DIR` / `--automation-write-root DIR` (each may be repeated; the folders
 must exist) confine the files `info`, `export`, `convert`, `render` and `run` touch: reads only

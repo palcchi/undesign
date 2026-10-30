@@ -17,7 +17,7 @@
 //! history. After a dropped connection the client resumes with its id and catches up; what it
 //! made meanwhile goes out then.
 //!
-//! A file can also live on a `undesign-server`: `collab.publish` uploads the open document and
+//! A file can also live on a standalone server: `collab.publish` uploads the open document and
 //! syncs that tab through the server, whose share links let others edit or only view. A view link
 //! makes the synced document read-only here (every edit is refused before it is sent; the server
 //! refuses it too).
@@ -2026,7 +2026,7 @@ pub fn specs() -> Vec<CommandSpec> {
         spec!(
             "collab.publish",
             "Publish to server",
-            "{server: ws://host:port/?key=… or wss://host/path/?key=… (the server's address with its key; `undesign-server key` prints it; without a key on a server open to the public), key? (when the address has none), name? (default: the file's name)} → status \"connecting\": the open file is uploaded as a new file and this tab syncs through the server; `collab.peers` then has `published: {server, file, name, edit, view, owner (published without a key: the owner token, shown once), expires (seconds since 1970, or null)}` and `hosting` (the server's operator, terms and idle expiry)",
+            "{server: ws://host:port/?key=… or wss://host/path/?key=… (the server's address with its key; ask the server's operator for it; without a key on a server open to the public), key? (when the address has none), name? (default: the file's name)} → status \"connecting\": the open file is uploaded as a new file and this tab syncs through the server; `collab.peers` then has `published: {server, file, name, edit, view, owner (published without a key: the owner token, shown once), expires (seconds since 1970, or null)}` and `hosting` (the server's operator, terms and idle expiry)",
             false,
             publish
         ),

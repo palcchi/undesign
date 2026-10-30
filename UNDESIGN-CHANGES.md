@@ -53,3 +53,25 @@ upstream revision so future syncs stay auditable.
   `LICENSE-APACHE`, the upstream copyright paragraph in `NOTICE`, and the
   `contributors/` history snapshot. These four are the only places that still
   name FigCraft/ArtCraft, plus this file's audit trail.
+
+## 2026-10-30 — Standalone server and contributor data removed (change #3)
+
+- Deleted the standalone collaboration server: `apps/undesign-server`,
+  `packaging/server/` and `docs/server.md`. Gone with it: server releases, the
+  deployment guide, open hosting, operator commands and the server-side halves
+  of team libraries and the plugin directory. What stays: the collaboration
+  protocol and client code (`crates/collab`, `crates/collab-net`, `collab.*` and
+  `plugin.directory.*` commands, Share ▸ Online against any compatible server,
+  hosting from the app, local-network sharing), still specified by
+  `docs/collab-protocol.md`.
+- Deleted the contributor-credit data: `contributors/` and
+  `docs/contributors.md`. About ▸ Contributors now shows its empty-data note
+  (no code change needed; `crates/ui-egui/build.rs` and the credits UI handle
+  missing files). The upstream copyright in `LICENSE-MIT`/`NOTICE` is untouched.
+- Reworded every present-tense reference to the deleted pieces (UI strings with
+  their 18 non-English translations dropped back to English, CLI help, command
+  docs, release workflow `has-server: false`, `Cargo.lock`, README and docs).
+  Dated history rows still name them, as records of what shipped.
+- Parity docs were reworded to past tense but NOT re-graded: percentages, hours
+  and estimates still predate this removal (next re-measure must lower
+  collaboration/ecosystem rows that counted the server).

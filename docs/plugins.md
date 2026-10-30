@@ -21,7 +21,7 @@ permissions its manifest asks for, and nothing more.
   parts calls the plugin back to redraw it from its state, which is kept in the document.
 - **Permissions.** The manifest says whether the plugin only reads the document or may edit it, and
   can narrow the commands it may call. Undesign enforces both.
-- **Distribution.** A team's own `undesign-server` can keep a plugin directory: plugins are
+- **Distribution.** A team's own standalone server (no longer shipped) can keep a plugin directory: plugins are
   published to it with the server's key, browsed and installed from Plugins ▸ Manage plugins, and
   updated when a newer version is published (see [Plugin directories](#plugin-directories)). No
   third-party service is involved.
@@ -141,7 +141,7 @@ A session started by the CLI starts with no plugins: import them in the script.
 
 ## Plugin directories
 
-A `undesign-server` ([`server.md`](server.md#plugin-directory)) can keep a directory of plugins for a
+A standalone server (no longer shipped) can keep a directory of plugins for a
 team. Anyone who can reach the server may browse it and install from it; only whoever has the
 server's key may publish to it or unpublish from it. There are no accounts: the server's operator
 decides who gets the key and moderates what's there.
@@ -181,8 +181,8 @@ UNDESIGN_SERVER_KEY=<key> undesign-cli plugin publish target/plugins/dist/counte
 (the key may also be in the address, `?key=…`, but the environment keeps it out of your shell
 history), or `plugin.directory.publish {path, server}` from a script. The server checks the
 whole bundle before keeping it, refuses a version that isn't newer than the one it has, and lists
-the new version at once. `plugin.directory.unpublish` (or the operator's `undesign-server plugins
-remove`) takes a version, or the whole plugin, down; installed copies keep working.
+the new version at once. `plugin.directory.unpublish` (or the operator's server command)
+takes a version, or the whole plugin, down; installed copies keep working.
 
 **In the browser** the directory isn't available yet: the browser build's network link has no
 plugin directory requests (`plugin.directory.*` says so). Import plugins with `plugin.import
@@ -449,7 +449,7 @@ import what you need from `undesign`.
 
 ## Not yet
 
-- Distribution: directories live on your own `undesign-server`; there is no public catalogue,
+- Distribution: directories live on your own standalone server (no longer shipped); there is no public catalogue,
   no publisher accounts or signatures (the server's key is the publisher), no ratings, reviews or
   install counts, and updates are found when you browse, not in the background. The browser build
   can't use a directory yet.

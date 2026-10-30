@@ -24,7 +24,7 @@ The web build can join a live session hosted by the desktop app (File ▸ Join l
 paste the invite link); it can't host one. Desktop-hosted sessions use plain `ws://`, which
 browsers block from a page served over `https://` except to the same computer. To join sessions on
 other machines, serve the site over `http://` on a trusted network (or use the desktop app);
-`wss://` comes with the standalone server.
+`wss://` needs a compatible standalone server (Undesign ships none).
 
 ## Sizes
 

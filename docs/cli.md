@@ -21,11 +21,6 @@ On Linux and other Unix systems except macOS, user fonts are read from
 `$XDG_DATA_HOME/fonts`, or `$HOME/.local/share/fonts` when `XDG_DATA_HOME` is unset,
 empty or relative. The legacy `$HOME/.fonts` directory is also scanned.
 
-The collaboration server is a binary of its own, `undesign-server` (`cargo build --release -p
-undesign-server`): it keeps files with share links and serves their live sessions, and its
-`key`, `files`, `links`, `reports`, `block-ip` and `check` subcommands manage them (a server can
-be open to the public: [server.md](server.md#running-a-public-server)). See [server.md](server.md).
-
 ## Subcommands
 
 ### `info <file> [--json]`
@@ -189,7 +184,7 @@ machines.
 ### `plugin publish <folder> --server ws://host:port/[?key=KEY]`
 
 Publishes a plugin folder (`undesign-plugin.json`, the module its `main` names, an optional `assets/`
-folder) to a `undesign-server`'s plugin directory as a new version, and prints its name, version,
+folder) to a standalone server's plugin directory as a new version, and prints its name, version,
 size and SHA-256. The server's key comes from the address or, better, from the
 `UNDESIGN_SERVER_KEY` environment variable (it then stays out of the shell history and process
 lists); it is never printed. The bundle is checked before it is sent and again by the server. See

@@ -4634,30 +4634,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "undesign-server"
-version = "0.10.0"
-dependencies = [
- "crc32fast",
- "ctrlc",
- "env_logger",
- "log",
- "rustix 1.1.5",
- "serde",
- "serde_json",
- "sha2",
- "toml",
- "tungstenite",
- "undesign-collab",
- "undesign-collab-net",
- "undesign-doc",
- "undesign-engine",
- "undesign-format",
- "undesign-plugin",
- "wat",
- "zip",
-]
-
-[[package]]
 name = "undesign-svg"
 version = "0.10.0"
 dependencies = [

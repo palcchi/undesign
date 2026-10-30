@@ -41,7 +41,7 @@ const VIEW_NOTE: &str = tr_noop("View only: you see every change as it happens b
 
 /// What a published file's links are.
 const PUBLISHED_NOTE: &str = tr_noop(
-    "Anyone with the edit link can change the file; the view link only lets people look. The links carry their secrets: share them like passwords. `undesign-server links` makes more and revokes them.",
+    "Anyone with the edit link can change the file; the view link only lets people look. The links carry their secrets: share them like passwords. The server's operator can make more and revoke them.",
 );
 
 /// What the owner token is for (shown once, when a file is published without the server key).
@@ -1192,12 +1192,12 @@ pub fn publish_dialog(app: &mut FigApp, ctx: &egui::Context) {
             }
             Some(_) => widgets::label(
                 ui,
-                tr("This server needs its key: add ?key=… to the address (`undesign-server key` prints it on the server's machine)."),
+                tr("This server needs its key: add ?key=… to the address (ask the server's operator for it)."),
                 t.danger,
             ),
             None => widgets::label(
                 ui,
-                tr("Give the address of a server open to the public, or a server's address with its key (`undesign-server key` prints it)."),
+                tr("Give the address of a server open to the public, or a server's address with its key (ask the server's operator for it)."),
                 t.text_secondary,
             ),
         }
