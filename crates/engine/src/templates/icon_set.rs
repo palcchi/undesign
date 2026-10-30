@@ -18,7 +18,7 @@ const LIBRARY: f64 = 6.0 * 88.0 + 5.0 * 16.0 + 72.0;
 
 pub(super) fn build(k: &mut Kit) -> Result<()> {
     k.foundations()?;
-    k.colors(&[(STROKE, "#14201C")])?;
+    k.colors(&[(STROKE, "#0E1512")])?;
     k.rename_page("Icons")?;
     let page = k.page()?;
     anatomy(k, page)?;

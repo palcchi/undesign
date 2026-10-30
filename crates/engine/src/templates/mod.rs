@@ -1,7 +1,7 @@
 //! Starter templates: documents to begin from, built in code by running commands (no template
-//! files ship with the app). Everything in them is original and synthetic: the Ridgeline names,
-//! people and figures are invented, the pictures are drawn from shapes and the icons are Undesign's
-//! own ([`glyphs`]).
+//! files ship with the app). Everything in them is original and synthetic: the Simmer, Pixel Summit
+//! and Pulse names, people and figures are invented, the pictures are drawn from shapes and the
+//! icons are Undesign's own ([`glyphs`]).
 //!
 //! Each template is real, editable content: shared colour and text styles, auto layout,
 //! components with properties and instances of them, variables with modes, constraints and
@@ -73,7 +73,7 @@ pub static TEMPLATES: &[Template] = &[
     Template {
         id: "mobile-app",
         name: "Mobile app",
-        description: "Four screens of a trail app with components and a prototype flow",
+        description: "Four screens of a recipe app with components and a prototype flow",
         kind: Kind::App,
         size: "390 × 844",
         make: mobile::build,
@@ -81,7 +81,7 @@ pub static TEMPLATES: &[Template] = &[
     Template {
         id: "landing-page",
         name: "Landing page",
-        description: "A responsive product page: hero, features, figures, a quote and a footer",
+        description: "A responsive conference page: hero, sessions, figures, a quote and a footer",
         kind: Kind::Website,
         size: "1440 wide",
         make: landing::build,
@@ -89,7 +89,7 @@ pub static TEMPLATES: &[Template] = &[
     Template {
         id: "dashboard",
         name: "Dashboard",
-        description: "An analytics screen on a grid: figures, charts drawn from vectors and a table",
+        description: "A fitness screen on a grid: figures, charts drawn from vectors and a table",
         kind: Kind::App,
         size: "1440 × 960",
         make: dashboard::build,
@@ -113,7 +113,7 @@ pub static TEMPLATES: &[Template] = &[
     Template {
         id: "social-posts",
         name: "Social post sizes",
-        description: "One announcement in five common sizes: square, portrait, story, link and banner",
+        description: "One launch announcement in five common sizes: square, portrait, story, link and banner",
         kind: Kind::Media,
         size: "5 sizes",
         make: social::build,

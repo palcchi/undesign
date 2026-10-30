@@ -75,3 +75,21 @@ upstream revision so future syncs stay auditable.
 - Parity docs were reworded to past tense but NOT re-graded: percentages, hours
   and estimates still predate this removal (next re-measure must lower
   collaboration/ecosystem rows that counted the server).
+
+## 2026-10-30 — Deeper dark theme, replaced starter templates (change #4)
+
+- Dark theme deepened (`crates/ui-egui/src/theme.rs`: panels `#1B1B1B`,
+  canvas `#101010`, matching borders, fields, rows and menus; text and accent
+  colours unchanged) and the toast made theme-aware (a raised, outlined
+  surface in the dark theme, `crates/ui-egui/src/lib.rs`).
+- Starter templates replaced with new original designs built in code
+  (`crates/engine/src/templates/`): a Simmer recipe app, a Pixel Summit
+  conference page, a Pulse fitness dashboard, a design system starter in
+  Undesign greens, a checkout wireframe kit, a Simmer launch announcement, a
+  Simmer pitch deck and a redrawn 24-icon set (the glyph library's Mountain
+  mark replaced by an original Sprout). Template ids, kinds, names, frame
+  sizes and content-shape contracts are unchanged; the four changed
+  descriptions are translated in Spanish, other drafts read English for them
+  (stale keys removed from 13 locale files).
+- Not re-graded: percentages, hours and estimates are unchanged by this
+  re-skin (it adds no Figma behaviour).

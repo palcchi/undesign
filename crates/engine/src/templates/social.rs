@@ -1,4 +1,4 @@
-//! Social post sizes: one invented announcement ("Summer trail series") laid out in five common
+//! Social post sizes: one invented launch announcement ("Simmer is here") laid out in five common
 //! sizes by the same code. Wide sizes put the words beside the picture, tall ones above it; type
 //! and spacing scale with the frame.
 
@@ -36,18 +36,18 @@ fn post(k: &mut Kit, page: NodeId, name: &str, [w, h]: [f64; 2], [x, y]: [f64; 2
     let root = k.stack(page, name, if wide { H } else { V }, 0.0, json!(0), frame)?;
     let words = k.stack(root, "Words", V, u, json!(u * 1.2), json!({"sizingH": "fill", "sizingV": "fill", "mainAlign": "spaceBetween"}))?;
     let logo = k.stack(words, "Logo", H, u * 0.3, json!(0), json!({"crossAlign": "center"}))?;
-    k.icon(logo, &glyphs::MOUNTAIN, (u * 0.9).round(), ACCENT)?;
-    k.sized_text(logo, "Ridgeline Trails", [u * 0.62, u * 0.9], "Semi Bold", ON_BRAND, json!({}))?;
+    k.icon(logo, &glyphs::SPROUT, (u * 0.9).round(), ACCENT)?;
+    k.sized_text(logo, "Simmer", [u * 0.62, u * 0.9], "Semi Bold", ON_BRAND, json!({}))?;
     let message = k.stack(words, "Message", V, u * 0.5, json!(0), json!({"sizingH": "fill"}))?;
-    k.sized_text(message, "SUMMER TRAIL SERIES", [u * 0.5, u * 0.7], "Semi Bold", ACCENT, json!({"letterSpacing": "8%"}))?;
+    k.sized_text(message, "SIMMER IS HERE", [u * 0.5, u * 0.7], "Semi Bold", ACCENT, json!({"letterSpacing": "8%"}))?;
     let wrap = json!({"sizingH": "fill", "textAutoResize": "height"});
     let headline = u * 1.8;
-    k.sized_text(message, "Six Saturdays.\nSix summits.", [headline, headline * 1.08], "Bold", ON_BRAND, wrap.clone())?;
-    k.sized_text(message, "Guided walks for every pace, starting 14 June.", [u * 0.6, u * 0.9], "Regular", "#CFE6DE", wrap)?;
+    k.sized_text(message, "Dinner,\ndecided.", [headline, headline * 1.08], "Bold", ON_BRAND, wrap.clone())?;
+    k.sized_text(message, "Seasonal recipes, free for the first month.", [u * 0.6, u * 0.9], "Regular", "#CFE6DE", wrap)?;
     let action = k.stack(words, "Action", H, u * 0.6, json!(0), json!({"crossAlign": "center"}))?;
     let button = k.stack(action, "Button", H, 0.0, json!([u * 0.4, u * 0.8, u * 0.4, u * 0.8]), json!({"fill": ACCENT, "cornerRadius": 999}))?;
-    k.sized_text(button, "Join the first walk", [u * 0.55, u * 0.8], "Semi Bold", INK, json!({}))?;
-    k.sized_text(action, "ridgeline.example", [u * 0.5, u * 0.8], "Medium", "#CFE6DE", json!({}))?;
+    k.sized_text(button, "Get the app", [u * 0.55, u * 0.8], "Semi Bold", INK, json!({}))?;
+    k.sized_text(action, "simmer.example", [u * 0.5, u * 0.8], "Medium", "#CFE6DE", json!({}))?;
     // The picture takes the rest: the right-hand side of a wide post, the bottom of a tall one.
     let (size, fill) = if wide {
         ([w * 0.4, h], json!({"sizingV": "fill"}))

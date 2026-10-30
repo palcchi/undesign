@@ -1,5 +1,5 @@
-//! Mobile app: four screens of an invented trail app ("Ridgeline Trails") built with auto layout
-//! from three components (a button, a trail card, a tab bar with two variants), linked into a
+//! Mobile app: four screens of an invented recipe app ("Simmer") built with auto layout
+//! from three components (a button, a recipe card, a tab bar with two variants), linked into a
 //! prototype flow.
 
 use serde_json::json;
@@ -14,11 +14,11 @@ const SCREEN_H: f64 = 844.0;
 /// Space between screens on the canvas.
 const GAP: f64 = 80.0;
 
-/// The trails on the Explore screen: (name, distance and difficulty).
-const TRAILS: [(&str, &str); 3] =
-    [("Cedar Hollow Loop", "8.4 km · Moderate"), ("Lantern Ridge", "12.1 km · Hard"), ("Mill Pond Walk", "3.2 km · Easy")];
+/// The recipes on the Explore screen: (name, time and level).
+const RECIPES: [(&str, &str); 3] =
+    [("Charred leek soup", "35 min · Easy"), ("Miso-glazed aubergine", "25 min · Easy"), ("Rye and seed loaf", "3 h · Weekend")];
 
-const TABS: [(&str, Glyph); 4] = [("Explore", glyphs::MOUNTAIN), ("Saved", glyphs::BOOKMARK), ("Activity", glyphs::CHART), ("Profile", glyphs::USER)];
+const TABS: [(&str, Glyph); 4] = [("Explore", glyphs::SEARCH), ("Saved", glyphs::BOOKMARK), ("Planned", glyphs::CALENDAR), ("Profile", glyphs::USER)];
 
 struct Parts {
     button: NodeId,
@@ -31,7 +31,7 @@ pub(super) fn build(k: &mut Kit) -> Result<()> {
     k.rename_page("Screens")?;
     let screens = k.page()?;
     let page = k.add_page("Components")?;
-    let parts = Parts { button: button(k, page)?, card: trail_card(k, page)?, tabs: tab_bar(k, page)? };
+    let parts = Parts { button: button(k, page)?, card: recipe_card(k, page)?, tabs: tab_bar(k, page)? };
     k.go(screens)?;
     let (welcome, start) = welcome(k, screens, &parts)?;
     let (explore, first_card, explore_tabs) = explore(k, screens, &parts)?;
@@ -51,17 +51,17 @@ fn button(k: &mut Kit, page: NodeId) -> Result<NodeId> {
     Ok(c)
 }
 
-fn trail_card(k: &mut Kit, page: NodeId) -> Result<NodeId> {
+fn recipe_card(k: &mut Kit, page: NodeId) -> Result<NodeId> {
     let props =
         json!({"fill": CARD, "cornerRadius": 20, "crossAlign": "center", "effects": shadow(), "sizingH": "fixed", "width": W - 48.0, "y": 120});
-    let c = k.stack_of("component", page, "Trail card", H, 14.0, json!(12), props)?;
+    let c = k.stack_of("component", page, "Recipe card", H, 14.0, json!(12), props)?;
     k.scene(c, "Picture", [72.0, 72.0], json!({"cornerRadius": 14}))?;
     let words = k.stack(c, "Words", V, 2.0, json!(0), json!({"sizingH": "fill"}))?;
-    let title = k.text(words, "Trail name", "Heading/S", INK)?;
-    let meta = k.text(words, "Distance · Difficulty", "Body/S", MUTED)?;
+    let title = k.text(words, "Recipe name", "Heading/S", INK)?;
+    let meta = k.text(words, "Time · Level", "Body/S", MUTED)?;
     k.icon(c, &glyphs::CHEVRON_RIGHT, 20.0, MUTED)?;
-    k.text_prop(c, "Name", "Trail name", &[title])?;
-    k.text_prop(c, "Details", "Distance · Difficulty", &[meta])?;
+    k.text_prop(c, "Name", "Recipe name", &[title])?;
+    k.text_prop(c, "Details", "Time · Level", &[meta])?;
     Ok(c)
 }
 
@@ -99,18 +99,18 @@ fn welcome(k: &mut Kit, page: NodeId, parts: &Parts) -> Result<(NodeId, NodeId)>
     let content = body(k, s, 0.0, 32.0)?;
     k.set(content, json!({"mainAlign": "spaceBetween"}))?;
     let words = k.stack(content, "Words", V, 12.0, json!(0), json!({"sizingH": "fill"}))?;
-    k.text(words, "RIDGELINE TRAILS", "Label/S", PRIMARY)?;
-    k.para(words, "Find your next trail", "Heading/L", INK)?;
-    k.para(words, "Maps, distances and notes for quiet walks and long climbs, saved for when there is no signal.", "Body/M", MUTED)?;
+    k.text(words, "SIMMER", "Label/S", PRIMARY)?;
+    k.para(words, "Dinner, decided", "Heading/L", INK)?;
+    k.para(words, "Seasonal recipes with pantry-first shopping lists, tested twice in our own kitchen.", "Body/M", MUTED)?;
     let actions = k.stack(content, "Actions", V, 16.0, json!(0), json!({"sizingH": "fill", "crossAlign": "center"}))?;
-    let start = k.instance(parts.button, actions, json!({"Label": "Get started"}), json!({"sizingH": "fill"}))?;
+    let start = k.instance(parts.button, actions, json!({"Label": "Get cooking"}), json!({"sizingH": "fill"}))?;
     k.text(actions, "I already have an account", "Label/M", PRIMARY)?;
     Ok((s, start))
 }
 
 fn avatar(k: &mut Kit, parent: NodeId, size: f64, style: &str) -> Result<NodeId> {
     let a = k.tile(parent, size, size / 2.0)?;
-    k.text(a, "ML", style, PRIMARY)?;
+    k.text(a, "JP", style, PRIMARY)?;
     Ok(a)
 }
 
@@ -119,15 +119,15 @@ fn explore(k: &mut Kit, page: NodeId, parts: &Parts) -> Result<(NodeId, NodeId, 
     let content = body(k, s, 20.0, 56.0)?;
     let header = k.stack(content, "Header", H, 12.0, json!(0), json!({"sizingH": "fill", "mainAlign": "spaceBetween", "crossAlign": "center"}))?;
     let hello = k.stack(header, "Greeting", V, 2.0, json!(0), json!({}))?;
-    k.text(hello, "Good morning", "Body/S", MUTED)?;
-    k.text(hello, "Mara Lindqvist", "Heading/M", INK)?;
+    k.text(hello, "Good evening", "Body/S", MUTED)?;
+    k.text(hello, "June Park", "Heading/M", INK)?;
     avatar(k, header, 44.0, "Label/M")?;
     let search_props = json!({"fill": CARD, "cornerRadius": 16, "stroke": BORDER, "strokeWeight": 1, "sizingH": "fill", "crossAlign": "center"});
     let search = k.stack(content, "Search", H, 10.0, json!([14, 16, 14, 16]), search_props)?;
     k.icon(search, &glyphs::SEARCH, 20.0, MUTED)?;
-    k.text(search, "Search trails and places", "Body/M", MUTED)?;
+    k.text(search, "Search recipes and ingredients", "Body/M", MUTED)?;
     let filters = k.stack(content, "Filters", H, 8.0, json!(0), json!({}))?;
-    for (i, label) in ["Nearby", "Easy", "Lakes", "Summits"].into_iter().enumerate() {
+    for (i, label) in ["Under 30 min", "Vegetarian", "One pot", "Baking"].into_iter().enumerate() {
         let (color, fill) = if i == 0 { (ON_BRAND, PRIMARY) } else { (INK, SUNKEN) };
         k.chip(filters, label, ["Label/M", color], fill, [8.0, 16.0], 999.0)?;
     }
@@ -135,9 +135,9 @@ fn explore(k: &mut Kit, page: NodeId, parts: &Parts) -> Result<(NodeId, NodeId, 
         k.stack(content, "Section title", H, 8.0, json!(0), json!({"sizingH": "fill", "mainAlign": "spaceBetween", "crossAlign": "center"}))?;
     k.text(title, "Popular this week", "Heading/S", INK)?;
     k.text(title, "See all", "Label/M", PRIMARY)?;
-    let list = k.stack(content, "Trails", V, 12.0, json!(0), json!({"sizingH": "fill"}))?;
+    let list = k.stack(content, "Recipes", V, 12.0, json!(0), json!({"sizingH": "fill"}))?;
     let mut first = None;
-    for (name, details) in TRAILS {
+    for (name, details) in RECIPES {
         let card = k.instance(parts.card, list, json!({"Name": name, "Details": details}), json!({"sizingH": "fill"}))?;
         first.get_or_insert(card);
     }
@@ -146,7 +146,7 @@ fn explore(k: &mut Kit, page: NodeId, parts: &Parts) -> Result<(NodeId, NodeId, 
 }
 
 fn detail(k: &mut Kit, page: NodeId, parts: &Parts) -> Result<(NodeId, NodeId)> {
-    let s = screen(k, page, "Trail", 2)?;
+    let s = screen(k, page, "Recipe", 2)?;
     k.scene(s, "Picture", [W, 300.0], json!({"sizingH": "fill"}))?;
     let back = k.tile(s, 44.0, 22.0)?;
     k.set(back, json!({"name": "Back", "fill": CARD, "absolute": true, "x": 20, "y": 52}))?;
@@ -155,18 +155,18 @@ fn detail(k: &mut Kit, page: NodeId, parts: &Parts) -> Result<(NodeId, NodeId)> 
     k.set(content, json!({"mainAlign": "spaceBetween"}))?;
     let about = k.stack(content, "About", V, 16.0, json!(0), json!({"sizingH": "fill"}))?;
     let heading = k.stack(about, "Heading", V, 6.0, json!(0), json!({"sizingH": "fill"}))?;
-    let [(name, _), ..] = TRAILS;
+    let [(name, _), ..] = RECIPES;
     k.para(heading, name, "Heading/L", INK)?;
     let place = k.stack(heading, "Place", H, 6.0, json!(0), json!({"crossAlign": "center"}))?;
     k.icon(place, &glyphs::PIN, 16.0, MUTED)?;
-    k.text(place, "Northfork Valley", "Body/M", MUTED)?;
+    k.text(place, "From our test farm", "Body/M", MUTED)?;
     let stats = k.stack(about, "Figures", H, 10.0, json!(0), json!({"sizingH": "fill"}))?;
-    for (value, label) in [("8.4 km", "Distance"), ("310 m", "Climb"), ("2 h 40", "Time")] {
+    for (value, label) in [("35 min", "Time"), ("4", "Serves"), ("Easy", "Level")] {
         k.stat(stats, value, label, "Heading/S")?;
     }
-    k.text(about, "About this trail", "Heading/S", INK)?;
-    k.para(about, "A shaded loop through old cedars that opens onto the ridge at the halfway point. Bring water: the spring near the trailhead dries up in late summer.", "Body/M", MUTED)?;
-    k.instance(parts.button, content, json!({"Label": "Start hike"}), json!({"sizingH": "fill"}))?;
+    k.text(about, "About this recipe", "Heading/S", INK)?;
+    k.para(about, "Leeks scorched until sweet, blended with potato and finished with brown butter. The leeks grow two streets from our kitchen, so this one is on the menu all winter.", "Body/M", MUTED)?;
+    k.instance(parts.button, content, json!({"Label": "Start cooking"}), json!({"sizingH": "fill"}))?;
     Ok((s, back))
 }
 
@@ -175,15 +175,15 @@ fn profile(k: &mut Kit, page: NodeId, parts: &Parts) -> Result<(NodeId, NodeId)>
     let content = body(k, s, 24.0, 72.0)?;
     let who = k.stack(content, "Who", V, 6.0, json!(0), json!({"sizingH": "fill", "crossAlign": "center"}))?;
     avatar(k, who, 88.0, "Heading/M")?;
-    k.text(who, "Mara Lindqvist", "Heading/M", INK)?;
-    k.text(who, "Hiking since 2021 · Northfork", "Body/M", MUTED)?;
+    k.text(who, "June Park", "Heading/M", INK)?;
+    k.text(who, "Cooking since 2023 · Northfork", "Body/M", MUTED)?;
     let stats = k.stack(content, "Figures", H, 10.0, json!(0), json!({"sizingH": "fill"}))?;
-    for (value, label) in [("128 km", "This year"), ("23", "Hikes"), ("9", "Summits")] {
+    for (value, label) in [("214", "Cooked"), ("38", "Planned"), ("12", "Shared")] {
         k.stat(stats, value, label, "Heading/S")?;
     }
     let menu = k.stack(content, "Menu", V, 0.0, json!([4, 16, 4, 16]), json!({"fill": CARD, "cornerRadius": 20, "sizingH": "fill"}))?;
     for (label, glyph) in
-        [("Saved trails", glyphs::BOOKMARK), ("Offline maps", glyphs::DOWNLOAD), ("Notifications", glyphs::BELL), ("Settings", glyphs::SLIDERS)]
+        [("Saved recipes", glyphs::BOOKMARK), ("Meal planner", glyphs::CALENDAR), ("Notifications", glyphs::BELL), ("Settings", glyphs::SLIDERS)]
     {
         let row = k.stack(menu, label, H, 12.0, json!([14, 0, 14, 0]), json!({"sizingH": "fill", "crossAlign": "center"}))?;
         k.icon(row, &glyph, 20.0, PRIMARY)?;

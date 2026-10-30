@@ -1,6 +1,6 @@
-//! Landing page: the page of an invented product ("Ridgeline Studio") as one auto layout frame per
-//! width. Sections fill the frame and hold a container with a maximum width, so the desktop frame
-//! can be resized; the phone frame is the same page built with its rows stacked.
+//! Landing page: the page of an invented conference ("Pixel Summit 2027") as one auto layout
+//! frame per width. Sections fill the frame and hold a container with a maximum width, so the
+//! desktop frame can be resized; the phone frame is the same page built with its rows stacked.
 
 use serde_json::{Value, json};
 use undesign_doc::NodeId;
@@ -13,13 +13,12 @@ use crate::Result;
 const CONTAINER: f64 = 1120.0;
 
 const FEATURES: [(&str, Glyph, &str); 3] = [
-    ("Routes everyone can edit", glyphs::LAYERS, "Draw a route once and let the whole club adjust it. Every change is kept, so nothing is lost."),
-    ("Ready without signal", glyphs::DOWNLOAD, "Maps, notes and meeting points are saved to each phone before you leave the car park."),
-    ("Plans that fit the day", glyphs::CLOCK, "Sunrise, daylight and pace are worked out for you, with a turnaround time you can trust."),
+    ("Keynotes that show the work", glyphs::STAR, "Speakers walk through real projects, files open: what shipped, what didn't, and why."),
+    ("Hands-on workshops", glyphs::LAYERS, "Small rooms, long sessions, something finished to take home at the end of the morning."),
+    ("A hallway track that works", glyphs::USER, "Long breaks, shared tables and a quiet room, so the conversations have somewhere to happen."),
 ];
 
-const FIGURES: [(&str, &str); 4] =
-    [("4,200", "Clubs planning together"), ("38k", "Routes shared"), ("96%", "Walks finished on time"), ("12", "Languages")];
+const FIGURES: [(&str, &str); 4] = [("900", "Designers attending"), ("36", "Talks and workshops"), ("2", "Days in Northfork"), ("14", "Countries")];
 
 /// One width of the page.
 struct Layout {
@@ -76,8 +75,8 @@ fn section(k: &mut Kit, root: NodeId, name: &str, l: &Layout, dir: &str, [top, b
 
 fn logo(k: &mut Kit, parent: NodeId) -> Result<NodeId> {
     let logo = k.stack(parent, "Logo", H, 8.0, json!(0), json!({"crossAlign": "center"}))?;
-    k.icon(logo, &glyphs::MOUNTAIN, ICON, PRIMARY)?;
-    k.text(logo, "Ridgeline Studio", "Heading/S", INK)?;
+    k.icon(logo, &glyphs::STAR, ICON, PRIMARY)?;
+    k.text(logo, "Pixel Summit", "Heading/S", INK)?;
     Ok(logo)
 }
 
@@ -95,31 +94,31 @@ fn nav(k: &mut Kit, root: NodeId, l: &Layout) -> Result<()> {
         return Ok(());
     }
     let links = k.stack(bar, "Links", H, 36.0, json!(0), json!({}))?;
-    for link in ["Product", "Pricing", "Stories", "Help"] {
+    for link in ["Speakers", "Schedule", "Tickets", "Venue"] {
         k.text(links, link, "Label/M", MUTED)?;
     }
     let actions = k.stack(bar, "Actions", H, 20.0, json!(0), json!({"crossAlign": "center"}))?;
     k.text(actions, "Sign in", "Label/M", INK)?;
-    k.chip(actions, "Start free", ["Label/M", ON_BRAND], PRIMARY, [10.0, 18.0], 12.0).map(drop)
+    k.chip(actions, "Get a ticket", ["Label/M", ON_BRAND], PRIMARY, [10.0, 18.0], 12.0).map(drop)
 }
 
 fn hero(k: &mut Kit, root: NodeId, l: &Layout) -> Result<()> {
     let hero = section(k, root, "Hero", l, l.row(), [88.0, 88.0, if l.narrow { 32.0 } else { 72.0 }], json!({}))?;
     k.set(hero, json!({"crossAlign": "center"}))?;
     let words = k.stack(hero, "Words", V, 24.0, json!(0), json!({"sizingH": "fill"}))?;
-    k.chip(words, "New · Shared trail maps", ["Label/S", PRIMARY], SOFT, [6.0, 12.0], 999.0)?;
+    k.chip(words, "New · 2027 dates announced", ["Label/S", PRIMARY], SOFT, [6.0, 12.0], 999.0)?;
     let text = k.stack(words, "Headline", V, 16.0, json!(0), json!({"sizingH": "fill"}))?;
-    k.para(text, "Plan every walk together", if l.narrow { "Display" } else { "Display/XL" }, INK)?;
+    k.para(text, "Two days about interface design", if l.narrow { "Display" } else { "Display/XL" }, INK)?;
     k.para(
         text,
-        "Ridgeline Studio keeps your club's routes, maps and meeting points in one place, so the only thing left to decide is who brings the flask.",
+        "Pixel Summit brings 900 designers to Northfork for talks, workshops and the hallway track, with everything a ten-minute walk apart.",
         "Body/L",
         MUTED,
     )?;
     let actions = k.stack(words, "Actions", H, 12.0, json!(0), json!({}))?;
-    button(k, actions, "Start free", true)?;
-    button(k, actions, "Watch the tour", false)?;
-    k.text(words, "Free for clubs of up to ten people", "Body/S", MUTED)?;
+    button(k, actions, "Get a ticket", true)?;
+    button(k, actions, "See the schedule", false)?;
+    k.text(words, "Early tickets until the end of March", "Body/S", MUTED)?;
     let picture = if l.narrow { json!({"cornerRadius": 24, "sizingH": "fill"}) } else { json!({"cornerRadius": 32}) };
     k.scene(hero, "Picture", if l.narrow { [350.0, 260.0] } else { [520.0, 420.0] }, picture).map(drop)
 }
@@ -135,7 +134,7 @@ fn heading(k: &mut Kit, parent: NodeId, title: &str, line: &str) -> Result<()> {
 fn features(k: &mut Kit, root: NodeId, l: &Layout) -> Result<()> {
     let features = section(k, root, "Features", l, V, [88.0, 88.0, 48.0], json!({"fill": PAGE}))?;
     k.set(features, json!({"crossAlign": "center"}))?;
-    heading(k, features, "Everything the day needs", "Three things walking clubs told us they were tired of doing by hand.")?;
+    heading(k, features, "Everything the weekend needs", "Three things last year's visitors told us they came for.")?;
     let cards = k.stack(features, "Cards", l.row(), 24.0, json!(0), json!({"sizingH": "fill"}))?;
     for (title, glyph, line) in &FEATURES {
         let card = k.stack(cards, title, V, 16.0, json!(28), json!({"fill": CARD, "cornerRadius": 24, "sizingH": "fill", "effects": shadow()}))?;
@@ -162,14 +161,14 @@ fn quote(k: &mut Kit, root: NodeId, l: &Layout) -> Result<()> {
     let quote = section(k, root, "Quote", l, V, [88.0, 88.0, 28.0], json!({}))?;
     k.set(quote, json!({"crossAlign": "center"}))?;
     let words = json!({"sizingH": "fill", "maxWidth": 760, "textAutoResize": "height", "textAlign": "center"});
-    let said = "“We used to plan in three group chats and a spreadsheet. Now the route is simply there, and everyone has it.”";
+    let said = "“I came for the talks and stayed for the hallway conversations. My notebook was full before lunch on day one.”";
     k.text_with(quote, said, "Heading/M", INK, words)?;
     let person = k.stack(quote, "Person", H, 12.0, json!(0), json!({"crossAlign": "center"}))?;
     let avatar = k.tile(person, 44.0, 22.0)?;
-    k.text(avatar, "IO", "Label/M", PRIMARY)?;
+    k.text(avatar, "JP", "Label/M", PRIMARY)?;
     let who = k.stack(person, "Who", V, 0.0, json!(0), json!({}))?;
-    k.text(who, "Ilse Okafor", "Label/M", INK)?;
-    k.text(who, "Walk leader, Harrow Fell Ramblers", "Body/S", MUTED).map(drop)
+    k.text(who, "June Park", "Label/M", INK)?;
+    k.text(who, "Product designer, Pixel Summit 2026", "Body/S", MUTED).map(drop)
 }
 
 fn call_to_action(k: &mut Kit, root: NodeId, l: &Layout) -> Result<()> {
@@ -178,14 +177,14 @@ fn call_to_action(k: &mut Kit, root: NodeId, l: &Layout) -> Result<()> {
     let props = json!({"fill": SOFT, "cornerRadius": 28, "sizingH": "fill", "mainAlign": "spaceBetween", "crossAlign": l.cross()});
     let card = k.stack(outer, "Card", l.row(), 24.0, json!(pad), props)?;
     let words = k.stack(card, "Words", V, 8.0, json!(0), json!({"sizingH": "fill"}))?;
-    k.para(words, "Take the next walk off the group chat", "Heading/L", INK)?;
-    k.para(words, "Set up your club in a couple of minutes. No card needed.", "Body/L", MUTED)?;
-    button(k, card, "Start free", true).map(drop)
+    k.para(words, "Bring your team to Northfork", "Heading/L", INK)?;
+    k.para(words, "Groups of five or more save a fifth. Student tickets too.", "Body/L", MUTED)?;
+    button(k, card, "Get a ticket", true).map(drop)
 }
 
 fn footer(k: &mut Kit, root: NodeId, l: &Layout) -> Result<()> {
     let footer = section(k, root, "Footer", l, l.row(), [32.0, 32.0, 12.0], json!({"stroke": BORDER, "strokeSides": TOP_EDGE}))?;
     k.set(footer, json!({"mainAlign": "spaceBetween", "crossAlign": l.cross()}))?;
     logo(k, footer)?;
-    k.text(footer, "© 2026 Ridgeline Studio, an invented company", "Body/S", MUTED).map(drop)
+    k.text(footer, "© 2027 Pixel Summit, an invented conference", "Body/S", MUTED).map(drop)
 }

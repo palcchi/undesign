@@ -1767,6 +1767,7 @@ impl FigApp {
 
     fn toast_ui(&mut self, ctx: &egui::Context) {
         let Some((msg, clock)) = &mut self.ui.toast else { return };
+        let t = theme::Tokens::get(ctx);
         let now = ctx.input(|i| i.time);
         // The clock starts on the frame after the one that first draws the toast: that frame's
         // time was taken before whatever raised it ran (a file dialog, a long open), and would
@@ -1798,8 +1799,11 @@ impl FigApp {
             .pivot(egui::Align2::CENTER_BOTTOM)
             .order(egui::Order::Tooltip)
             .show(ctx, |ui| {
+                // A dark toast in both themes; on the dark theme it is a raised surface
+                // with an outline so it separates from the near-black canvas.
                 egui::Frame::NONE
-                    .fill(egui::Color32::from_rgb(0x1E, 0x1E, 0x1E))
+                    .fill(if t.dark { t.pressed } else { egui::Color32::from_rgb(0x1E, 0x1E, 0x1E) })
+                    .stroke(if t.dark { egui::Stroke::new(1.0, t.border_strong) } else { egui::Stroke::NONE })
                     .corner_radius(egui::CornerRadius::same(8))
                     .inner_margin(egui::Margin::symmetric(14, 10))
                     .show(ui, |ui| {

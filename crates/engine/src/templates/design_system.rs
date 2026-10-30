@@ -16,10 +16,10 @@ const MODES: [&str; 2] = ["Light", "Dark"];
 const THEME_COLORS: [(&str, &str, &str); 9] = [
     ("Surface", "#FFFFFF", "#121816"),
     ("Surface raised", "#F5F7F6", "#1C2421"),
-    ("Text", "#14201C", "#F2F5F4"),
-    ("Text muted", "#5C6B66", "#9FADA8"),
-    ("Primary", "#1F6F5C", "#58C2A6"),
-    ("Primary hover", "#185848", "#7AD3BA"),
+    ("Text", "#0E1512", "#F2F5F4"),
+    ("Text muted", "#5A6B64", "#9FADA8"),
+    ("Primary", "#00875F", "#4AD6A5"),
+    ("Primary hover", "#006B4C", "#7CE3BC"),
     ("On primary", "#FFFFFF", "#0C1A16"),
     ("Border", "#D8DFDC", "#34403B"),
     ("Danger", "#B4472E", "#F08A72"),
@@ -31,7 +31,7 @@ const SIZES: [(&str, f64); 7] =
 
 /// Text in a text style whose colour follows theme variable `var`.
 fn themed(k: &mut Kit, parent: NodeId, chars: &str, style: &str, var: &str, props: Value) -> Result<NodeId> {
-    let id = k.text_with(parent, chars, style, "#14201C", props)?;
+    let id = k.text_with(parent, chars, style, "#0E1512", props)?;
     k.bound(id, &[("fill", var)])
 }
 
@@ -96,7 +96,7 @@ fn type_scale(k: &mut Kit, page: NodeId, x: f64) -> Result<()> {
     for (name, size, weight, line) in TYPE {
         let row = k.stack(board, name, V, 2.0, json!(0), json!({"sizingH": "fill"}))?;
         themed(k, row, &format!("{name} · {weight} {size} / {line}"), "Label/S", "Text muted", json!({}))?;
-        themed(k, row, "Ridgeline at first light", name, "Text", json!({"sizingH": "fill", "textAutoResize": "height"}))?;
+        themed(k, row, "Design in the open", name, "Text", json!({"sizingH": "fill", "textAutoResize": "height"}))?;
     }
     Ok(())
 }
@@ -113,7 +113,7 @@ fn sizes_board(k: &mut Kit, page: NodeId, x: f64) -> Result<()> {
             themed(k, item, &format!("{name} · {value}"), "Label/S", "Text", json!({}))?;
         } else {
             let item = k.stack(spaces, name, H, 12.0, json!(0), json!({"crossAlign": "center"}))?;
-            let bar = k.rect(item, "Space", [0.0, 0.0, value, 16.0], json!({"fill": "#1F6F5C", "cornerRadius": 3}))?;
+            let bar = k.rect(item, "Space", [0.0, 0.0, value, 16.0], json!({"fill": "#00875F", "cornerRadius": 3}))?;
             k.bound(bar, &[("fill", "Primary"), ("width", name)])?;
             themed(k, item, &format!("{name} · {value}"), "Label/S", "Text", json!({}))?;
         }
@@ -136,7 +136,7 @@ fn buttons(k: &mut Kit, page: NodeId) -> Result<NodeId> {
             };
             let mut props = json!({"mainAlign": "center", "crossAlign": "center", "x": column as f64 * 150.0, "y": row as f64 * 68.0});
             if fill.is_some() {
-                props = merged(props, json!({"fill": "#1F6F5C"}));
+                props = merged(props, json!({"fill": "#00875F"}));
             }
             if outlined {
                 props = merged(props, json!({"stroke": "#D8DFDC", "strokeWeight": 1}));
@@ -209,9 +209,9 @@ fn example(k: &mut Kit, page: NodeId, mode: &str, x: f64, button: NodeId, input:
     k.mode(form, THEME, mode)?;
     let words = k.stack(form, "Words", V, 6.0, json!(0), json!({"sizingH": "fill"}))?;
     themed(k, words, "Welcome back", "Heading/M", "Text", json!({}))?;
-    themed(k, words, "Sign in to plan your next walk.", "Body/M", "Text muted", json!({}))?;
+    themed(k, words, "Sign in to your studio.", "Body/M", "Text muted", json!({}))?;
     let fill = json!({"sizingH": "fill"});
-    k.instance(input, form, json!({"Label": "Email", "Value": "mara@ridgeline.example"}), fill.clone())?;
+    k.instance(input, form, json!({"Label": "Email", "Value": "june@studio.example"}), fill.clone())?;
     k.instance(input, form, json!({"State": "Focus", "Label": "Password", "Value": "••••••••••"}), fill.clone())?;
     let actions = k.stack(form, "Actions", V, 8.0, json!([8, 0, 0, 0]), fill.clone())?;
     k.instance(button, actions, json!({"Label": "Sign in"}), fill.clone())?;

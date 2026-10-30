@@ -1,4 +1,4 @@
-//! Presentation slides: five 1920 × 1080 slides of an invented season review (title, agenda, a big
+//! Presentation slides: five 1920 × 1080 slides of an invented seed pitch (title, agenda, a big
 //! figure, a chart, closing) with their own text styles and a footer component whose page number
 //! is a property.
 
@@ -13,7 +13,7 @@ const W: f64 = 1920.0;
 const SLIDE_H: f64 = 1080.0;
 const GAP: f64 = 160.0;
 
-const AGENDA: [&str; 4] = ["The season in numbers", "What walkers asked for", "What we are building next", "Questions"];
+const AGENDA: [&str; 4] = ["Dinner is a daily decision", "What home cooks asked for", "What we are building next", "Questions"];
 const WEEKS: [(&str, f64); 10] =
     [("W1", 0.30), ("W2", 0.36), ("W3", 0.44), ("W4", 0.41), ("W5", 0.55), ("W6", 0.63), ("W7", 0.72), ("W8", 0.95), ("W9", 0.84), ("W10", 0.77)];
 
@@ -42,8 +42,8 @@ fn footer(k: &mut Kit, page: NodeId) -> Result<NodeId> {
     let props = json!({"sizingH": "fixed", "width": W - 240.0, "mainAlign": "spaceBetween", "crossAlign": "center", "stroke": BORDER, "strokeSides": TOP_EDGE});
     let c = k.stack_of("component", page, "Footer", H, 16.0, json!([28, 0, 0, 0]), props)?;
     let logo = k.stack(c, "Logo", H, 12.0, json!(0), json!({"crossAlign": "center"}))?;
-    k.icon(logo, &glyphs::MOUNTAIN, 32.0, PRIMARY)?;
-    k.text(logo, "Ridgeline Studio · Season review 2026", "Slide/Label", MUTED)?;
+    k.icon(logo, &glyphs::SPROUT, 32.0, PRIMARY)?;
+    k.text(logo, "Simmer · Seed pitch 2026", "Slide/Label", MUTED)?;
     let number = k.text(c, "1", "Slide/Label", MUTED)?;
     k.text_prop(c, "Page", "1", &[number])?;
     Ok(c)
@@ -71,9 +71,9 @@ fn title(k: &mut Kit, page: NodeId) -> Result<()> {
     let content = slide(k, page, "1 Title", 0, true, None)?;
     k.set(content, json!({"layout": H, "gap": 96, "crossAlign": "center"}))?;
     let words = k.stack(content, "Words", V, 32.0, json!(0), json!({"sizingH": "fill"}))?;
-    k.text(words, "SEASON REVIEW · 2026", "Slide/Label", ACCENT)?;
-    k.text_with(words, "A summer on the ridge", "Slide/Title", ON_BRAND, wrap())?;
-    k.text_with(words, "What 4,200 clubs walked, and what we learned from them", "Slide/Body", ON_BRAND, merged(wrap(), json!({"opacity": 0.8})))?;
+    k.text(words, "SEED PITCH · 2026", "Slide/Label", ACCENT)?;
+    k.text_with(words, "Dinner, decided", "Slide/Title", ON_BRAND, wrap())?;
+    k.text_with(words, "What 120,000 home cooks make, and what we learned from them", "Slide/Body", ON_BRAND, merged(wrap(), json!({"opacity": 0.8})))?;
     k.scene(content, "Picture", [640.0, 720.0], json!({"cornerRadius": 48})).map(drop)
 }
 
@@ -93,10 +93,10 @@ fn agenda(k: &mut Kit, page: NodeId, footer: NodeId) -> Result<()> {
 fn figure(k: &mut Kit, page: NodeId, footer: NodeId) -> Result<()> {
     let content = slide(k, page, "3 Figure", 2, false, Some(footer))?;
     k.set(content, json!({"gap": 8}))?;
-    k.text(content, "38,000", "Slide/Figure", PRIMARY)?;
+    k.text(content, "120,000", "Slide/Figure", PRIMARY)?;
     k.text_with(
         content,
-        "routes shared between June and September: three times as many as last summer",
+        "dinners cooked with Simmer in October: three times as many as in July",
         "Slide/Body",
         MUTED,
         merged(wrap(), json!({"maxWidth": 1100})),
@@ -108,24 +108,24 @@ fn chart(k: &mut Kit, page: NodeId, footer: NodeId) -> Result<()> {
     let content = slide(k, page, "4 Chart", 3, false, Some(footer))?;
     k.set(content, json!({"layout": H, "gap": 96, "crossAlign": "center"}))?;
     let words = k.stack(content, "Words", V, 32.0, json!(0), json!({"sizingH": "fixed", "width": 620}))?;
-    k.text_with(words, "Walks peaked in week eight", "Slide/Heading", INK, wrap())?;
-    k.text_with(words, "The long weekend filled every guided walk. Weeks nine and ten held most of it.", "Slide/Body", MUTED, wrap())?;
+    k.text_with(words, "Cooking peaked in week eight", "Slide/Heading", INK, wrap())?;
+    k.text_with(words, "The autumn holidays filled every meal plan. Weeks nine and ten held most of it.", "Slide/Body", MUTED, wrap())?;
     let card = k.stack(
         content,
-        "Walks per week",
+        "Cooks per week",
         V,
         24.0,
         json!(48),
         json!({"fill": PAGE, "cornerRadius": 40, "sizingH": "fill", "sizingV": "fixed", "height": 640}),
     )?;
-    k.text(card, "Walks per week", "Slide/Label", INK)?;
+    k.text(card, "Cooks per week", "Slide/Label", INK)?;
     k.bar_chart(card, [900.0, 440.0], &WEEKS, "Slide/Label")
 }
 
 fn closing(k: &mut Kit, page: NodeId) -> Result<()> {
     let content = slide(k, page, "5 Closing", 4, true, None)?;
     k.set(content, json!({"gap": 24}))?;
-    k.icon(content, &glyphs::MOUNTAIN, 96.0, ACCENT)?;
+    k.icon(content, &glyphs::SPROUT, 96.0, ACCENT)?;
     k.text(content, "Thank you", "Slide/Title", ON_BRAND)?;
-    k.text_with(content, "Questions and routes to hello@ridgeline.example", "Slide/Body", ON_BRAND, json!({"opacity": 0.8})).map(drop)
+    k.text_with(content, "Questions and recipes to hello@simmer.example", "Slide/Body", ON_BRAND, json!({"opacity": 0.8})).map(drop)
 }
