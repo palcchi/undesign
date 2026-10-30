@@ -226,7 +226,7 @@ git clone https://github.com/storytold/craft-fonts ../craft-fonts
 
 If you clone it after a first build, run `cargo clean -p undesign-text` once so the next build embeds the fonts.
 
-**Start from a template.** The home screen's Templates tab has eight starter files (a mobile app, a landing page, a dashboard, a design system starter, a wireframe kit, social post sizes, presentation slides and an icon set starter), also under File ▸ New from template…. They are built in code from original, synthetic content, so scripts can open them too: `file.newFromTemplate {template}`.
+**Start from a template.** Eight starter files are built in code from original, synthetic content (a mobile app, a landing page, a dashboard, a design system starter, a wireframe kit, a launch announcement, presentation slides and an icon set starter): scripts open them with `template.list` and `file.newFromTemplate {template}`.
 
 For the web build, install [trunk](https://trunkrs.dev/) and run `cargo xtask wasm`.
 

@@ -1072,10 +1072,6 @@ impl FigApp {
                     self.ui.libraries = true;
                 }
                 "home" => self.ui.home = true,
-                "home.templates" => {
-                    self.ui.home = true;
-                    self.ui.home_view.section = home::Section::Templates;
-                }
                 "home.gettingStarted" => {
                     self.ui.home = true;
                     self.ui.home_view.section = home::Section::Recents;

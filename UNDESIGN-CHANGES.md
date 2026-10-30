@@ -109,3 +109,33 @@ upstream revision so future syncs stay auditable.
 - Reference screenshots stay local under `plan/figma/screenshots/` (gitignored,
   never committed); only layout, density, theme and behaviour were matched, no
   Figma artwork was copied or traced. Not re-graded: numbers unchanged.
+
+## 2026-10-30 — Locale catch-up: nine catalogs' UI keys to 100% (change #6)
+
+- Indonesian (74 keys, previous commit) plus Spanish (11), French (35), German
+  (118), Brazilian Portuguese (17), Czech (74), Dutch (38), Polish (39) and
+  Russian (24) UI keys, all 1,795/1,795 (`crates/ui-egui/locales/`), drafted in
+  each file's conventions and still drafts; Russian's additions welcome native
+  re-confirm. Bengali, Finnish, Japanese, Georgian, Korean, Swedish, Turkish
+  and Simplified Chinese still show English for their missing keys. Totals to
+  re-measure with `cargo xtask i18n-report`. Not re-graded: numbers unchanged.
+
+## 2026-10-30 — Icon redraw, toolbar pill, home Templates removed (change #7)
+
+- All 159 code-drawn icons redrawn from scratch in a rounded geometric style
+  on the 16-unit grid (`crates/ui-egui/src/icons.rs`); original artwork, no
+  third-party iconography. Geometry written to the pinning tests' contracts
+  (grid guard, inset Frame/Text, Slice knife coverage, corner marks, gradient
+  fades); `cargo test` still to run on a machine with the toolchain.
+- Toolbar pill content centred with symmetric 8 px insets plus a
+  `pill_content_is_centred` test (`crates/ui-egui/src/toolbar.rs`).
+- Home screen: the Templates tab, the first-run template row and File ▸ New
+  from template… removed (`crates/ui-egui/src/home.rs`, `home_tests.rs`, the
+  `home.templates` request arm in `lib.rs`, the catalog entry in
+  `crates/engine/src/catalog.rs`); `file.newFromTemplate` without `template`
+  returns the list without asking the UI to show a picker. The eight starter
+  templates stay in the engine, the CLI and the control channel. Ten home UI
+  keys removed and two added (`Search files`, `No files match your search`;
+  nine catalogs at 1,787/1,787). Docs updated (`ui-parity.md`,
+  `target-app-parity.md`, `control-protocol.md`, `README.md`, `ROADMAP.md`):
+  discoverability ×0.94 → ×0.93, essentials 59.2% → 58.6% (~59%).

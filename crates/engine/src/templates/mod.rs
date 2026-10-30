@@ -163,8 +163,7 @@ const MAX_NAME: usize = 200;
 fn new_from_template(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "file.newFromTemplate";
     let Some(id) = p.get("template") else {
-        // Asked from a menu: the app shows the templates to pick from.
-        s.request_ui("home.templates", json!({}));
+        // No picker UI: the caller picks an id from the list itself.
         return Ok(json!({"templates": list()}));
     };
     let template = id.as_str().and_then(find).ok_or_else(|| bad(cmd, "`template` must be an id from `template.list`"))?;
@@ -189,7 +188,7 @@ pub fn specs() -> Vec<CommandSpec> {
         spec!(
             "file.newFromTemplate",
             "New from template",
-            "{template (an id from `template.list`), name? (the document's name; default the template's)}  opens a new, unsaved document built from the template → {index, template}; without `template`, returns {templates} (and the app shows them to pick from)",
+            "{template (an id from `template.list`), name? (the document's name; default the template's)}  opens a new, unsaved document built from the template → {index, template}; without `template`, returns {templates} to pick an id from",
             false,
             new_from_template
         ),

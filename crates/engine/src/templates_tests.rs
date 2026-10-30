@@ -161,12 +161,12 @@ fn new_from_template_opens_a_new_unsaved_document_and_leaves_the_others_alone() 
 }
 
 #[test]
-fn without_a_template_the_app_is_asked_to_show_them() {
+fn without_a_template_only_the_list_comes_back() {
     let mut s = Session::empty();
     let r = s.execute("file.newFromTemplate", &json!({})).unwrap();
     assert_eq!(r["templates"].as_array().unwrap().len(), TEMPLATES.len());
     assert!(s.docs.is_empty());
-    assert_eq!(s.ui_requests.iter().map(|r| r.kind.as_str()).collect::<Vec<_>>(), ["home.templates"]);
+    assert!(s.ui_requests.is_empty(), "nothing to show: the caller picks an id from the list");
 }
 
 #[test]

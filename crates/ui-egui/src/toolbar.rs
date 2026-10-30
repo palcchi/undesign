@@ -126,11 +126,12 @@ pub(crate) fn bar_width(app: &FigApp) -> f32 {
 }
 
 /// The main toolbar pill's width: the tool groups with their flyout carets, Resources and
-/// Actions, and the mode switcher (boards: the Design panel's button instead).
+/// Actions, and the mode switcher (boards: the Design panel's button instead). The content
+/// starts 8 px in and the tail below leaves the same 8 px out, so the pill reads centred.
 fn main_width(groups: &[Group], board: bool) -> f32 {
     let (cell, gap) = (TOOL_CELL, 4.0);
     let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
-    let end = if board { cell + 16.0 } else { 4.0 * 34.0 + 24.0 };
+    let end = if board { cell + 8.0 } else { 4.0 * 34.0 + 12.0 };
     groups.len() as f32 * (cell + gap) + carets + 2.0 * (cell + gap) + 16.0 + end
 }
 
@@ -642,6 +643,18 @@ mod tests {
             for icon in [Icon::Frame, Icon::Text] {
                 assert_eq!(widths(ppp, icon, GLYPH), mark, "{icon:?} at {ppp}×");
             }
+        }
+    }
+
+    /// The pill's content ends as far from its edge as it starts (8 px), on design
+    /// files and on boards: the pill reads centred.
+    #[test]
+    fn pill_content_is_centred() {
+        for (groups, board, tail) in [(GROUPS, false, 4.0 * 34.0 + 4.0), (BOARD_GROUPS, true, TOOL_CELL)] {
+            let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
+            let content = 8.0 + groups.len() as f32 * (TOOL_CELL + 4.0) + carets + 2.0 * (TOOL_CELL + 4.0) + 8.0 + tail;
+            let trailing = main_width(groups, board) - content;
+            assert!((trailing - 8.0).abs() < 0.001, "trailing {trailing}");
         }
     }
 }
