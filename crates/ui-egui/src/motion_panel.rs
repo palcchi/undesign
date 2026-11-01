@@ -80,14 +80,39 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     ui.separator();
 
     ui.label(egui::RichText::new("PLAYHEAD").size(9.0).strong().color(t.text_tertiary));
+    if app.ui.motion_playing {
+        // Frame-accurate advance at the composition's fps; loops for directing.
+        let now = ui.ctx().input(|i| i.time);
+        let dt = if app.ui.motion_play_last > 0.0 { (now - app.ui.motion_play_last).clamp(0.0, 0.25) } else { 0.0 };
+        app.ui.motion_play_last = now;
+        app.ui.motion_play_acc += dt * f64::from(composition.fps.max(1));
+        let steps = app.ui.motion_play_acc.floor().max(0.0) as u32;
+        if steps > 0 {
+            app.ui.motion_play_acc -= f64::from(steps);
+            let len = composition.duration_frames.saturating_add(1);
+            app.ui.motion_frame = app.ui.motion_frame.saturating_add(steps) % len;
+        }
+        ui.ctx().request_repaint();
+    }
     let mut frame = app.ui.motion_frame.min(composition.duration_frames);
     ui.horizontal(|ui| {
+        let playing = app.ui.motion_playing;
+        if crate::widgets::icon_button(
+            ui,
+            if playing { crate::icons::Icon::Pause } else { crate::icons::Icon::Play },
+            if playing { "Pause" } else { "Play" },
+        ) {
+            app.ui.motion_playing = !playing;
+            app.ui.motion_play_acc = 0.0;
+            app.ui.motion_play_last = 0.0;
+        }
         ui.label("Frame");
         let changed = ui.add(egui::DragValue::new(&mut frame).range(0..=composition.duration_frames).speed(1)).changed();
         if changed {
             app.ui.motion_frame = frame;
         }
         ui.label(format!("/ {}", composition.duration_frames));
+        ui.label(format!("{:.2}s", f64::from(frame) / f64::from(composition.fps.max(1))));
     });
     let slider = ui.add(egui::Slider::new(&mut frame, 0..=composition.duration_frames).show_value(false));
     if slider.changed() {

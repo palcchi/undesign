@@ -62,7 +62,7 @@ blockers.
 | M11 Plugins | runtime, API, menu, manager and SDK done (#101); plugin panels and settings (ABI v2); widgets (API 3), panels side by side, colour picker on plugin fields; a plugin directory on a standalone server (removed 2026-10-30; publish, browse, install, update) | a public catalogue, publisher accounts and signatures, the directory in the browser, richer widget events; Figma plugin compatibility is an owner decision | 8–26 |
 | M12 Boards (new) | first slice landed (2026-10-24): board files, sticky notes, shapes with text, connectors that follow, marker, highlighter, eraser, stamps, board toolbar and contextual bar, live sessions | timer, voting, widgets, templates, tables, mind maps ([boards-parity](boards-parity.md)) | 30–60 |
 | M13 AI Assistant (expanded, owner decision) | not started | secure provider transport, model picker, document-aware tool calling and undoable edits | 30–60 |
-| M14 Motion Studio (new) | data model and first engine/UI slice landed | dockable timeline, playback/render evaluation, graph editor, effects/compositing and export | 45–95 |
+| M14 Motion Studio (new) | data model, engine/UI slice and playback preview landed | dockable timeline, graph editor, effects/compositing and export | 40–90 |
 
 ## Next, after the current focus
 
@@ -79,6 +79,7 @@ blockers.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-01 | minor | Motion Studio M14.3 playback slice: play/pause with frame-accurate advance and looping at the composition's fps, and a render-only canvas preview while the Motion tab is active (sampled values apply like manual edits; no undo entries, no dirty document). Selection outlines and hit-testing stay on base values. |
 | 2026-11-01 | minor | Motion Studio M14: composition/track/keyframe commands are undoable and registered in the engine; the first Motion tab supports composition creation, property tracks, frame scrubbing and keyframe entry. Engine command tests pass in an Ubuntu 22.04 test container because the host is GLIBC 2.34 while the installed Rust toolchains require GLIBC 2.35. Playback, graph editor, effects and export remain. |
 | 2026-10-31 | minor | Added M13 AI Assistant with provider-neutral API support and M14 Motion Studio; the first motion document model slice landed with serializable compositions, property tracks, keyframes, interpolation and validation. See `ai-motion-architecture.md` |
 | 2026-10-24 | minor | Boards (M12): a file kind of its own (`file.newBoard`, saved in `.undesign`, carried to live-session joiners) with sticky notes, shapes with text, connectors that re-route when what they join moves (an engine recompute, the same for local edits, undo and others' edits), marker, highlighter and eraser, stamps with the placer's name, a board toolbar and a contextual bar; prototyping and Dev Mode refuse on boards; design files and boards have their own marks on tabs and file rows. Milestone M12 Boards added; AI features move to M13 |

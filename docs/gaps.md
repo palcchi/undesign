@@ -487,12 +487,13 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
 - **Estimate:** 30–60 h.
 
 ### 25. Motion Studio
-- **Missing:** timeline-based animation, keyframes, interpolation/graph editor, playback, effects
-  animation, compositing and video export.
+- **Missing:** graph editor, animated effects, compositing and video export; the timeline is not yet
+  dockable and canvas edits don't auto-keyframe.
 - **Landed (2026-11-01):** serializable composition/track/keyframe model with validation and
   Step, Linear and Cubic Bezier sampling; undoable composition, track and keyframe commands; initial
-  Motion Studio tab with a composition selector, playhead, editable keyframe values and timeline rows.
-  Playback/render evaluation, graph editing, animated effects, compositing and export remain missing.
+  Motion Studio tab with a composition selector, playhead, editable keyframe values and timeline rows;
+  frame-accurate play/pause with looping and a render-only canvas preview while the Motion tab is
+  active (selection outlines and hit-testing stay on base values).
 - **Estimate:** 50–100 h for a substantial first version; audio, advanced compositing and full
   After Effects parity are later work. See [ai-motion-architecture](ai-motion-architecture.md).
 

@@ -1,8 +1,8 @@
 # AI Assistant and Motion Studio architecture
 
-> Status: in progress, 2026-11-01. The motion document model, undoable engine commands and an
-> initial Motion Studio side panel are implemented. Playback, render evaluation, graph editing,
-> export and the AI provider transport remain future milestones.
+> Status: in progress, 2026-11-01. The motion document model, undoable engine commands, an
+> initial Motion Studio side panel, frame-accurate playback and a render-only canvas preview are
+> implemented. Graph editing, export and the AI provider transport remain future milestones.
 
 Undesign is evolving from a static interface editor into an AI-assisted design and motion workspace.
 The design engine remains the source of truth: AI and timeline tools must edit the same document
@@ -118,9 +118,11 @@ not create undo entries, mark the document dirty on every frame, or change the s
   validation and backwards-compatible document decoding.
 - **M14.2 Motion commands:** first slice done. Undoable composition creation/deletion, track add/remove,
   keyframe set/remove and inspection; command tests cover undo and validation.
-- **M14.3 Timeline UI:** in progress. Initial Motion tab supports composition creation, track creation,
-  playhead scrubbing, numeric keyframe entry and clickable keyframe rows. Docking, playback and a
-  render-only evaluated scene are still required.
+- **M14.3 Timeline UI:** playback slice done. The Motion tab plays and loops at the composition's
+  fps with a time readout; while it is active the canvas renders the composition evaluated at the
+  playhead without touching the saved document, creating undo entries or marking it dirty.
+  Selection outlines and hit-testing stay on base values. A dockable timeline and auto-keyframing
+  from canvas edits remain; bezier editing is M14.4.
 - **M14.4 Graph editor:** Bezier editing and interpolation preview.
 - **M14.5 Export:** image sequence, then browser/native video encoders.
 - **M13.1 AI foundation:** provider configuration and secure credential storage for desktop and

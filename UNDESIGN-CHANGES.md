@@ -160,3 +160,13 @@ upstream revision so future syncs stay auditable.
   playhead scrubbing and numeric keyframe entry. Playback/render evaluation, graph editing, effects
   and video export are not implemented yet.
 - Added the provider-neutral AI Assistant architecture; provider transport and chat UI remain planned.
+
+## 2026-11-01 — Motion playback preview (change #10)
+
+- Added frame sampling across a composition (`Composition::sample_all`) and a render-only preview
+  document (`preview_document`) that applies sampled values like manual edits, with a new
+  centre-preserving scale helper in geom (`set_scale_about_center`, `scales`).
+- The Motion tab plays and loops at the composition's fps with a time readout; while it is active
+  the canvas renders the evaluated preview without touching the saved document, creating undo
+  entries or marking it dirty. Selection outlines and hit-testing stay on base values.
+- Added an original code-drawn `Pause` icon next to `Play` for the transport button.
