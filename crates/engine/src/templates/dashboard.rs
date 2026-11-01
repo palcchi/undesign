@@ -19,12 +19,8 @@ const NAV: [(&str, Glyph); 6] = [
 ];
 
 /// The figures across the top: (label, value, change, whether the change is good).
-const FIGURES: [(&str, &str, &str, bool); 4] = [
-    ("Steps", "84,210", "+9.2%", true),
-    ("Workouts", "18", "+3", true),
-    ("Day streak", "24", "+6", true),
-    ("Resting HR", "58", "+2", false),
-];
+const FIGURES: [(&str, &str, &str, bool); 4] =
+    [("Steps", "84,210", "+9.2%", true), ("Workouts", "18", "+3", true), ("Day streak", "24", "+6", true), ("Resting HR", "58", "+2", false)];
 
 /// Active minutes per week, as a share of the plot's height.
 const ACTIVITY: [f64; 12] = [0.32, 0.38, 0.35, 0.46, 0.52, 0.48, 0.61, 0.58, 0.70, 0.66, 0.78, 0.86];

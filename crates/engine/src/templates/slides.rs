@@ -73,7 +73,13 @@ fn title(k: &mut Kit, page: NodeId) -> Result<()> {
     let words = k.stack(content, "Words", V, 32.0, json!(0), json!({"sizingH": "fill"}))?;
     k.text(words, "SEED PITCH · 2026", "Slide/Label", ACCENT)?;
     k.text_with(words, "Dinner, decided", "Slide/Title", ON_BRAND, wrap())?;
-    k.text_with(words, "What 120,000 home cooks make, and what we learned from them", "Slide/Body", ON_BRAND, merged(wrap(), json!({"opacity": 0.8})))?;
+    k.text_with(
+        words,
+        "What 120,000 home cooks make, and what we learned from them",
+        "Slide/Body",
+        ON_BRAND,
+        merged(wrap(), json!({"opacity": 0.8})),
+    )?;
     k.scene(content, "Picture", [640.0, 720.0], json!({"cornerRadius": 48})).map(drop)
 }
 
