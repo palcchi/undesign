@@ -21,10 +21,7 @@ pub enum Section {
 
 impl Section {
     /// The sidebar, top to bottom.
-    const ALL: [(Section, Icon, &str); 2] = [
-        (Section::Recents, Icon::Home, tr_noop("Recents")),
-        (Section::Online, Icon::Online, tr_noop("Online")),
-    ];
+    const ALL: [(Section, Icon, &str); 2] = [(Section::Recents, Icon::Home, tr_noop("Recents")), (Section::Online, Icon::Online, tr_noop("Online"))];
 
     /// The id `ui.set {homeSection}` and `ui.inspect` use.
     pub fn id(self) -> &'static str {
@@ -177,8 +174,7 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
     y += 52.0;
     let search = Rect::from_min_size(pos2(left.min.x + 8.0, y), vec2(SIDEBAR - 16.0, widgets::FIELD_H));
     ui.scope_builder(egui::UiBuilder::new().max_rect(search), |ui| {
-        let response =
-            widgets::text_input(ui, Id::new("home_file_search"), &mut app.ui.home_view.file_query, search.width(), tr("Search files"));
+        let response = widgets::text_input(ui, Id::new("home_file_search"), &mut app.ui.home_view.file_query, search.width(), tr("Search files"));
         a11y::text(&response, tr("Search files"), &app.ui.home_view.file_query);
         if (response.has_focus() || response.lost_focus()) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             app.ui.home_view.file_query.clear();

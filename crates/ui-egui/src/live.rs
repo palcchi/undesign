@@ -1190,11 +1190,7 @@ pub fn publish_dialog(app: &mut FigApp, ctx: &egui::Context) {
                 widgets::label(ui, tr("This server is open to the public: no key needed."), t.success);
                 hosting_lines(ui, &t, v);
             }
-            Some(_) => widgets::label(
-                ui,
-                tr("This server needs its key: add ?key=… to the address (ask the server's operator for it)."),
-                t.danger,
-            ),
+            Some(_) => widgets::label(ui, tr("This server needs its key: add ?key=… to the address (ask the server's operator for it)."), t.danger),
             None => widgets::label(
                 ui,
                 tr("Give the address of a server open to the public, or a server's address with its key (ask the server's operator for it)."),
