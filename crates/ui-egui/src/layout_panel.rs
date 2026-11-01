@@ -315,7 +315,7 @@ fn alignment(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], l: &AutoLayout) {
                 if on {
                     ui.painter().rect_filled(
                         Rect::from_center_size(c, vec2(if horizontal { 4.0 } else { 12.0 }, if horizontal { 12.0 } else { 4.0 })),
-                        CornerRadius::same(1),
+                        CornerRadius::same(2),
                         ACCENT,
                     );
                 } else {

@@ -103,6 +103,8 @@ fn wasm() -> bool {
         "undesign-ui-egui",
         "-p",
         "undesign-web",
+        "-p",
+        "undesign-agent",
     ])) && plugins()
 }
 

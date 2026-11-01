@@ -1,4 +1,8 @@
 //! Design tokens (UI3 light and dark) and fonts.
+//!
+//! Radius scale (points): 2, 3, 4, 5, 6, 8, 10, 12, 13, 16. Full-round pills and circular
+//! swatches use half their height instead, and canvas selection handles stay sharp like the
+//! incumbent's.
 
 use std::sync::{Arc, OnceLock};
 

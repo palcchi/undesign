@@ -1783,7 +1783,7 @@ fn navigation_bar(p: &mut Presenter, ctx: &egui::Context, now: f64) -> Option<St
         egui::Frame::NONE
             .fill(t.panel)
             .stroke(Stroke::new(1.0, t.border))
-            .corner_radius(CornerRadius::same(9))
+            .corner_radius(CornerRadius::same(10))
             .inner_margin(egui::Margin::symmetric(8, 5))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {

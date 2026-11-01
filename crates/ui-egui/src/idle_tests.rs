@@ -74,6 +74,21 @@ impl Harness {
             assert!(delay >= IDLE, "{what}: asked for a repaint in {delay:?}: {:?}", self.ctx.repaint_causes());
         }
     }
+
+    /// One frame like [`frame`], returning what it painted and the tokens it used.
+    fn painted(&mut self) -> (Vec<egui::epaint::ClippedShape>, crate::theme::Tokens) {
+        self.time += 1.0 / 60.0;
+        let input = RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))),
+            time: Some(self.time),
+            events: Vec::new(),
+            ..Default::default()
+        };
+        let app = &mut self.app;
+        let mut out = self.ctx.run_ui(input, |ui| app.ui(ui));
+        out.textures_delta.clear();
+        (out.shapes, crate::theme::Tokens::get(&self.ctx))
+    }
 }
 
 /// Waits (without drawing frames, however slow the machine) until the render thread is done with
@@ -97,6 +112,21 @@ fn document() -> (Harness, Value) {
     let text = s.execute("text.create", &json!({"x": 40, "y": 220, "text": "Idle"})).unwrap()["id"].clone();
     s.execute("select.set", &json!({"ids": []})).unwrap();
     (Harness::new(s), text)
+}
+
+/// The window bed: the root paints the canvas colour over the whole window before the
+/// floating cards, so their margins never show the GPU clear colour (near-black in light mode).
+#[test]
+fn the_root_paints_the_window_bed() {
+    let (mut h, _) = document();
+    h.frame(vec![]);
+    let (shapes, tokens) = h.painted();
+    let screen = Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0));
+    let bed = shapes.iter().find_map(|c| match &c.shape {
+        egui::Shape::Rect(r) if r.rect == screen => Some(r.fill),
+        _ => None,
+    });
+    assert_eq!(bed, Some(tokens.canvas), "a full-window bed in the canvas colour");
 }
 
 #[test]

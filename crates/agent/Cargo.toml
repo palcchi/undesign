@@ -1,0 +1,16 @@
+[package]
+name = "undesign-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Undesign hackathon agent core: prompt-to-plan loop over the engine command registry (shared native and wasm, no UI, no networking)"
+
+[lints]
+workspace = true
+
+[dependencies]
+undesign-doc = { workspace = true }
+undesign-engine = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

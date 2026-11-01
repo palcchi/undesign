@@ -117,6 +117,15 @@ mod tests {
     }
 
     #[test]
+    fn non_uniform_scale_under_rotation_reads_per_axis() {
+        let xf = Affine::rotate(-30.0_f64.to_radians());
+        let out = set_scale_about_center(xf, 80.0, 40.0, 2.0, 1.0);
+        assert!(near(rotation_degrees(out), 30.0));
+        let (sx, sy) = scales(out);
+        assert!(near(sx, 2.0) && near(sy, 1.0));
+    }
+
+    #[test]
     fn non_finite_scales_fall_back_to_one() {
         let out = set_scale_about_center(Affine::IDENTITY, 10.0, 10.0, f64::NAN, f64::INFINITY);
         let (sx, sy) = scales(out);
