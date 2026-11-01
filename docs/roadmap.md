@@ -61,9 +61,13 @@ blockers.
 | M10 Localization | ~39%: the layer, English, Russian and Turkish reviewed by native speakers; Spanish (with a Latin American overlay), French, German, Brazilian Portuguese, Japanese, Korean, Simplified Chinese, Indonesian and Czech drafts | native reviews, Hindi, Vietnamese, Arabic (with mirrored panels), engine messages and number formatting ([localization-parity](localization-parity.md)) | 29–51 |
 | M11 Plugins | runtime, API, menu, manager and SDK done (#101); plugin panels and settings (ABI v2); widgets (API 3), panels side by side, colour picker on plugin fields; a plugin directory on a standalone server (removed 2026-10-30; publish, browse, install, update) | a public catalogue, publisher accounts and signatures, the directory in the browser, richer widget events; Figma plugin compatibility is an owner decision | 8–26 |
 | M12 Boards (new) | first slice landed (2026-10-24): board files, sticky notes, shapes with text, connectors that follow, marker, highlighter, eraser, stamps, board toolbar and contextual bar, live sessions | timer, voting, widgets, templates, tables, mind maps ([boards-parity](boards-parity.md)) | 30–60 |
-| M13 AI features (new, owner decision) | not started | local models | 30–60 |
+| M13 AI Assistant (expanded, owner decision) | not started | secure provider transport, model picker, document-aware tool calling and undoable edits | 30–60 |
+| M14 Motion Studio (new) | data model and first engine/UI slice landed | dockable timeline, playback/render evaluation, graph editor, effects/compositing and export | 45–95 |
 
 ## Next, after the current focus
+
+- AI Assistant and Motion Studio are new product tracks; architecture and acceptance criteria:
+  [`ai-motion-architecture.md`](ai-motion-architecture.md).
 
 - Team libraries for a whole team (lists, accounts and permissions) and deeper library analytics (4–8 h, after
   accounts), branching (8–15 h).
@@ -75,6 +79,8 @@ blockers.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-01 | minor | Motion Studio M14: composition/track/keyframe commands are undoable and registered in the engine; the first Motion tab supports composition creation, property tracks, frame scrubbing and keyframe entry. Engine command tests pass in an Ubuntu 22.04 test container because the host is GLIBC 2.34 while the installed Rust toolchains require GLIBC 2.35. Playback, graph editor, effects and export remain. |
+| 2026-10-31 | minor | Added M13 AI Assistant with provider-neutral API support and M14 Motion Studio; the first motion document model slice landed with serializable compositions, property tracks, keyframes, interpolation and validation. See `ai-motion-architecture.md` |
 | 2026-10-24 | minor | Boards (M12): a file kind of its own (`file.newBoard`, saved in `.undesign`, carried to live-session joiners) with sticky notes, shapes with text, connectors that re-route when what they join moves (an engine recompute, the same for local edits, undo and others' edits), marker, highlighter and eraser, stamps with the placer's name, a board toolbar and a contextual bar; prototyping and Dev Mode refuse on boards; design files and boards have their own marks on tabs and file rows. Milestone M12 Boards added; AI features move to M13 |
 | 2026-10-15 | minor | Auto-save (#305, #296): Preferences ▸ Save files automatically (`pref.autoSave`, off by default; desktop only, the browser has no files to save to) saves each open file that has a path 3 s after its last change, so steady editing doesn't save every few seconds, and never during a gesture, a live text preview or while a version is shown. The file is encoded on a thread of its own and written as of that moment (edits made meanwhile stay unsaved); a failed save says why in a toast and is tried again a minute later, and version history checkpoints keep coming with it on. Numbers unchanged |
 | 2026-10-15 | minor | A text box by dragging (#363, #360): a drag with the Text tool makes a fixed-size text box the size of the drag (at least one line tall); a click, or a drag shorter than the drag threshold, still makes auto-width text. Numbers unchanged |

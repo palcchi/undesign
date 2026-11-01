@@ -39,8 +39,10 @@ upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 - **Every asset file must have a row in [`ATTRIBUTION.md`](ATTRIBUTION.md)** (path, author, source,
   licence, notes). `cargo xtask assets` (part of `cargo xtask ci`) fails on any unlisted file under
   `assets/` or `docs/images/`.
-- Undesign's UI icons are drawn in code (`crates/ui-egui/src/icons.rs`) from simple primitives and
-  are original. Keep it that way: new icons are new code, designed from scratch.
+- The UI glyph set is drawn in code (`crates/ui-egui/src/icons.rs`) and adapted from FigCraft's
+  original icon artwork. Preserve the upstream FigCraft copyright and licence notices. The
+  Undesign `Logo` glyph is original. Do not add third-party icon packs or copy/trace icons from
+  Figma or another product; any new glyph must be designed from scratch.
 - The app icon is a placeholder U mark drawn for Undesign (`assets/app-icon/README.md`);
   `cargo xtask icon` renders the PNGs and `.ico` from `assets/app-icon/undesign.svg`.
 - **Fonts live in [storytold/craft-fonts](https://github.com/storytold/craft-fonts), never in this

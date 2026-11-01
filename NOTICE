@@ -11,9 +11,10 @@ Copyright (c) 2026 ArtCraft Team and the FigCraft contributors (see LICENSE-MIT)
 
 Third-party material
 
-This product bundles no third-party fonts, icons or images in the repository: every icon is
-drawn in code and original to Undesign. The per-file list (author, source, license) of any bundled
-asset is in ATTRIBUTION.md.
+This product bundles no third-party fonts, icons or images in the repository. The code-drawn UI
+glyph set is adapted from FigCraft's original icon artwork; the Undesign `Logo` glyph is original
+Undesign work. The inherited FigCraft copyright and licence are retained above. The per-file list
+(author, source, license) of any bundled asset is in ATTRIBUTION.md.
 
 Release builds made with the optional craft-fonts build input (CRAFT_FONTS_DIR) embed the fonts
 listed in ATTRIBUTION.md (Inter and others, SIL Open Font License 1.1); each package carries their

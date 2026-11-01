@@ -268,9 +268,9 @@ Undesign is a modification of the open-source FigCraft editor
 © 2026 ArtCraft Team and the FigCraft contributors). Every local change against the imported
 upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 
-Every icon in Undesign is drawn in code or made for this project, and bundled fonts, images and other
-assets keep their own open licenses; each one is listed with its author, source and license in
-[ATTRIBUTION.md](ATTRIBUTION.md).
+The UI glyph set is code-drawn and adapted from FigCraft; Undesign's U logo and app icon are
+original project artwork. Bundled fonts, images and other assets keep their applicable open
+licenses, with their authors and sources listed in [ATTRIBUTION.md](ATTRIBUTION.md).
 
 ## Star history
 

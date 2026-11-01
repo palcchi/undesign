@@ -124,7 +124,7 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
     let (tabs, _) = ui.allocate_exact_size(vec2(w, 40.0), Sense::hover());
     ui.painter().line_segment([tabs.left_top(), tabs.right_top()], Stroke::new(1.0, t.border));
     let mut x = tabs.min.x + 8.0;
-    for (tab, label) in [(RightTab::Design, tr("Design")), (RightTab::Prototype, tr("Prototype"))] {
+    for (tab, label) in [(RightTab::Design, tr("Design")), (RightTab::Prototype, tr("Prototype")), (RightTab::Motion, tr("Motion"))] {
         let galley = ui.painter().layout_no_wrap(label.into(), semibold(11.0), t.text);
         let r = Rect::from_min_size(pos2(x, tabs.center().y - 12.0), vec2(galley.size().x + 16.0, 24.0));
         let resp = ui.interact(r, ui.id().with(("rtab", label)), Sense::click());
@@ -135,7 +135,7 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
         }
         ui.painter().galley(pos2(r.min.x + 8.0, r.center().y - galley.size().y / 2.0), galley, if active { t.text } else { t.text_secondary });
         if resp.clicked() {
-            if app.ui.right_tab != tab {
+            if tab == RightTab::Prototype && app.ui.right_tab != tab {
                 crate::proto_panel::open_editor(ui.ctx(), None);
             }
             app.ui.right_tab = tab;
@@ -207,6 +207,7 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
             RightTab::Design if app.session.tool.tool == undesign_engine::ToolId::Frame => crate::frame_presets::panel(app, ui),
             RightTab::Design => design(app, ui),
             RightTab::Prototype => crate::proto_panel::prototype(app, ui),
+            RightTab::Motion => crate::motion_panel::panel(app, ui),
             RightTab::Inspect => inspect(app, ui),
         }
         ui.add_space(80.0);

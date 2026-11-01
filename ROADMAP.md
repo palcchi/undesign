@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~26 points and ~162–292 h away (one developer; ~33–67 h wall-clock with 5 developers)
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-30 · **Change:** minor (UI revamp: all 159 icons redrawn in a rounded geometric style, symmetric toolbar pill, home Templates tab and File ▸ New from template… removed with templates staying script-accessible (essentials 59.2% → 58.6%, ~59%); eight more catalogs' UI keys to 100%; Indonesian UI keys to 100%; Figma-look pass: file-kind label, accent zoom, icon grid guard; starter templates replaced with Undesign's own designs; a deeper dark theme; Dev Mode measurements kept on the canvas and a read-only layers panel; Dev Mode measurements kept on the canvas and a read-only layers panel; boards: a board area row and progress entry; community fixes in #507, #510, #529 and #530: auto-save, a text box by dragging, batch step references, removing someone from a live session, Russian and Turkish catalogs reviewed, Czech and Indonesian drafts, the Japanese draft completed, zoom previews, the web clipboard, Alt-drag snapping and Cmd+D repeat, recovery copies, crash and rollback fixes, colour emoji, `.fig` import fixes; earlier changes are in the revision history below) · **Target:** Figma Design (desktop app 126.10.7)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-11-01 · **Change:** minor (recent UI revamp, localization catch-up and Figma-look pass retained; Motion Studio first slice adds undoable composition/track/keyframe commands and an initial Motion tab; AI Assistant architecture is documented as the next product track; earlier changes are in the revision history below) · **Target:** Figma Design (desktop app 126.10.7)
 
 Undesign is a clean-room, open-source, pure-Rust reimplementation of the Figma design workflow,
 native on macOS, Windows, Linux and FreeBSD and in the browser, fully drivable by scripts through
@@ -66,7 +66,8 @@ native speakers' reviews of the nine language drafts need people.
 | Localization | 39% (layer; English; Russian and Turkish reviewed by native speakers; Spanish with a Latin American overlay, French, German, Brazilian Portuguese, Japanese, Korean, Simplified Chinese, Indonesian and Czech drafts; CJK UI fonts) | 29–51 | [localization-parity](docs/localization-parity.md) |
 | Platforms | 75% | 10–20 | [hardware-parity](docs/hardware-parity.md) |
 | Ecosystem / plugins | 38% (own WASM plugins with panels, settings and widgets; a self-hosted plugin directory) | 8–26 | [gaps](docs/gaps.md) |
-| AI features | 0% | 30–60 | [gaps](docs/gaps.md) |
+| AI Assistant | 0% | 30–60 | [ai-motion-architecture](docs/ai-motion-architecture.md) |
+| Motion Studio | data model started | 50–100 | [ai-motion-architecture](docs/ai-motion-architecture.md) |
 
 ## Features
 
@@ -92,7 +93,8 @@ native speakers' reviews of the nine language drafts need people.
 | Plugins & widgets | 60% | 35% | 8–26 | [plugins](docs/plugins.md) |
 | Team libraries | 70% | 40% | 4–8 | [components-parity](docs/components-parity.md) |
 | Figma Draw extras | 88% | 60% | 1–3 | [gaps](docs/gaps.md) |
-| AI features | 0% | 0% | 30–60 | [gaps](docs/gaps.md) |
+| AI Assistant | 0% | 0% | 30–60 | [ai-motion-architecture](docs/ai-motion-architecture.md) |
+| Motion Studio | data model started | 0% | 50–100 | [ai-motion-architecture](docs/ai-motion-architecture.md) |
 | Boards (whiteboarding; not in the weighted numbers) | ~35% | ~20% | 30–60 | [boards-parity](docs/boards-parity.md) |
 
 ## Languages
@@ -132,6 +134,8 @@ Ranked; detail and milestones in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Progress log
 
+- **2026-11-01** · Motion Studio first slice: registered undoable commands create/delete compositions, add/remove property tracks, set/remove keyframes and inspect motion data. The right panel now has an initial Motion tab for composition setup, track creation, playhead scrubbing and numeric keyframe entry. Engine command tests pass in Ubuntu 22.04; playback/render evaluation, graph editing, effects and export remain. AI provider transport and chat UI remain planned. Numbers unchanged.
+- **2026-10-31** · Motion Studio foundation: the native document model now has optional compositions, property tracks, keyframes, Step/Linear/Cubic Bezier interpolation, frame sampling and validation. Existing files without motion remain compatible. Added the AI Assistant/Motion Studio architecture and milestone plan. Numbers unchanged.
 - **2026-10-30** · Eight more catalogs caught up (M10, gap 5): es, fr, de, pt-BR, cs, nl, pl, ru UI keys to 1,795/1,795 (356 added in all); bn, fi, ja, ka, ko, sv, tr, zh-Hans left for the machine-translation pipeline. Numbers unchanged.
 - **2026-10-30** · Indonesian catalog caught up (M10, gap 5): 74 missing UI keys translated, UI 1,795/1,795 (100%), pronouns unified to Anda; native-speaker confirm still pending. Numbers unchanged.
 - **2026-10-30** · Figma-look pass from the owner's screenshots (M7): the left panel's header names the file's kind (Design/Board) under its name instead of the stale "Drafts" (Figma names the project there; "Board" translated in Spanish, other drafts read English); the zoom readout carries the accent, as Figma's blue zoom does; a guard test keeps every code-drawn icon on the 16-unit grid and painting. Structure audit: pages header, toolbar pill, rail, section rows and cards already match Figma UI3's patterns (brand green kept). Numbers unchanged.

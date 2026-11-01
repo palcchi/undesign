@@ -1,9 +1,9 @@
-//! Undesign's icon set, drawn in code from simple primitives on a 16×16 grid. Original artwork
-//! (MIT OR Apache-2.0): no third-party icons are used anywhere.
+//! Undesign's code-drawn icon set, adapted from FigCraft's original glyph artwork (MIT OR
+//! Apache-2.0). The Undesign `Logo` glyph is original; no third-party icon sets are used.
 //!
-//! The grid is pixel-exact at 16 px: 1-unit strokes sit on half coordinates (pixel centres) and
-//! fills on whole ones. Larger boxes scale by whole steps and smaller ones are hinted: straight
-//! strokes snap to the pixel grid so they stay one sharp pixel wide at any size.
+//! At 16 px, stroke centre-lines sit on pixel centres and fill edges on whole pixels. Stroke
+//! weight scales proportionally with larger glyphs; smaller ones are hinted so straight strokes
+//! stay crisp on the physical pixel grid.
 
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU};
 
@@ -442,7 +442,9 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
     let snap = |v: f32| (v * ppp).round() * px;
     let o = rect.center() - vec2(8.0 * s, 8.0 * s);
     let o = pos2(snap(o.x), snap(o.y));
-    let w = (k * 0.9).round().max(1.0) * px;
+    // Give the 16 px glyphs a clear 1.25 px outline, then scale it proportionally.
+    // Keep a 1 px floor for tiny glyphs; whole-pixel rounding made larger icons too light.
+    let w = k.max(0.8) * 1.25 * px;
     let p = P { painter, o, s, px, stroke: Stroke::new(w, color), color };
     draw(&p, icon);
 }
@@ -1308,6 +1310,29 @@ mod tests {
         });
         out.textures_delta.clear();
         assert!(out.shapes.len() > Icon::ALL.len() * 10);
+    }
+
+    /// Icon strokes keep a consistent visual weight as the glyph scales.
+    #[test]
+    fn stroke_weight_scales_with_glyph_size() {
+        fn width(size: f32) -> f32 {
+            let ctx = egui::Context::default();
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                paint(ui.painter(), Rect::from_min_size(Pos2::ZERO, Vec2::splat(size)), Icon::Plus, Color32::WHITE);
+            });
+            out.textures_delta.clear();
+            out.shapes
+                .iter()
+                .find_map(|clipped| match &clipped.shape {
+                    Shape::LineSegment { stroke, .. } => Some(stroke.width),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        }
+
+        for (size, expected) in [(16.0, 1.25), (24.0, 1.875), (32.0, 2.5)] {
+            assert!((width(size) - expected).abs() < 0.01, "{size}px glyph should use a {expected}px stroke");
+        }
     }
 
     /// The gradient kinds' icons show a fade: a mesh whose vertices run from opaque to clear.

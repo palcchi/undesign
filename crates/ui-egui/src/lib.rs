@@ -42,6 +42,7 @@ pub mod live_text;
 pub mod measure_overlay;
 pub mod menus;
 pub mod missing_fonts;
+pub mod motion_panel;
 pub mod online;
 pub mod pending_open;
 pub mod plugins_ui;
@@ -249,7 +250,7 @@ use std::sync::Arc;
 use std::task::{Context as TaskContext, Poll, Wake, Waker};
 
 use serde_json::{Value, json};
-use undesign_doc::NodeId;
+use undesign_doc::{AnimatedProperty, NodeId};
 use undesign_engine::Session;
 
 pub use control::{ControlReply, ControlRequest};
@@ -418,6 +419,7 @@ pub enum RightTab {
     Design,
     Prototype,
     Inspect,
+    Motion,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -503,6 +505,11 @@ pub struct UiState {
     pub left_width: f32,
     pub right_width: f32,
     pub right_tab: RightTab,
+    /// Motion Studio timeline selection and playhead state.
+    pub motion_composition: Option<u64>,
+    pub motion_frame: u32,
+    pub motion_property: AnimatedProperty,
+    pub motion_value: f64,
     /// The tab of the previous frame, to see the right panel change mode.
     pub last_right_tab: RightTab,
     pub left_tab: LeftTab,
@@ -691,6 +698,10 @@ impl Default for UiState {
             left_width: PANEL_DEFAULT,
             right_width: PANEL_DEFAULT,
             right_tab: RightTab::Design,
+            motion_composition: None,
+            motion_frame: 0,
+            motion_property: AnimatedProperty::PositionX,
+            motion_value: 0.0,
             last_right_tab: RightTab::Design,
             left_tab: LeftTab::File,
             pages_open: true,
@@ -1701,6 +1712,7 @@ impl FigApp {
                         RightTab::Design => i18n::tr("Design"),
                         RightTab::Prototype => i18n::tr("Prototype"),
                         RightTab::Inspect => i18n::tr("Dev Mode"),
+                        RightTab::Motion => i18n::tr("Motion"),
                     };
                     a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
                     right::right_panel(self, ui)
