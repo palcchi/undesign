@@ -100,7 +100,6 @@ icons! {
     LayoutWrap,
     LayoutGrid,
     AutoLayout,
-    ClipContent,
     Effects,
     Styles,
     Menu,
@@ -170,7 +169,6 @@ icons! {
     Prototype,
     /// The prototype preview pane: a small window playing a frame.
     Preview,
-    Section2,
     Logo,
     /// Ignore auto layout: a layer pinned at an offset inside its frame.
     AbsolutePosition,
@@ -492,7 +490,7 @@ fn draw(p: &P, icon: Icon) {
             p.line(3.5, 5.0, 12.5, 5.0);
             p.line(3.5, 11.0, 12.5, 11.0);
         }
-        Section | Section2 => {
+        Section => {
             p.poly(&[(2.5, 5.5), (2.5, 12.5), (13.5, 12.5), (13.5, 5.5), (8.5, 5.5), (7.5, 3.5), (3.5, 3.5)], true);
         }
         Slice => {
@@ -786,11 +784,6 @@ fn draw(p: &P, icon: Icon) {
             p.rect(3.0, 3.0, 13.0, 13.0, 2.0);
             p.fill_rect(5.0, 5.0, 7.0, 11.0, 1.0);
             p.fill_rect(9.0, 5.0, 11.0, 11.0, 1.0);
-        }
-        ClipContent => {
-            p.rect(5.0, 5.0, 13.0, 13.0, 1.0);
-            p.line(3.0, 2.0, 3.0, 10.0);
-            p.line(2.0, 3.0, 10.0, 3.0);
         }
         Effects | Sun => {
             p.circle(8.0, 8.0, if icon == Sun { 2.2 } else { 2.8 });
