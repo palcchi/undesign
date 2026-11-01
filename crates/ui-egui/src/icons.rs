@@ -256,6 +256,40 @@ fn triangulate(v: &[Pos2]) -> Vec<u32> {
     out
 }
 
+/// `pts` with each corner replaced by a quadratic join of radius `r` (same units, tangent to
+/// both edges). The radius clamps to half the shortest adjacent edge per corner; degenerate
+/// corners and a non-positive or non-finite `r` keep the original points.
+fn round_poly(pts: &[(f32, f32)], r: f32) -> Vec<(f32, f32)> {
+    const STEPS: usize = 4;
+    let n = pts.len();
+    if n < 3 || !(r > 0.0) || !r.is_finite() {
+        return pts.to_vec();
+    }
+    let at = |i: usize| pts[i % n];
+    let mut out = Vec::with_capacity(n * (STEPS + 1));
+    for i in 0..n {
+        let (vx, vy) = at(i);
+        let (px, py) = at(i + n - 1);
+        let (nx, ny) = at(i + 1);
+        let (e0x, e0y) = (vx - px, vy - py);
+        let (e1x, e1y) = (nx - vx, ny - vy);
+        let (l0, l1) = (e0x.hypot(e0y), e1x.hypot(e1y));
+        let rr = r.min(l0 / 2.0).min(l1 / 2.0);
+        if !(l0 > 0.0) || !(l1 > 0.0) || !(rr > 0.0) {
+            out.push((vx, vy));
+            continue;
+        }
+        let (t0x, t0y) = (vx - e0x / l0 * rr, vy - e0y / l0 * rr);
+        let (t1x, t1y) = (vx + e1x / l1 * rr, vy + e1y / l1 * rr);
+        for s in 0..=STEPS {
+            let t = s as f32 / STEPS as f32;
+            let (u, w) = (1.0 - t, t);
+            out.push((u * u * t0x + 2.0 * u * w * vx + w * w * t1x, u * u * t0y + 2.0 * u * w * vy + w * w * t1y));
+        }
+    }
+    out
+}
+
 struct P<'a> {
     painter: &'a Painter,
     o: Pos2,
@@ -285,8 +319,8 @@ impl P<'_> {
         let q = self.raw(x, y);
         pos2(self.snap_c(q.x), self.snap_c(q.y))
     }
-    /// A straight stroke; axis-aligned ones are hinted (crossways onto pixel centres, lengthways
-    /// onto pixel edges so they end sharp).
+    /// A straight stroke with round caps; axis-aligned ones are hinted (crossways onto pixel
+    /// centres, lengthways onto pixel edges).
     fn line(&self, x0: f32, y0: f32, x1: f32, y1: f32) {
         let (a, b) = (self.raw(x0, y0), self.raw(x1, y1));
         let (a, b) = if y0 == y1 {
@@ -299,6 +333,13 @@ impl P<'_> {
             (a, b)
         };
         self.painter.line_segment([a, b], self.stroke);
+        self.cap(a);
+        self.cap(b);
+    }
+
+    /// A round cap or join: a disc of the stroke's width.
+    fn cap(&self, at: Pos2) {
+        self.painter.circle_filled(at, self.stroke.width / 2.0, self.color);
     }
     /// A polyline of straight segments through hinted vertices.
     fn poly(&self, pts: &[(f32, f32)], closed: bool) {
@@ -310,16 +351,35 @@ impl P<'_> {
         let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.raw(x, y)).collect();
         self.stroke_pts(v, closed);
     }
+    /// Segments with round caps at every vertex (round joins without miter spikes).
     fn stroke_pts(&self, v: Vec<Pos2>, closed: bool) {
-        if closed {
-            self.painter.add(Shape::closed_line(v, self.stroke));
-        } else {
-            self.painter.add(Shape::line(v, self.stroke));
+        if v.is_empty() {
+            return;
+        }
+        if v.len() == 1 {
+            self.cap(v[0]);
+            return;
+        }
+        let last = if closed { v.len() } else { v.len() - 1 };
+        for i in 0..last {
+            self.painter.line_segment([v[i], v[(i + 1) % v.len()]], self.stroke);
+        }
+        for p in &v {
+            self.cap(*p);
         }
     }
     /// A filled polygon, convex or not.
     fn fill(&self, pts: &[(f32, f32)]) {
-        let v: Vec<Pos2> = pts.iter().map(|&(x, y)| self.raw(x, y)).collect();
+        self.fill_pts(pts.iter().map(|&(x, y)| self.raw(x, y)).collect());
+    }
+
+    /// A filled polygon with corners rounded to `r` grid units.
+    fn fill_rounded(&self, pts: &[(f32, f32)], r: f32) {
+        self.fill_pts(round_poly(pts, r).iter().map(|&(x, y)| self.raw(x, y)).collect());
+    }
+
+    /// Fill already-mapped points (convex directly, concave through triangulation).
+    fn fill_pts(&self, v: Vec<Pos2>) {
         let n = v.len();
         let turn = |i: usize| {
             let (a, b, c) = (v[i], v[(i + 1) % n], v[(i + 2) % n]);
@@ -516,7 +576,7 @@ fn draw(p: &P, icon: Icon) {
         }
         PaintBucket => {
             p.poly(&[(3.0, 7.0), (8.0, 12.0), (13.0, 7.0), (8.0, 2.0)], true);
-            p.fill(&[(3.0, 7.0), (8.0, 12.0), (13.0, 7.0)]);
+            p.fill_rounded(&[(3.0, 7.0), (8.0, 12.0), (13.0, 7.0)], 0.8);
             p.line(10.5, 4.5, 13.0, 2.0);
             p.dot(3.5, 12.5, 1.2);
         }
@@ -608,7 +668,7 @@ fn draw(p: &P, icon: Icon) {
         }
         Component => {
             for (cx, cy) in [(8.0, 4.5), (11.5, 8.0), (8.0, 11.5), (4.5, 8.0)] {
-                p.fill(&[(cx, cy - 2.2), (cx + 2.2, cy), (cx, cy + 2.2), (cx - 2.2, cy)]);
+                p.fill_rounded(&[(cx, cy - 2.2), (cx + 2.2, cy), (cx, cy + 2.2), (cx - 2.2, cy)], 0.7);
             }
         }
         ComponentSet => {
@@ -722,14 +782,14 @@ fn draw(p: &P, icon: Icon) {
                 p.line(8.0, y, 8.0, y + 2.0);
             }
             p.poly(&[(6.0, 4.0), (6.0, 12.0), (2.5, 8.0)], true);
-            p.fill(&[(10.0, 4.0), (10.0, 12.0), (13.5, 8.0)]);
+            p.fill_rounded(&[(10.0, 4.0), (10.0, 12.0), (13.5, 8.0)], 0.7);
         }
         FlipV => {
             for x in [2.0, 6.0, 10.0] {
                 p.line(x, 8.0, x + 2.0, 8.0);
             }
             p.poly(&[(4.0, 6.0), (12.0, 6.0), (8.0, 2.5)], true);
-            p.fill(&[(4.0, 10.0), (12.0, 10.0), (8.0, 13.5)]);
+            p.fill_rounded(&[(4.0, 10.0), (12.0, 10.0), (8.0, 13.5)], 0.7);
         }
         CornerRadius | CornerTopLeft => p.corner(3.0, 3.0, 1.0, 1.0, 10.0, 5.0),
         CornerTopRight => p.corner(13.0, 3.0, -1.0, 1.0, 10.0, 5.0),
@@ -803,7 +863,7 @@ fn draw(p: &P, icon: Icon) {
                 p.line(2.5, y, 13.5, y);
             }
         }
-        Play => p.fill(&[(5.0, 3.0), (12.5, 8.0), (5.0, 13.0)]),
+        Play => p.fill_rounded(&[(5.0, 3.0), (12.5, 8.0), (5.0, 13.0)], 1.3),
         Pause => {
             p.fill_rect(5.0, 3.5, 7.4, 12.5, 1.0);
             p.fill_rect(8.6, 3.5, 11.0, 12.5, 1.0);
@@ -1078,7 +1138,7 @@ fn draw(p: &P, icon: Icon) {
             // A window with a title strip and a play triangle in it.
             p.rect(3.0, 3.0, 13.0, 13.0, 1.5);
             p.line(3.5, 6.0, 12.5, 6.0);
-            p.fill(&[(7.0, 8.0), (10.5, 10.0), (7.0, 12.0)]);
+            p.fill_rounded(&[(7.0, 8.0), (10.5, 10.0), (7.0, 12.0)], 0.7);
         }
         AbsolutePosition => {
             // The frame, a small layer near its top-right corner, and the two offsets pinning it.
@@ -1151,18 +1211,18 @@ fn draw(p: &P, icon: Icon) {
             let (dx, dy) = at(0.0, 0.5);
             p.dot(dx, dy, 1.0);
             let grip: Vec<(f32, f32)> = [(-2.2, -3.2), (2.2, -3.2), (2.2, -5.2), (-2.2, -5.2)].iter().map(|&(x, y)| at(x, y)).collect();
-            p.fill(&grip);
+            p.fill_rounded(&grip, 0.6);
         }
         Board => {
             p.poly(&[(3.0, 3.0), (13.0, 3.0), (13.0, 9.0), (9.0, 13.0), (3.0, 13.0)], true);
-            p.fill(&[(9.0, 13.0), (9.0, 9.0), (13.0, 9.0)]);
+            p.fill_rounded(&[(9.0, 13.0), (9.0, 9.0), (13.0, 9.0)], 0.6);
             p.line(5.5, 6.5, 10.5, 6.5);
             p.line(5.5, 9.0, 8.0, 9.0);
         }
         Marker => {
             p.poly(&[(3.5, 12.5), (3.5, 10.0), (10.5, 3.0), (13.0, 5.5), (6.0, 12.5)], true);
             p.line(9.0, 4.5, 11.5, 7.0);
-            p.fill(&[(2.5, 13.5), (2.5, 11.0), (5.0, 13.5)]);
+            p.fill_rounded(&[(2.5, 13.5), (2.5, 11.0), (5.0, 13.5)], 0.6);
         }
         Highlighter => {
             p.poly(&[(4.5, 9.5), (11.0, 3.0), (13.0, 5.0), (6.5, 11.5)], true);
@@ -1308,6 +1368,20 @@ mod tests {
         });
         out.textures_delta.clear();
         assert!(out.shapes.len() > Icon::ALL.len() * 10);
+    }
+
+    /// Rounded joins stay inside the original box; degenerate input survives.
+    #[test]
+    fn round_poly_softens_corners_without_leaving_the_box() {
+        let tri = [(5.0, 3.0), (12.5, 8.0), (5.0, 13.0)];
+        let out = round_poly(&tri, 1.2);
+        assert_eq!(out.len(), tri.len() * 5);
+        assert!(out.iter().all(|&(x, y)| x.is_finite() && y.is_finite()));
+        assert!(out.iter().all(|&(x, y)| x >= 5.0 && x <= 12.5 && y >= 3.0 && y <= 13.0));
+        let dupe = round_poly(&[(0.0, 0.0), (0.0, 0.0), (1.0, 1.0)], 1.0);
+        assert!(dupe.len() >= 3 && dupe.iter().all(|&(x, y)| x.is_finite() && y.is_finite()));
+        assert_eq!(round_poly(&tri, 0.0), tri.to_vec());
+        assert_eq!(round_poly(&tri, f32::NAN), tri.to_vec());
     }
 
     /// Icon strokes keep a consistent visual weight as the glyph scales.
