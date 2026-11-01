@@ -510,6 +510,12 @@ pub struct UiState {
     pub motion_frame: u32,
     pub motion_property: AnimatedProperty,
     pub motion_value: f64,
+    /// Playback runs (the Motion panel advances the playhead and asks for repaints).
+    pub motion_playing: bool,
+    /// Fractional frames banked while playing (frame-accurate advance at any fps).
+    pub motion_play_acc: f64,
+    /// egui clock time of the last playback advance (0 before the first tick).
+    pub motion_play_last: f64,
     /// The tab of the previous frame, to see the right panel change mode.
     pub last_right_tab: RightTab,
     pub left_tab: LeftTab,
@@ -702,6 +708,9 @@ impl Default for UiState {
             motion_frame: 0,
             motion_property: AnimatedProperty::PositionX,
             motion_value: 0.0,
+            motion_playing: false,
+            motion_play_acc: 0.0,
+            motion_play_last: 0.0,
             last_right_tab: RightTab::Design,
             left_tab: LeftTab::File,
             pages_open: true,

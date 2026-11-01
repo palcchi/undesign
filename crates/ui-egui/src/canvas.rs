@@ -45,6 +45,7 @@ pub struct CanvasState {
     /// something on the canvas with a cursor of its own has it (a ruler guide, a gradient handle).
     pub cursor: Option<crate::cursors::Shown>,
     preedit: Option<PreeditView>,
+    motion_preview: Option<MotionPreview>,
     /// The pen pressure last reported during the current press (pen and stylus touches; the
     /// winit backends and browsers that report it).
     pressure: Option<f32>,
@@ -72,6 +73,7 @@ impl Default for CanvasState {
             last_pointer: None,
             hovering: false,
             preedit: None,
+            motion_preview: None,
             pressure: None,
         }
     }
@@ -114,6 +116,47 @@ impl FigApp {
     }
 }
 
+/// What the canvas shows while Motion directing is active: the document with the selected
+/// composition evaluated at the playhead (the saved document is never touched).
+pub struct MotionPreview {
+    /// The base document, composition and frame it was built from.
+    key: (Arc<Document>, u64, u32),
+    pub doc: Arc<Document>,
+}
+
+impl FigApp {
+    fn motion_preview_key(&self) -> Option<(Arc<Document>, u64, u32)> {
+        if self.ui.right_tab != crate::RightTab::Motion {
+            return None;
+        }
+        let ds = self.session.ds().ok()?;
+        let id = self.ui.motion_composition?;
+        let composition = ds.doc.motion.compositions.iter().find(|c| c.id == id)?;
+        if composition.tracks.is_empty() {
+            return None;
+        }
+        Some((ds.doc.clone(), id, self.ui.motion_frame.min(composition.duration_frames)))
+    }
+
+    /// Rebuild the directing preview when the document, composition or playhead changed.
+    pub fn sync_motion_preview(&mut self) {
+        if self.motion_preview_view().is_some() {
+            return;
+        }
+        self.canvas.motion_preview = self.motion_preview_key().and_then(|key| {
+            let doc = undesign_engine::cmd::motion::preview_document(&key.0, key.1, f64::from(key.2))?;
+            Some(MotionPreview { key, doc: Arc::new(doc) })
+        });
+    }
+
+    /// The directing preview, when it matches the current state.
+    pub fn motion_preview_view(&self) -> Option<&MotionPreview> {
+        let p = self.canvas.motion_preview.as_ref()?;
+        let (doc, id, frame) = self.motion_preview_key()?;
+        (Arc::ptr_eq(&p.key.0, &doc) && p.key.1 == id && p.key.2 == frame).then_some(p)
+    }
+}
+
 #[derive(Clone, PartialEq)]
 struct JobKey {
     doc: usize,
@@ -129,6 +172,8 @@ struct JobKey {
     /// Text lays out anew when fonts arrive (system fonts load in the background).
     fonts: u64,
     proof: bool,
+    /// The directing preview the pixels show (composition, playhead frame).
+    motion: Option<(u64, u32)>,
 }
 
 impl FigApp {
@@ -197,6 +242,7 @@ pub fn show(app: &mut FigApp, ui: &mut Ui, worker: &mut Worker) {
     crate::guides::end_released(&ctx);
     crate::live::track_pointer(app, &ctx);
     app.sync_preedit();
+    app.sync_motion_preview();
     // Retained rendering snaps the view outward and adds one pixel on each axis.
     let max_texture_side = (ctx.input(|i| i.max_texture_side).min(16_384) as u32).saturating_sub(1).max(1);
     request_render(app, worker, ppp, max_texture_side);
@@ -370,8 +416,13 @@ fn request_render(app: &mut FigApp, worker: &mut Worker, ppp: f32, max_texture_s
     } else {
         (ds.view.zoom * f64::from(ppp), (rect.width() * ppp).ceil().max(1.0) as u32, (rect.height() * ppp).ceil().max(1.0) as u32)
     };
-    // The edited text is drawn live (an IME composition included); the caret is an overlay.
-    let doc = app.preedit_view().map(|p| p.doc.clone()).unwrap_or_else(|| ds.doc.clone());
+    // The edited text is drawn live (an IME composition included); the caret is an overlay. While
+    // Motion directing is active the canvas shows the composition evaluated at the playhead.
+    let (doc, motion) = match (app.preedit_view(), app.motion_preview_view()) {
+        (Some(p), _) => (p.doc.clone(), None),
+        (None, Some(m)) => (m.doc.clone(), Some((m.key.1, m.key.2))),
+        (None, None) => (ds.doc.clone(), None),
+    };
     let outlined = if ds.view.outlines_selection { ds.selection.clone() } else { vec![] };
     let proof = ds.view.proof_srgb && !doc.color_profile.is_srgb();
     let outline_extras = undesign_render::Outline { hidden: ds.view.outline_hidden, bounds: ds.view.outline_bounds, light: false };
@@ -396,6 +447,7 @@ fn request_render(app: &mut FigApp, worker: &mut Worker, ppp: f32, max_texture_s
         solo: ds.focused(),
         fonts: undesign_text::layout_generation(),
         proof,
+        motion,
     };
     if let Some(previous) = &app.canvas.submitted {
         let previous_origin = (previous.origin.0 as f64 / 1000.0, previous.origin.1 as f64 / 1000.0);

@@ -1,6 +1,10 @@
 //! Motion compositions, tracks and keyframes.
-use serde_json::{Value, json};
-use undesign_doc::{AnimatedProperty, AnimationTrack, Composition, Interpolation, Keyframe, MotionDocument, MotionError, NodeId};
+use std::collections::BTreeMap;
+
+use serde_json::{Map, Value, json};
+use undesign_doc::{
+    AnimatedProperty, AnimationTrack, Composition, Document, Interpolation, Keyframe, MotionDocument, MotionError, NodeId, SampledTrack,
+};
 
 use super::CommandSpec;
 use crate::cmd::props::enum_of;
@@ -145,6 +149,68 @@ pub fn specs() -> Vec<CommandSpec> {
     ]
 }
 
+/// A render-only document with `composition_id` evaluated at `frame`: every enabled track's
+/// sampled value applied the same way a manual edit applies it (group-relative X/Y, rotation
+/// about the centre, clamped opacity, constraint-aware resize). Returns `None` when the
+/// composition is missing or nothing animates, so callers keep the base document. Never fails:
+/// unknown targets and failed applications are skipped, and the input is never mutated.
+pub fn preview_document(doc: &Document, composition_id: u64, frame: f64) -> Option<Document> {
+    let composition = doc.motion.compositions.iter().find(|c| c.id == composition_id)?;
+    if composition.tracks.is_empty() || !frame.is_finite() {
+        return None;
+    }
+    let samples = composition.sample_all(frame);
+    if samples.is_empty() {
+        return None;
+    }
+    let mut out = doc.clone();
+    let mut by_node: BTreeMap<NodeId, Vec<SampledTrack>> = BTreeMap::new();
+    for sample in samples {
+        by_node.entry(sample.target).or_default().push(sample);
+    }
+    for (target, samples) in by_node {
+        let mut props = Map::new();
+        let mut scale = (None, None);
+        for sample in samples {
+            if !sample.value.is_finite() {
+                continue;
+            }
+            let key = match sample.property {
+                AnimatedProperty::PositionX => "x",
+                AnimatedProperty::PositionY => "y",
+                AnimatedProperty::Rotation => "rotation",
+                AnimatedProperty::ScaleX => {
+                    scale.0 = Some(sample.value);
+                    continue;
+                }
+                AnimatedProperty::ScaleY => {
+                    scale.1 = Some(sample.value);
+                    continue;
+                }
+                AnimatedProperty::Opacity => "opacity",
+                AnimatedProperty::Width => "width",
+                AnimatedProperty::Height => "height",
+            };
+            props.insert(key.to_string(), json!(sample.value));
+        }
+        // One call keeps manual multi-property order; scale last since setting rotation rebuilds
+        // the linear part without scale.
+        let _ = super::props::apply("motion.preview", &mut out, target, &props);
+        if scale.0.is_some() || scale.1.is_some() {
+            let Ok(node) = out.get_mut(target) else { continue };
+            let (current_x, current_y) = undesign_geom::scales(node.transform);
+            node.transform = undesign_geom::set_scale_about_center(
+                node.transform,
+                node.width,
+                node.height,
+                scale.0.unwrap_or(current_x),
+                scale.1.unwrap_or(current_y),
+            );
+        }
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,5 +242,63 @@ mod tests {
         let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
         assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![0, 30]);
         assert!(session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":61,"value":0.0})).is_err());
+    }
+
+    #[test]
+    fn preview_applies_samples_without_mutating_the_base_document() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":0,"value":1.0})).unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":30,"value":0.0})).unwrap();
+        let doc = session.doc().unwrap().clone();
+        let base = doc.node(frame).unwrap().opacity;
+        let preview = preview_document(&doc, composition_id, 15.0).unwrap();
+        assert_eq!(preview.node(frame).unwrap().opacity, 0.5);
+        assert_eq!(doc.node(frame).unwrap().opacity, base);
+    }
+
+    #[test]
+    fn preview_returns_none_without_samples() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let doc = session.doc().unwrap().clone();
+        assert!(preview_document(&doc, composition_id + 1, 0.0).is_none());
+        assert!(preview_document(&doc, composition_id, 0.0).is_none());
+        assert!(preview_document(&doc, composition_id, f64::NAN).is_none());
+        let track = session
+            .execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity","enabled":false}))
+            .unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":0,"value":0.0})).unwrap();
+        let doc = session.doc().unwrap().clone();
+        assert!(preview_document(&doc, composition_id, 0.0).is_none());
+    }
+
+    #[test]
+    fn preview_keeps_scale_when_rotation_animates_too() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":30})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        for (property, end) in [("rotation", 30.0), ("scaleX", 2.0)] {
+            let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":property})).unwrap();
+            let track_id = track["trackId"].as_u64().unwrap();
+            let start = if property == "rotation" { 0.0 } else { 1.0 };
+            session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":0,"value":start})).unwrap();
+            session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":30,"value":end})).unwrap();
+        }
+        let doc = session.doc().unwrap().clone();
+        let preview = preview_document(&doc, composition_id, 30.0).unwrap();
+        let node = preview.node(frame).unwrap();
+        assert!((undesign_geom::rotation_degrees(node.transform) - 30.0).abs() < 1e-9);
+        let c = node.transform.as_coeffs();
+        assert!((c[0].hypot(c[2]) - 2.0).abs() < 1e-9);
+        assert!((c[1].hypot(c[3]) - 1.0).abs() < 1e-9);
     }
 }

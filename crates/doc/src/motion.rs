@@ -38,10 +38,29 @@ pub struct Composition {
     pub tracks: Vec<AnimationTrack>,
 }
 
+/// One track's value at a frame: what playback applies to a render-only document.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SampledTrack {
+    pub target: NodeId,
+    pub property: AnimatedProperty,
+    pub value: f64,
+}
+
 impl Composition {
     /// Duration in seconds.
     pub fn duration_seconds(&self) -> f64 {
         f64::from(self.duration_frames) / f64::from(self.fps.max(1))
+    }
+
+    /// Every enabled track's value at `frame` (empty when nothing animates there).
+    pub fn sample_all(&self, frame: f64) -> Vec<SampledTrack> {
+        if !frame.is_finite() {
+            return Vec::new();
+        }
+        self.tracks
+            .iter()
+            .filter_map(|t| t.sample(frame).map(|value| SampledTrack { target: t.target, property: t.property, value }))
+            .collect()
     }
 
     /// Check values that must be valid before playback or export.
@@ -234,6 +253,27 @@ mod tests {
         let track = track(Interpolation::Step);
         assert_eq!(track.sample(29.0), Some(0.0));
         assert_eq!(track.sample(30.0), Some(100.0));
+    }
+
+    #[test]
+    fn sample_all_collects_enabled_tracks_and_skips_the_rest() {
+        let mut opacity = track(Interpolation::Linear);
+        opacity.id = 2;
+        opacity.target = NodeId(9);
+        opacity.property = AnimatedProperty::Opacity;
+        opacity.enabled = false;
+        let empty = AnimationTrack { id: 3, target: NodeId(11), property: AnimatedProperty::Rotation, enabled: true, keyframes: Vec::new() };
+        let composition = Composition {
+            id: 1,
+            name: "Main".into(),
+            width: 1920,
+            height: 1080,
+            fps: 30,
+            duration_frames: 90,
+            tracks: vec![track(Interpolation::Linear), opacity, empty],
+        };
+        assert_eq!(composition.sample_all(15.0), vec![SampledTrack { target: NodeId(7), property: AnimatedProperty::PositionX, value: 50.0 }]);
+        assert!(composition.sample_all(f64::NAN).is_empty());
     }
 
     #[test]
