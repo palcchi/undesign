@@ -6,7 +6,7 @@ use undesign_doc::{
     AnimatedProperty, AnimationTrack, Composition, Document, Interpolation, Keyframe, MotionDocument, MotionError, NodeId, SampledTrack,
 };
 
-use super::CommandSpec;
+use super::{CommandSpec, ok};
 use crate::cmd::props::enum_of;
 use crate::{Result, bad, spec};
 
@@ -138,6 +138,27 @@ pub fn specs() -> Vec<CommandSpec> {
             }
             Ok(json!({"frame": frame, "trackId": track_id}))
         }),
+        spec!("motion.keyframe.move", "Move keyframe", "{compositionId, trackId, from, to}", true, |s, p| {
+            let cmd = "motion.keyframe.move";
+            let composition_id = required_u64(cmd, p, "compositionId")?;
+            let track_id = required_u64(cmd, p, "trackId")?;
+            let from = required_u32(cmd, p, "from")?;
+            let to = required_u32(cmd, p, "to")?;
+            let doc = s.doc_mut()?;
+            let composition = doc.motion.compositions.iter_mut().find(|c| c.id == composition_id).ok_or_else(|| bad(cmd, "no such composition"))?;
+            let track = composition.tracks.iter_mut().find(|t| t.id == track_id).ok_or_else(|| bad(cmd, "no such track"))?;
+            let pos = track.keyframes.iter().position(|k| k.frame == from).ok_or_else(|| bad(cmd, "no keyframe at that frame"))?;
+            if from != to {
+                let mut keyframe = track.keyframes.remove(pos);
+                // Dropping onto another keyframe replaces it, like After Effects.
+                track.keyframes.retain(|k| k.frame != to);
+                keyframe.frame = to;
+                track.keyframes.push(keyframe);
+                track.keyframes.sort_by_key(|k| k.frame);
+            }
+            composition.validate().map_err(|e| motion_error(cmd, e))?;
+            Ok(json!({"frame": to, "trackId": track_id}))
+        }),
         spec!("motion.inspect", "Inspect motion composition", "{compositionId?}", false, |s, p| {
             let doc = s.doc()?;
             let Some(id) = p.get("compositionId").and_then(Value::as_u64) else {
@@ -145,6 +166,10 @@ pub fn specs() -> Vec<CommandSpec> {
             };
             let composition = doc.motion.compositions.iter().find(|c| c.id == id).ok_or_else(|| bad("motion.inspect", "no such composition"))?;
             Ok(serde_json::to_value(composition).unwrap_or(Value::Null))
+        }),
+        spec!("motion.timeline", "Motion timeline", "{on?}  show or hide the docked Motion timeline", false, |s, p| {
+            s.request_ui("panel.motionTimeline", json!({"on": p.get("on").and_then(Value::as_bool)}));
+            ok()
         }),
     ]
 }
@@ -211,6 +236,24 @@ pub fn preview_document(doc: &Document, composition_id: u64, frame: f64) -> Opti
     Some(out)
 }
 
+/// The value a new keyframe takes: the property as the design panel shows it now (X/Y in the
+/// node's frame, degrees, opacity 0–1, size, current axis scales). `None` when the node is
+/// missing or the value is not finite.
+pub fn current_value(doc: &Document, target: NodeId, property: AnimatedProperty) -> Option<f64> {
+    let node = doc.node(target)?;
+    let value = match property {
+        AnimatedProperty::PositionX => doc.frame_relative(target).as_coeffs()[4],
+        AnimatedProperty::PositionY => doc.frame_relative(target).as_coeffs()[5],
+        AnimatedProperty::Rotation => undesign_geom::rotation_degrees(node.transform),
+        AnimatedProperty::ScaleX => undesign_geom::scales(node.transform).0,
+        AnimatedProperty::ScaleY => undesign_geom::scales(node.transform).1,
+        AnimatedProperty::Opacity => f64::from(node.opacity),
+        AnimatedProperty::Width => node.width,
+        AnimatedProperty::Height => node.height,
+    };
+    value.is_finite().then_some(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,6 +285,46 @@ mod tests {
         let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
         assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![0, 30]);
         assert!(session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":61,"value":0.0})).is_err());
+    }
+
+    #[test]
+    fn keyframe_move_keeps_order_merges_on_drop_and_undoes() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        for (at, value) in [(0, 1.0), (10, 0.5), (20, 0.0)] {
+            session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":at,"value":value})).unwrap();
+        }
+        let frames = |s: &Session| s.doc().unwrap().motion.compositions[0].tracks[0].keyframes.iter().map(|k| (k.frame, k.value)).collect::<Vec<_>>();
+        session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"from":10,"to":15})).unwrap();
+        assert_eq!(frames(&session), vec![(0, 1.0), (15, 0.5), (20, 0.0)]);
+        assert!(session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"from":15,"to":15})).is_ok());
+        assert_eq!(frames(&session), vec![(0, 1.0), (15, 0.5), (20, 0.0)]);
+        session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"from":0,"to":20})).unwrap();
+        assert_eq!(frames(&session), vec![(15, 0.5), (20, 1.0)]);
+        assert!(session.undo().unwrap());
+        assert_eq!(frames(&session), vec![(0, 1.0), (15, 0.5), (20, 0.0)]);
+        assert!(session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"from":15,"to":61})).is_err());
+        assert!(session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"from":99,"to":15})).is_err());
+    }
+
+    #[test]
+    fn current_value_reads_properties_like_the_design_panel() {
+        let session = Session::new();
+        let frame = session.page().unwrap();
+        let doc = session.doc().unwrap();
+        let node = doc.node(frame).unwrap();
+        assert_eq!(current_value(doc, frame, AnimatedProperty::Opacity), Some(f64::from(node.opacity)));
+        assert_eq!(current_value(doc, frame, AnimatedProperty::Rotation), Some(0.0));
+        assert_eq!(current_value(doc, frame, AnimatedProperty::ScaleX), Some(1.0));
+        assert_eq!(current_value(doc, frame, AnimatedProperty::ScaleY), Some(1.0));
+        for property in [AnimatedProperty::PositionX, AnimatedProperty::PositionY, AnimatedProperty::Width, AnimatedProperty::Height] {
+            assert!(current_value(doc, frame, property).is_some_and(|v| v.is_finite()));
+        }
+        assert_eq!(current_value(doc, NodeId(999_999), AnimatedProperty::Opacity), None);
     }
 
     #[test]
@@ -297,8 +380,10 @@ mod tests {
         let preview = preview_document(&doc, composition_id, 30.0).unwrap();
         let node = preview.node(frame).unwrap();
         assert!((undesign_geom::rotation_degrees(node.transform) - 30.0).abs() < 1e-9);
-        let c = node.transform.as_coeffs();
-        assert!((c[0].hypot(c[2]) - 2.0).abs() < 1e-9);
-        assert!((c[1].hypot(c[3]) - 1.0).abs() < 1e-9);
+        // Axis scales are the column lengths (what `scales` reads for the design panel):
+        // row lengths mix the axes once the node rotates.
+        let (sx, sy) = undesign_geom::scales(node.transform);
+        assert!((sx - 2.0).abs() < 1e-9);
+        assert!((sy - 1.0).abs() < 1e-9);
     }
 }

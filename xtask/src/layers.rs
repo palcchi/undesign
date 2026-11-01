@@ -22,6 +22,8 @@ const TABLE: &[(&str, u8)] = &[
     ("ui-egui", 6),
     // Live sessions over the network (WebSockets): above the engine, beside the UI.
     ("collab-net", 6),
+    // The hackathon agent core: drives the engine registry, no UI toolkit.
+    ("agent", 6),
 ];
 
 /// Networking crates: only L6 (`collab-net`) may use them.
@@ -69,5 +71,6 @@ pub fn check(root: &std::path::Path) -> bool {
 
 fn same_layer_ok(from: &str, to: &str) -> bool {
     // Within L0: color uses geom types; within L2: text/layout/pathops/collab are independent.
-    matches!((from, to), ("undesign-color", "undesign-geom") | ("undesign-render", "undesign-format"))
+    // Within L6: the UI drives the agent core, which is UI-toolkit-free (engine/doc only).
+    matches!((from, to), ("undesign-color", "undesign-geom") | ("undesign-render", "undesign-format") | ("undesign-ui-egui", "undesign-agent"))
 }

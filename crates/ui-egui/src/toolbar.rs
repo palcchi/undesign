@@ -125,40 +125,67 @@ pub(crate) fn bar_width(app: &FigApp) -> f32 {
     main_width(if board { BOARD_GROUPS } else { GROUPS }, board)
 }
 
-/// The main toolbar pill's width: the tool groups with their flyout carets, Resources and
-/// Actions, and the mode switcher (boards: the Design panel's button instead). The content
-/// starts 8 px in and the tail below leaves the same 8 px out, so the pill reads centred.
+/// The main toolbar pill's width: the tool groups with their flyout carets, Resources,
+/// Actions and Motion, and the mode switcher (boards: the Design panel's button instead). The
+/// content starts 8 px in and the tail below leaves the same 8 px out, so the pill reads centred.
 fn main_width(groups: &[Group], board: bool) -> f32 {
     let (cell, gap) = (TOOL_CELL, 4.0);
     let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
     let end = if board { cell + 8.0 } else { 4.0 * 34.0 + 12.0 };
-    groups.len() as f32 * (cell + gap) + carets + 2.0 * (cell + gap) + 16.0 + end
+    groups.len() as f32 * (cell + gap) + carets + 3.0 * (cell + gap) + 16.0 + end
+}
+
+/// The pill's width on a `canvas_w`-wide canvas for a `full`-wide row, and whether the help
+/// button still fits beside it: the pill shrinks to the canvas and scrolls inside, and the
+/// help button (also in the main menu) hides when the two would collide.
+fn toolbar_layout(canvas_w: f32, full: f32) -> (f32, bool) {
+    let shown = full.min((canvas_w - 16.0).max(0.0));
+    (shown, canvas_w / 2.0 + shown / 2.0 + 8.0 <= canvas_w - 48.0)
 }
 
 /// The main toolbar pill: the tool groups with their flyouts, Resources and Actions, then the
 /// Draw · Design · Prototype · Inspect mode switcher (on a board, the Design panel's button).
 fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: bool) {
     let groups = if board { BOARD_GROUPS } else { GROUPS };
-    let rect = pill(ui, &mut app.ui.nav, canvas, main_width(groups, board), t);
-    let cy = rect.center().y;
-    let mut x = rect.min.x + 8.0;
-    for g in groups {
-        x = group_cell(app, ui, g, pos2(x, cy), rect.min.y, t);
-    }
-    x = side_buttons(app, ui, x, cy, t);
-    divider(ui, t, x, cy);
-    x += 8.0;
-    if board {
-        // Boards have no prototypes or Dev Mode; the Design panel is hidden until asked for.
-        let r = Rect::from_center_size(pos2(x + TOOL_CELL / 2.0, cy), vec2(TOOL_CELL, TOOL_CELL));
-        let tip = crate::shortcuts::tip(tr("Design panel"), "view.design");
-        if tool_cell(ui, t, r, "board_panel", Icon::Panels, app.ui.board_panel, tip).clicked() {
-            app.run("view.design", json!({}));
+    let full = main_width(groups, board);
+    let (shown, help) = toolbar_layout(canvas.width(), full);
+    let max_scroll = (full - shown).max(0.0);
+    let mut scroll = app.ui.toolbar_scroll.clamp(0.0, max_scroll);
+    let (rect, pill_resp) = pill(ui, &mut app.ui.nav, canvas, shown, t);
+    // A wheel over the pill and a drag across it scroll the row when it overflows.
+    if max_scroll > 0.0 {
+        if ui.rect_contains_pointer(rect) {
+            let d = ui.input(|i| i.smooth_scroll_delta);
+            scroll = (scroll - d.x - d.y).clamp(0.0, max_scroll);
         }
-    } else {
-        mode_switcher(app, ui, x, cy, t);
+        if pill_resp.dragged() {
+            scroll = (scroll - pill_resp.drag_delta().x).clamp(0.0, max_scroll);
+        }
+        app.ui.toolbar_scroll = scroll;
     }
-    help_button(app, ui, canvas, t);
+    let cy = rect.center().y;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(8.0, 0.0))), |ui| {
+        let mut x = rect.min.x + 8.0 - scroll;
+        for g in groups {
+            x = group_cell(app, ui, g, pos2(x, cy), rect.min.y, t);
+        }
+        x = side_buttons(app, ui, x, cy, t);
+        divider(ui, t, x, cy);
+        x += 8.0;
+        if board {
+            // Boards have no prototypes or Dev Mode; the Design panel is hidden until asked for.
+            let r = Rect::from_center_size(pos2(x + TOOL_CELL / 2.0, cy), vec2(TOOL_CELL, TOOL_CELL));
+            let tip = crate::shortcuts::tip(tr("Design panel"), "view.design");
+            if tool_cell(ui, t, r, "board_panel", Icon::Panels, app.ui.board_panel, tip).clicked() {
+                app.run("view.design", json!({}));
+            }
+        } else {
+            mode_switcher(app, ui, x, cy, t);
+        }
+    });
+    if help {
+        help_button(app, ui, canvas, t);
+    }
 }
 
 /// A toolbar button's size.
@@ -221,29 +248,34 @@ fn flyout_caret(app: &mut FigApp, ui: &mut Ui, g: &Group, at: egui::Pos2, t: &To
     }
 }
 
-/// Resources (components, plugins: the Assets panel) and the Actions palette's button, from `x`.
-/// Where the next part starts.
+/// Resources (components, plugins: the Assets panel), the Actions palette's button and the
+/// Motion timeline's toggle, from `x`. Where the next part starts.
 fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) -> f32 {
-    for (icon, tip, id) in [
-        (Icon::Assets, crate::shortcuts::key_tip(tr("Resources"), "Shift+I"), "resources"),
-        (Icon::Actions, crate::shortcuts::tip(tr("Actions"), "app.actions"), "actions"),
-    ] {
+    for (icon, id) in [(Icon::Assets, "resources"), (Icon::Actions, "actions"), (Icon::Motion, "motion")] {
+        let tip: &str = match id {
+            "resources" => crate::shortcuts::key_tip(tr("Resources"), "Shift+I"),
+            "actions" => crate::shortcuts::tip(tr("Actions"), "app.actions"),
+            _ => tr("Motion"),
+        };
         let r = Rect::from_center_size(pos2(x + TOOL_CELL / 2.0, cy), vec2(TOOL_CELL, TOOL_CELL));
         let resp = ui.interact(r, ui.id().with(id), Sense::click()).tip(tip);
         if id == "actions" {
             app.ui.actions_rect = Some(r);
         }
-        // The Actions button reads on while its panel is open; clicking it again closes it.
-        let actions_open = id == "actions" && app.ui.palette.is_some();
-        if actions_open {
+        // The Actions and Motion buttons read on while their panel is open; clicking one again
+        // closes it.
+        let open = id == "actions" && app.ui.palette.is_some() || id == "motion" && app.ui.motion_timeline;
+        if open {
             ui.painter().rect_filled(r, CornerRadius::same(16), t.accent);
         } else if resp.hovered() {
             ui.painter().rect_filled(r, CornerRadius::same(16), t.hover);
         }
-        icons::paint(ui.painter(), glyph_rect(r), icon, if actions_open { t.accent_on } else { t.icon });
+        icons::paint(ui.painter(), glyph_rect(r), icon, if open { t.accent_on } else { t.icon });
         if resp.clicked() {
             if id == "actions" {
                 crate::menus::toggle_palette(&mut app.ui);
+            } else if id == "motion" {
+                app.run("motion.timeline", json!({}));
             } else {
                 app.run("view.assets", json!({}));
             }
@@ -262,6 +294,7 @@ fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
         crate::RightTab::Prototype => 2,
         crate::RightTab::Inspect => 3,
         crate::RightTab::Motion => 1,
+        crate::RightTab::Agent => 1,
     };
     let seg = Rect::from_min_size(pos2(x, cy - 18.0), vec2(4.0 * 34.0 + 4.0, 36.0));
     ui.painter().rect_filled(seg, CornerRadius::same(8), t.field);
@@ -335,7 +368,7 @@ fn view_only_toolbar(app: &mut FigApp, ui: &mut Ui, why: &'static str) {
     let text = ui.painter().layout_no_wrap(label.to_string(), crate::theme::semibold(11.5), t.text);
     let badge_w = 12.0 + 14.0 + 6.0 + text.size().x + 12.0;
     let width = 2.0 * (cell + 4.0) + 8.0 + 12.0 + badge_w + 8.0;
-    let rect = pill(ui, &mut app.ui.nav, app.canvas.rect, width, &t);
+    let (rect, _) = pill(ui, &mut app.ui.nav, app.canvas.rect, width, &t);
     let cy = rect.center().y;
     let mut x = rect.min.x + 8.0;
     for (tool, icon) in [(ToolId::Move, Icon::Move), (ToolId::Hand, Icon::Hand)] {
@@ -365,7 +398,7 @@ fn edit_toolbar(app: &mut FigApp, ui: &mut Ui, current: VTool) {
     let canvas = app.canvas.rect;
     let cell = 32.0;
     let width = VTool::ALL.len() as f32 * (cell + 4.0) + 8.0 + 12.0 + DONE_W + 8.0;
-    let rect = pill(ui, &mut app.ui.nav, canvas, width, &t);
+    let (rect, _) = pill(ui, &mut app.ui.nav, canvas, width, &t);
     let cy = rect.center().y;
     let mut x = rect.min.x + 8.0;
     // Holding Cmd with the Move tool bends: show it.
@@ -418,7 +451,7 @@ fn builder_toolbar(app: &mut FigApp, ui: &mut Ui) {
     };
     let galley = ui.painter().layout_no_wrap(hint, regular(12.0), t.text_secondary);
     let width = 2.0 * (cell + 4.0) + 8.0 + 12.0 + galley.size().x + 12.0 + 12.0 + DONE_W + 8.0;
-    let rect = pill(ui, &mut app.ui.nav, app.canvas.rect, width, &t);
+    let (rect, _) = pill(ui, &mut app.ui.nav, app.canvas.rect, width, &t);
     let cy = rect.center().y;
     let mut x = rect.min.x + 8.0;
     for (mode, icon, tip) in [("merge", Icon::ShapeBuilder, tr("Merge regions")), ("remove", Icon::ShapeBuilderRemove, tr("Remove regions"))] {
@@ -449,13 +482,14 @@ pub(crate) fn pill_rect(canvas: Rect, width: f32) -> Rect {
 }
 
 /// The floating pill (shadow, panel, border) `width` wide at the bottom centre of the canvas: the
-/// toolbar region keyboard navigation moves through.
-fn pill(ui: &Ui, nav: &mut Nav, canvas: Rect, width: f32, t: &Tokens) -> Rect {
+/// toolbar region keyboard navigation moves through. Also its response (the main pill scrolls
+/// on a drag across it).
+fn pill(ui: &Ui, nav: &mut Nav, canvas: Rect, width: f32, t: &Tokens) -> (Rect, egui::Response) {
     let rect = pill_rect(canvas, width);
     // The pill takes the press and the drag over it: its buttons sense clicks only, and egui gives
     // a drag the canvas under them would sense to the canvas, so the pen placed an anchor there.
     // Not focusable: the keyboard walks the buttons, not the pill.
-    ui.interact(rect, ui.id().with("pill"), Sense::CLICK | Sense::DRAG);
+    let resp = ui.interact(rect, ui.id().with("pill"), Sense::CLICK | Sense::DRAG);
     a11y::area(nav, Region::Toolbar, rect);
     a11y::container_bounds(ui, rect);
     let painter = ui.painter();
@@ -464,7 +498,7 @@ fn pill(ui: &Ui, nav: &mut Nav, canvas: Rect, width: f32, t: &Tokens) -> Rect {
     }
     painter.rect_filled(rect, CornerRadius::same(13), t.panel);
     painter.rect_stroke(rect, CornerRadius::same(13), Stroke::new(1.0, t.border), StrokeKind::Inside);
-    rect
+    (rect, resp)
 }
 
 /// A round tool button: accent when active, tinted on hover; `tip` is its tooltip and name.
@@ -647,13 +681,25 @@ mod tests {
         }
     }
 
+    /// The pill fits the canvas and scrolls inside it; the help button hides exactly when
+    /// the two would collide.
+    #[test]
+    fn toolbar_fits_narrow_canvases() {
+        assert_eq!(toolbar_layout(1000.0, 560.0), (560.0, true));
+        assert_eq!(toolbar_layout(470.0, 560.0), (454.0, false));
+        assert_eq!(toolbar_layout(250.0, 560.0), (234.0, false));
+        assert_eq!(toolbar_layout(1000.0, 300.0), (300.0, true));
+        assert_eq!(toolbar_layout(672.0, 560.0), (560.0, true));
+        assert!(!toolbar_layout(671.0, 560.0).1);
+    }
+
     /// The pill's content ends as far from its edge as it starts (8 px), on design
     /// files and on boards: the pill reads centred.
     #[test]
     fn pill_content_is_centred() {
         for (groups, board, tail) in [(GROUPS, false, 4.0 * 34.0 + 4.0), (BOARD_GROUPS, true, TOOL_CELL)] {
             let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
-            let content = 8.0 + groups.len() as f32 * (TOOL_CELL + 4.0) + carets + 2.0 * (TOOL_CELL + 4.0) + 8.0 + tail;
+            let content = 8.0 + groups.len() as f32 * (TOOL_CELL + 4.0) + carets + 3.0 * (TOOL_CELL + 4.0) + 8.0 + tail;
             let trailing = main_width(groups, board) - content;
             assert!((trailing - 8.0).abs() < 0.001, "trailing {trailing}");
         }

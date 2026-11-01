@@ -416,6 +416,8 @@ pub fn handle(app: &mut FigApp, ctx: &Context, method: &str, p: &Value) -> Resul
                 app.ui.right_tab = match t {
                     "prototype" => crate::RightTab::Prototype,
                     "inspect" => crate::RightTab::Inspect,
+                    "motion" => crate::RightTab::Motion,
+                    "agent" => crate::RightTab::Agent,
                     _ => crate::RightTab::Design,
                 };
             }
@@ -499,6 +501,10 @@ pub fn handle(app: &mut FigApp, ctx: &Context, method: &str, p: &Value) -> Resul
             }
             if let Some(h) = p.get("iconGallery").and_then(Value::as_bool) {
                 app.ui.icon_gallery = h;
+            }
+            // Motion timeline zoom in pixels per frame (null fits the composition).
+            if let Some(v) = p.get("motionZoom") {
+                app.ui.motion_ppf = v.as_f64().map(|ppf| ppf as f32);
             }
             // Comment thread popover: an id opens it, null closes it.
             if let Some(v) = p.get("commentOpen") {
@@ -672,6 +678,13 @@ pub fn handle(app: &mut FigApp, ctx: &Context, method: &str, p: &Value) -> Resul
             if let Some(v) = p.get("annotationFilter").and_then(Value::as_str) {
                 let doc = app.session.doc().map_err(|e| e.to_string())?;
                 app.ui.dev.categories = crate::dev_mode::CategoryFilter::parse(doc, v).ok_or("annotationFilter: all|none|a category id or name")?;
+            }
+            // Window size for viewport QA ([width, height], clamped to sane limits).
+            if let Some(size) = p.get("windowSize").and_then(Value::as_array) {
+                let wh: Vec<f32> = size.iter().filter_map(Value::as_f64).filter(|v| v.is_finite()).map(|v| v as f32).collect();
+                if let [w, h] = wh.as_slice() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(w.clamp(800.0, 4096.0), h.clamp(500.0, 4096.0))));
+                }
             }
             if b(p, "resetFrameStats") {
                 app.frame_stats.reset();
