@@ -49,7 +49,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     if compositions.is_empty() {
         ui.label(egui::RichText::new("No compositions yet").color(t.text_secondary));
         ui.add_space(8.0);
-        if ui.button("＋  Create composition").clicked()
+        if crate::widgets::button(ui, "＋  Create composition", true, true).clicked()
             && let Some(result) =
                 app.run("motion.composition.create", json!({"name":"Main","width":1920,"height":1080,"fps":30,"durationFrames":300}))
         {
@@ -79,7 +79,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     ui.add_space(8.0);
     ui.separator();
 
-    ui.label(egui::RichText::new("PLAYHEAD").size(9.0).strong().color(t.text_tertiary));
+    ui.label(egui::RichText::new("Playhead").size(11.0).strong().color(t.text));
     if app.ui.motion_playing {
         // Frame-accurate advance at the composition's fps; loops for directing.
         let now = ui.ctx().input(|i| i.time);
@@ -121,7 +121,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     ui.add_space(8.0);
     ui.separator();
 
-    ui.label(egui::RichText::new("ADD TRACK").size(9.0).strong().color(t.text_tertiary));
+    ui.label(egui::RichText::new("Add track").size(11.0).strong().color(t.text));
     let selected = app.session.selection().first().copied();
     let selected_name = selected.and_then(|id| app.session.doc().ok()?.node(id).map(|n| n.name.clone()));
     ui.label(selected_name.as_deref().unwrap_or("Select a layer on the canvas"));
@@ -135,7 +135,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
                 }
             });
         let can_add = selected.is_some();
-        if ui.add_enabled(can_add, egui::Button::new("＋ Track")).clicked()
+        if crate::widgets::button(ui, "＋ Track", false, can_add).clicked()
             && let Some(target) = selected
         {
             app.run(
@@ -151,7 +151,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     ui.add_space(8.0);
     ui.separator();
 
-    ui.label(egui::RichText::new("KEYFRAME").size(9.0).strong().color(t.text_tertiary));
+    ui.label(egui::RichText::new("Keyframe").size(11.0).strong().color(t.text));
     ui.horizontal(|ui| {
         ui.label("Value");
         ui.add(egui::DragValue::new(&mut app.ui.motion_value).speed(0.1).max_decimals(3));
@@ -159,7 +159,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     let matching_track = selected.and_then(|target| {
         composition.tracks.iter().find(|track| track.target == target && track.property == app.ui.motion_property).map(|track| track.id)
     });
-    if ui.add_enabled(selected.is_some(), egui::Button::new("◆  Set keyframe at current frame")).clicked()
+    if crate::widgets::button(ui, "◆  Set keyframe at current frame", true, selected.is_some()).clicked()
         && let Some(target) = selected
     {
         let track_id = matching_track.or_else(|| {
@@ -190,7 +190,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     ui.add_space(10.0);
     ui.separator();
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("TIMELINE").size(9.0).strong().color(t.text_tertiary));
+        ui.label(egui::RichText::new("Timeline").size(11.0).strong().color(t.text));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(egui::RichText::new(format!("{} tracks", composition.tracks.len())).size(10.0).color(t.text_secondary));
         });
@@ -210,7 +210,8 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
         });
         let width = ui.available_width().max(80.0);
         let (rect, response) = ui.allocate_exact_size(vec2(width, 28.0), Sense::click());
-        ui.painter().rect_filled(rect, 4.0, t.field);
+        ui.painter().rect_filled(rect, 10.0, t.field);
+        ui.painter().rect_stroke(rect, 10.0, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
         let y = rect.center().y;
         ui.painter().line_segment([pos2(rect.left() + 5.0, y), pos2(rect.right() - 5.0, y)], Stroke::new(1.0, t.border_strong));
         for tick in 0..=10 {

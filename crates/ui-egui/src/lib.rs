@@ -1694,12 +1694,19 @@ impl FigApp {
         let (left_w, right_w) = fit_panels(ui.available_width(), left_open.then_some(self.ui.left_width), right_open.then_some(self.ui.right_width));
         let rows = ui.available_rect_before_wrap().y_range();
         let mut edges: Vec<(&str, f32, f32, f32)> = Vec::new();
+        // The side panels float like cards (their resize edges sit on the visible edge).
+        let gap = 8.0;
+        let card = || {
+            egui::Frame::NONE
+                .fill(t.panel)
+                .stroke(egui::Stroke::new(1.0, t.border))
+                .corner_radius(egui::CornerRadius::same(12))
+                .outer_margin(egui::Margin::same(8))
+                .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
+        };
         if left_open {
-            edges.push(("left", ui.available_rect_before_wrap().min.x + left_w, left_w, 1.0));
-            egui::Panel::left("left_panel")
-                .resizable(false)
-                .exact_size(left_w)
-                .frame(egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border)))
+            edges.push(("left", ui.available_rect_before_wrap().min.x + left_w - gap, left_w, 1.0));
+            egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card())
                 .show(ui, |ui| {
                     let label = match self.ui.left_tab {
                         _ if self.ui.versions.open => i18n::tr("Version history"),
@@ -1711,11 +1718,8 @@ impl FigApp {
                 });
         }
         if right_open {
-            edges.push(("right", ui.available_rect_before_wrap().max.x - right_w, right_w, -1.0));
-            egui::Panel::right("right_panel")
-                .resizable(false)
-                .exact_size(right_w)
-                .frame(egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border)))
+            edges.push(("right", ui.available_rect_before_wrap().max.x - right_w + gap, right_w, -1.0));
+            egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card())
                 .show(ui, |ui| {
                     let label = match self.ui.right_tab {
                         RightTab::Design => i18n::tr("Design"),
