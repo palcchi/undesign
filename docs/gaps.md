@@ -443,10 +443,13 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
   gives only the main window one); window positions restored at the next start.
 - **Estimate:** 4–8 h.
 
-### 19. AI features
-- **Missing:** Figma AI (first draft, rename layers, remove background, image generation and
-  editing, visual search, Make).
-- **Estimate:** 30–60 h with openly licensed local models. **Owner decision needed.**
+### 19. AI Assistant
+- **Missing:** provider/model configuration, secure credential storage, streamed chat, document-aware
+  context, typed editor tools, preview/apply and undoable design changes.
+- **Direction (owner decision, 2026-10-31):** support configurable API providers and compatible
+  gateways rather than limiting the feature to local models. Never ship provider secrets in the
+  WASM bundle or persist them in design files/browser storage.
+- **Estimate:** 30–60 h. Architecture and acceptance criteria: [ai-motion-architecture](ai-motion-architecture.md).
 
 ### 20. Mobile apps
 - **Missing:** Figma's iOS and Android apps view and comment on files and mirror prototypes.
@@ -482,6 +485,16 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
 - **User impact:** boards cover a brainstorm or a flow sketch; facilitated workshops need the
   timer, voting and templates.
 - **Estimate:** 30–60 h.
+
+### 25. Motion Studio
+- **Missing:** timeline-based animation, keyframes, interpolation/graph editor, playback, effects
+  animation, compositing and video export.
+- **Landed (2026-11-01):** serializable composition/track/keyframe model with validation and
+  Step, Linear and Cubic Bezier sampling; undoable composition, track and keyframe commands; initial
+  Motion Studio tab with a composition selector, playhead, editable keyframe values and timeline rows.
+  Playback/render evaluation, graph editing, animated effects, compositing and export remain missing.
+- **Estimate:** 50–100 h for a substantial first version; audio, advanced compositing and full
+  After Effects parity are later work. See [ai-motion-architecture](ai-motion-architecture.md).
 
 ## Revision history
 

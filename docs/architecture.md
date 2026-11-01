@@ -16,7 +16,7 @@ replaced.
 |---|---|---|---|
 | L0 | `undesign-geom` | ~0.5k | Affine transforms, shape path builders (rounded and smoothed corners, polygons, stars, arcs) on kurbo |
 | L0 | `undesign-color` | ~1.3k | Colours (HSB/HSL, hex/CSS, Display P3), paints (solid, gradients, image), blend modes |
-| L1 | `undesign-doc` | ~8.5k | Document model: pages, node tree in a persistent map (`imbl`, stable ids), properties, components, styles, variables, prototype data, comments, versions. Serde everywhere |
+| L1 | `undesign-doc` | ~8.5k | Document model: pages, node tree in a persistent map (`imbl`, stable ids), properties, components, styles, variables, prototype data, comments, versions and motion compositions/tracks/keyframes. Serde everywhere |
 | L2 | `undesign-layout` | ~1.8k | Auto layout (horizontal, vertical, wrap, grid; hug/fill/fixed; min/max), constraints, layout grid geometry |
 | L2 | `undesign-text` | ~3.1k | Font database (optional embedded craft-fonts + system scan), shaping (harfrust), bidi, line layout, glyph outlines (skrifa), variable fonts |
 | L2 | `undesign-collab` | ~3.4k | Real-time collaboration core (no networking): synced object/property model, change sets, fractional positions, server ordering and validation, client reconciliation, wire messages |
@@ -37,8 +37,8 @@ replaced.
 
 A `Document` holds pages, a persistent map of nodes (frames, groups, sections, rectangles,
 ellipses, polygons, stars, lines, vector networks, text with styled runs, boolean groups,
-components, component sets, instances, slices), styles, variable collections, comments, versions
-and images by hash. Instances keep their main's id and per-layer overrides; the engine keeps their
+components, component sets, instances, slices), styles, variable collections, comments, versions,
+images by hash and optional motion compositions with property tracks and keyframes. Instances keep their main's id and per-layer overrides; the engine keeps their
 materialised children in sync when a main changes (directly for value, size and add/remove edits,
 by a rebuild otherwise). Snapshots are cheap (`Arc` and structural sharing), which gives unlimited
 undo with one step per gesture.
@@ -80,6 +80,7 @@ input.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-31 | minor | Added the backwards-compatible motion document model: compositions, property tracks, keyframes, interpolation and validation. Engine commands, playback and UI are still pending |
 | 2026-10-11 | minor | `collab-net` hosts through one hub for the app's sessions and the standalone server; added the `undesign-server` app |
 | 2026-10-10 | minor | Merged main after #101–#103: WASM plugins (plugins area 0% → 35% breadth, 20% ready; ecosystem 5% → 20%) and the multiplayer core without networking (multiplayer 5% → 15% breadth, 5% ready; collaboration 8% → 12%); menu breadth 97.5% → 98.5% (200/203); ready for real work ~46% → ~47%; full parity 420–790 h → 390–745 h; beta 210–380 h → 200–365 h. Fixed the stated weight sums (areas 1–16 sum to 94, total 113; percentages were already computed with those) |
 | 2026-10-10 | major | Created from the code as of PR #99 |

@@ -261,6 +261,7 @@ fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
         crate::RightTab::Design => 1,
         crate::RightTab::Prototype => 2,
         crate::RightTab::Inspect => 3,
+        crate::RightTab::Motion => 1,
     };
     let seg = Rect::from_min_size(pos2(x, cy - 18.0), vec2(4.0 * 34.0 + 4.0, 36.0));
     ui.painter().rect_filled(seg, CornerRadius::same(8), t.field);

@@ -15,6 +15,7 @@ pub mod geometry;
 pub mod handoff;
 pub mod ids;
 pub mod library;
+pub mod motion;
 pub mod node;
 pub mod props;
 pub mod proto;
@@ -29,6 +30,7 @@ pub use colors::*;
 pub use comments::*;
 pub use handoff::*;
 pub use library::*;
+pub use motion::*;
 pub use node::*;
 pub use props::*;
 pub use styles::*;
@@ -204,6 +206,9 @@ pub struct Document {
     /// [`handoff`]).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub dev_snapshots: BTreeMap<NodeId, Arc<DevSnapshot>>,
+    /// Motion compositions and keyframe tracks. Empty in files without animation.
+    #[serde(default, skip_serializing_if = "MotionDocument::is_empty")]
+    pub motion: MotionDocument,
 }
 
 impl Default for Document {
@@ -243,6 +248,7 @@ impl Document {
             image_presets: Vec::new(),
             annotation_categories: None,
             dev_snapshots: BTreeMap::new(),
+            motion: MotionDocument::default(),
         }
     }
 

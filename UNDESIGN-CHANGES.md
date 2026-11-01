@@ -139,3 +139,24 @@ upstream revision so future syncs stay auditable.
   nine catalogs at 1,787/1,787). Docs updated (`ui-parity.md`,
   `target-app-parity.md`, `control-protocol.md`, `README.md`, `ROADMAP.md`):
   discoverability ×0.94 → ×0.93, essentials 59.2% → 58.6% (~59%).
+
+## 2026-10-31 — Icon stroke consistency (change #8)
+
+- Kept the code-drawn FigCraft-derived glyph set with its upstream copyright and licence intact;
+  the Undesign `Logo` glyph remains original. No Figma icon assets, tracing or third-party icon
+  pack was introduced.
+- Increased the native 16 px outline to a clearer 1.25 px and scaled it proportionally
+  (1.875 px at 24, 2.5 px at 32), while retaining a 1 px floor for tiny glyphs.
+- Added a regression test for the size-to-stroke relationship.
+
+## 2026-10-31 — Motion document foundation (change #9)
+
+- Added optional motion compositions to the document model. Existing files decode with an empty
+  motion section and omit that section again when no compositions exist.
+- Added composition validation, property animation tracks, ordered numeric keyframes, Step/Linear/
+  Cubic Bezier interpolation and a pure frame-sampling evaluator.
+- Added tests for sampling, disabled tracks, keyframe ordering and backwards-compatible decoding.
+- Added undoable engine commands and an initial Motion tab for composition setup, track creation,
+  playhead scrubbing and numeric keyframe entry. Playback/render evaluation, graph editing, effects
+  and video export are not implemented yet.
+- Added the provider-neutral AI Assistant architecture; provider transport and chat UI remain planned.
