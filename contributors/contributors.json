@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "repo": "palcchi/undesign",
+  "branch": "main",
+  "head": "587e82e3a3e4c679362b85e9320c01c6a9805b6f",
+  "head_date": "2026-11-01T06:49:41Z",
+  "commits": 19,
+  "unattributed_commits": 19,
+  "contributors": [],
+  "models": [
+    {
+      "id": "meta/muse/spark",
+      "company": "Meta",
+      "model": "Muse",
+      "version": "Spark",
+      "commits": 1,
+      "lines_added": 97,
+      "lines_deleted": 2
+    }
+  ]
+}

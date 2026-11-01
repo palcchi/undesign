@@ -109,8 +109,10 @@ commit. Grade by behaviour against the incumbent, not by whether a menu item exi
 
 ## Contributor credits (About window)
 
-- Removed 2026-10-30 with `contributors/` and `docs/contributors.md`: About ▸ Contributors shows
-  a note instead of a table (the credits code handles missing data).
+- Contributor data was removed 2026-10-30; restored 2026-11-01 with only the Models credit
+  (Muse): About ▸ Contributors still shows its empty-data note, About ▸ Models lists Muse.
+  `contributors/contributors.json` is hand-maintained until the craftrules generator runs again;
+  each contributor adds only their own `people.toml` entry (see `docs/contributors.md`).
 
 <!-- antislop:start -->
 ## antislop
