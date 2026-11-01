@@ -213,7 +213,7 @@ fn flyout_caret(app: &mut FigApp, ui: &mut Ui, g: &Group, at: egui::Pos2, t: &To
         a11y::popup(&mut app.ui.nav, cresp.id, flyout_id(g.key));
     }
     if cresp.hovered() {
-        ui.painter().rect_filled(cr, CornerRadius::same(4), t.hover);
+        ui.painter().rect_filled(cr, CornerRadius::same(5), t.hover);
     }
     icons::paint(ui.painter(), Rect::from_center_size(cr.center(), vec2(CARET, CARET)), Icon::Chevron, t.icon_secondary);
     if cresp.clicked() {
@@ -236,9 +236,9 @@ fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) 
         // The Actions button reads on while its panel is open; clicking it again closes it.
         let actions_open = id == "actions" && app.ui.palette.is_some();
         if actions_open {
-            ui.painter().rect_filled(r, CornerRadius::same(5), t.accent);
+            ui.painter().rect_filled(r, CornerRadius::same(16), t.accent);
         } else if resp.hovered() {
-            ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
+            ui.painter().rect_filled(r, CornerRadius::same(16), t.hover);
         }
         icons::paint(ui.painter(), glyph_rect(r), icon, if actions_open { t.accent_on } else { t.icon });
         if resp.clicked() {
@@ -467,7 +467,7 @@ fn pill(ui: &Ui, nav: &mut Nav, canvas: Rect, width: f32, t: &Tokens) -> Rect {
     rect
 }
 
-/// A square tool button: accent when active, tinted on hover; `tip` is its tooltip and name.
+/// A round tool button: accent when active, tinted on hover; `tip` is its tooltip and name.
 pub(crate) fn tool_cell(ui: &mut Ui, t: &Tokens, r: Rect, id: impl egui::AsIdSalt, icon: Icon, active: bool, tip: &str) -> egui::Response {
     let resp = ui.interact(r, ui.id().with(id), Sense::click()).on_hover_ui(|ui| {
         ui.label(tip);
@@ -480,7 +480,7 @@ pub(crate) fn tool_cell(ui: &mut Ui, t: &Tokens, r: Rect, id: impl egui::AsIdSal
     } else {
         Color32::TRANSPARENT
     };
-    ui.painter().rect_filled(r, CornerRadius::same(5), bg);
+    ui.painter().rect_filled(r, CornerRadius::same(16), bg);
     icons::paint(ui.painter(), glyph_rect(r), icon, if active { t.accent_on } else { t.icon });
     resp
 }
@@ -497,7 +497,7 @@ fn done_button(ui: &mut Ui, t: &Tokens, x: f32, cy: f32, tip: &str) -> bool {
     divider(ui, t, x, cy);
     let done = Rect::from_min_size(pos2(x + 12.0, cy - 14.0), vec2(DONE_W, 28.0));
     let resp = ui.interact(done, ui.id().with("tool_done"), Sense::click()).tip(tip);
-    ui.painter().rect_filled(done, CornerRadius::same(6), if resp.hovered() { t.accent_hover } else { t.accent });
+    ui.painter().rect_filled(done, CornerRadius::same(14), if resp.hovered() { t.accent_hover } else { t.accent });
     ui.painter().text(done.center(), Align2::CENTER_CENTER, tr("Done"), crate::theme::semibold(11.5), t.accent_on);
     resp.clicked()
 }
@@ -520,7 +520,7 @@ fn options_flyout(app: &mut FigApp, ui: &mut Ui, g: &Group, bottom_left: egui::P
             a11y::menu_item(&resp, tr(c.label), "", Some(c.on));
             a11y::own_focus(&resp);
             if c.on || resp.hovered() || resp.has_focus() {
-                ui.painter().rect_filled(r, CornerRadius::same(5), t.menu_hover);
+                ui.painter().rect_filled(r, CornerRadius::same(16), t.menu_hover);
             }
             crate::board_bar::paint_choice(ui.painter(), r.shrink(5.0), &c.mark, t.menu_text);
             if resp.clicked() {
@@ -554,7 +554,7 @@ fn flyout(app: &mut FigApp, ui: &mut Ui, g: &Group, bottom_left: egui::Pos2) {
             // The keyboard's item is highlighted like the hovered one.
             a11y::own_focus(&resp);
             if resp.hovered() || resp.has_focus() {
-                ui.painter().rect_filled(r, CornerRadius::same(5), t.menu_hover);
+                ui.painter().rect_filled(r, CornerRadius::same(16), t.menu_hover);
             }
             if *tid == app.session.tool.tool {
                 icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 10.0, r.center().y), vec2(12.0, 12.0)), Icon::Check, t.menu_text);

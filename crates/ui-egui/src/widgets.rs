@@ -235,11 +235,11 @@ fn number_field_impl(
     // The label scrubs with the pointer; the keyboard stops at the value only.
     let lead_resp = ui.interact(lead_rect, id.with("lead"), Sense::CLICK | Sense::DRAG);
     let hovered = field_resp.hovered() || lead_resp.hovered() || editing.is_some();
-    ui.painter().rect_filled(rect, CornerRadius::same(5), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
     if editing.is_some() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
     } else if hovered {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
     }
     match lead {
         Lead::Text(s) => {
@@ -394,7 +394,7 @@ fn number_field_impl(
         let bresp = ui.interact(br, id.with("bind"), Sense::click());
         if bresp.has_focus() || rect.contains(ui.input(|i| i.pointer.hover_pos()).unwrap_or(egui::Pos2::new(f32::NAN, f32::NAN))) {
             if bresp.hovered() {
-                ui.painter().rect_filled(br, CornerRadius::same(4), t.hover);
+                ui.painter().rect_filled(br, CornerRadius::same(6), t.hover);
             }
             icons::paint(ui.painter(), br.shrink(3.0), Icon::Variable, t.icon_secondary);
         }
@@ -420,9 +420,9 @@ pub fn bound_field(ui: &mut Ui, id: Id, lead: Lead, rect: Rect, name: &str) -> O
     let t = Tokens::get(ui.ctx());
     let resp = ui.interact(rect, id.with("bound"), Sense::click());
     a11y::combo(&resp, lead.name(), name, false);
-    ui.painter().rect_filled(rect, CornerRadius::same(5), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
     if resp.hovered() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
     }
     let lead_w = match lead {
         Lead::None | Lead::Named(_) => 4.0,
@@ -438,8 +438,8 @@ pub fn bound_field(ui: &mut Ui, id: Id, lead: Lead, rect: Rect, name: &str) -> O
     };
     let dr = Rect::from_center_size(pos2(rect.max.x - 11.0, rect.center().y), vec2(18.0, 18.0));
     let chip = Rect::from_min_max(pos2(rect.min.x + lead_w - 2.0, rect.min.y + 3.0), pos2(dr.min.x - 2.0, rect.max.y - 3.0));
-    ui.painter().rect_filled(chip, CornerRadius::same(4), t.hover);
-    ui.painter().rect_stroke(chip, CornerRadius::same(4), Stroke::new(1.0, t.border), StrokeKind::Inside);
+    ui.painter().rect_filled(chip, CornerRadius::same(6), t.hover);
+    ui.painter().rect_stroke(chip, CornerRadius::same(6), Stroke::new(1.0, t.border), StrokeKind::Inside);
     // Grouped names ("size/card") show their last part; the tooltip has the full name.
     let short = name.rsplit('/').next().unwrap_or(name);
     let galley = ui.painter().layout_no_wrap(short.to_string(), regular(11.0), t.text);
@@ -447,7 +447,7 @@ pub fn bound_field(ui: &mut Ui, id: Id, lead: Lead, rect: Rect, name: &str) -> O
     let dresp = ui.interact(dr, id.with("detach"), Sense::click()).tip(tr("Detach variable"));
     if resp.hovered() || dresp.hovered() || dresp.has_focus() {
         if dresp.hovered() {
-            ui.painter().rect_filled(dr, CornerRadius::same(4), t.hover);
+            ui.painter().rect_filled(dr, CornerRadius::same(6), t.hover);
         }
         icons::paint(ui.painter(), dr.shrink(3.0), Icon::Detach, t.icon_secondary);
     }
@@ -481,7 +481,7 @@ pub fn multiline_field(ui: &mut Ui, id: Id, value: &str, hint: &str, rows: usize
     ui.horizontal(|ui| {
         ui.add_space(PAD);
         let w = ui.available_width() - PAD;
-        let r = egui::Frame::NONE.fill(t.field).corner_radius(CornerRadius::same(5)).inner_margin(egui::Margin::same(6)).show(ui, |ui| {
+        let r = egui::Frame::NONE.fill(t.field).corner_radius(CornerRadius::same(8)).inner_margin(egui::Margin::same(6)).show(ui, |ui| {
             ui.add(
                 egui::TextEdit::multiline(&mut text)
                     .id(te)
@@ -515,7 +515,7 @@ pub fn combo_field(ui: &mut Ui, id: Id, value: &str, width: f32, options: &[Stri
     let resp = ui.interact(chev, id.with("menu"), Sense::click());
     a11y::combo(&resp, tr("Presets"), value, a11y::menu_open(&resp));
     if resp.hovered() {
-        ui.painter().rect_filled(chev.shrink(2.0), CornerRadius::same(4), t.hover);
+        ui.painter().rect_filled(chev.shrink(2.0), CornerRadius::same(6), t.hover);
     }
     icons::paint(ui.painter(), Rect::from_center_size(chev.center(), vec2(12.0, 12.0)), Icon::Chevron, t.icon_secondary);
     crate::right::menu_popup(&resp).show(|ui| {
@@ -536,11 +536,11 @@ fn text_field_in(ui: &mut Ui, id: Id, value: &str, rect: Rect, placeholder: &str
     let mut editing: Option<String> = ui.data(|d| d.get_temp(editing_id));
     let resp = ui.interact(rect, id.with("click"), Sense::click());
     a11y::text(&resp, name, value);
-    ui.painter().rect_filled(rect, CornerRadius::same(5), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
     if editing.is_some() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
     } else if resp.hovered() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
     }
     let started = editing.is_none() && resp.clicked();
     if started {
@@ -598,12 +598,12 @@ fn field_editor(ui: &mut Ui, rect: Rect, id: Id, text: &mut String, hint: &str) 
 pub fn text_input(ui: &mut Ui, id: Id, text: &mut String, width: f32, hint: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, _) = ui.allocate_exact_size(vec2(width, FIELD_H), Sense::hover());
-    ui.painter().rect_filled(rect, CornerRadius::same(5), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
     let r = field_editor(ui, rect, id, text, hint);
     if r.has_focus() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
     } else if ui.rect_contains_pointer(rect) {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
     }
     r
 }
@@ -690,9 +690,9 @@ pub fn dropdown_lead(ui: &mut Ui, label: &str, width: f32, lead: Option<DropLead
     let (rect, resp) = ui.allocate_exact_size(vec2(width, FIELD_H), Sense::click());
     a11y::combo(&resp, "", label, a11y::menu_open(&resp));
     let bg = t.field;
-    ui.painter().rect_filled(rect, CornerRadius::same(5), bg);
+    ui.painter().rect_filled(rect, CornerRadius::same(8), bg);
     if resp.hovered() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
     }
     let mut x = rect.min.x + 8.0;
     match lead {
@@ -784,7 +784,7 @@ fn segments(
     let t = Tokens::get(ui.ctx());
     let w = cell * names.len() as f32;
     let (rect, _) = ui.allocate_exact_size(vec2(w, FIELD_H), Sense::hover());
-    ui.painter().rect_filled(rect, CornerRadius::same(5), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(12), t.field);
     let mut out = None;
     for (i, name) in names.iter().enumerate() {
         let r = Rect::from_min_size(pos2(rect.min.x + i as f32 * cell, rect.min.y), vec2(cell, FIELD_H));
@@ -794,10 +794,10 @@ fn segments(
         }
         a11y::toggle(&resp, name, active == Some(i));
         if active == Some(i) {
-            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(4), t.panel);
-            ui.painter().rect_stroke(r.shrink(2.0), CornerRadius::same(4), Stroke::new(1.0, t.border), StrokeKind::Inside);
+            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(10), t.panel);
+            ui.painter().rect_stroke(r.shrink(2.0), CornerRadius::same(10), Stroke::new(1.0, t.border), StrokeKind::Inside);
         } else if resp.hovered() {
-            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(4), t.hover);
+            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(10), t.hover);
         }
         paint(ui, r, i, active == Some(i), &t);
         if resp.clicked() {
@@ -815,7 +815,7 @@ pub fn disclosure(ui: &mut Ui, label: &str, open: bool) -> bool {
     let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 22.0, FIELD_H), Sense::click());
     a11y::disclosure(&resp, label, open);
     if resp.hovered() {
-        ui.painter().rect_filled(rect, CornerRadius::same(4), t.hover);
+        ui.painter().rect_filled(rect, CornerRadius::same(6), t.hover);
     }
     let chevron = Rect::from_center_size(pos2(rect.min.x + 8.0, rect.center().y), vec2(10.0, 10.0));
     icons::paint(ui.painter(), chevron, if open { Icon::Chevron } else { Icon::ChevronRight }, t.icon_secondary);
@@ -842,7 +842,7 @@ pub fn section_header(ui: &mut Ui, title: &str, buttons: &[(Icon, &str)], dim: b
         let r = Rect::from_min_size(pos2(x - 24.0, rect.center().y - 12.0), vec2(24.0, 24.0));
         let resp = ui.interact(r, ui.id().with(("hdr", title, i)), Sense::click()).tip(*tip);
         if resp.hovered() {
-            ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
+            ui.painter().rect_filled(r, CornerRadius::same(8), t.hover);
         }
         icons::paint(ui.painter(), r.shrink(5.0), *icon, t.icon);
         if resp.clicked() {
@@ -858,7 +858,7 @@ pub fn icon_button_at(ui: &mut Ui, id: Id, rect: Rect, icon: Icon, tip: &str) ->
     let t = Tokens::get(ui.ctx());
     let resp = ui.interact(rect, id, Sense::click()).tip(tip);
     if resp.hovered() {
-        ui.painter().rect_filled(rect, CornerRadius::same(5), t.hover);
+        ui.painter().rect_filled(rect, CornerRadius::same(8), t.hover);
     }
     icons::paint(ui.painter(), rect.shrink(5.0), icon, t.icon);
     resp.clicked()
@@ -910,8 +910,8 @@ pub fn drag_ghost(ctx: &egui::Context, at: egui::Pos2, galley: std::sync::Arc<eg
     ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, Id::new("drag_ghost")));
     let r = Rect::from_min_size(at + vec2(14.0, 10.0), galley.size() + vec2(16.0, 8.0));
-    painter.rect_filled(r, CornerRadius::same(5), t.panel);
-    painter.rect_stroke(r, CornerRadius::same(5), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
+    painter.rect_filled(r, CornerRadius::same(8), t.panel);
+    painter.rect_stroke(r, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
     painter.galley(r.min + vec2(8.0, 4.0), galley, t.text);
 }
 
@@ -1045,9 +1045,9 @@ pub fn button(ui: &mut Ui, label: &str, primary: bool, enabled: bool) -> Respons
         (true, false, false) => (Color32::TRANSPARENT, t.text),
         (true, false, true) => (t.hover, t.text),
     };
-    ui.painter().rect_filled(rect, CornerRadius::same(5), fill);
+    ui.painter().rect_filled(rect, CornerRadius::same(12), fill);
     if !primary {
-        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, t.border_strong), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0, t.border_strong), StrokeKind::Inside);
     }
     ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, regular(11.0), text);
     resp
@@ -1076,8 +1076,8 @@ pub fn text_field_inline(ui: &mut Ui, id: Id, value: &str, rect: Rect, font: egu
     }
     match buf {
         Some(mut text) => {
-            ui.painter().rect_filled(rect.expand(2.0), CornerRadius::same(4), t.panel);
-            ui.painter().rect_stroke(rect.expand(2.0), CornerRadius::same(4), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
+            ui.painter().rect_filled(rect.expand(2.0), CornerRadius::same(6), t.panel);
+            ui.painter().rect_stroke(rect.expand(2.0), CornerRadius::same(6), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
             let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
             let r = crate::bidi::single_line(&mut child, te_id, &mut text, font, rect.width());
             a11y::own_focus(&r);
@@ -1102,7 +1102,7 @@ pub fn text_field_inline(ui: &mut Ui, id: Id, value: &str, rect: Rect, font: egu
         }
         None => {
             if resp.hovered() {
-                ui.painter().rect_filled(rect.expand(2.0), CornerRadius::same(4), t.hover);
+                ui.painter().rect_filled(rect.expand(2.0), CornerRadius::same(6), t.hover);
             }
             crate::bidi::paint_name(ui.painter(), rect.left_center(), value, font, t.text, rect.width());
             None

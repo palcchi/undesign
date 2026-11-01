@@ -170,3 +170,11 @@ upstream revision so future syncs stay auditable.
   the canvas renders the evaluated preview without touching the saved document, creating undo
   entries or marking it dirty. Selection outlines and hit-testing stay on base values.
 - Added an original code-drawn `Pause` icon next to `Play` for the transport button.
+
+## 2026-11-01 — Interface restyle (change #11)
+
+- Restyled the interface after the owner-supplied references in the local `plan/` folder (layout
+  unchanged, all original code): side panels float as rounded cards with shadows, controls use
+  chunkier radii, segmented controls and buttons are pills, toolbar cells are round chips.
+- The Motion tab follows the same language: section labels match the app convention, timeline rows
+  are cards, actions use the shared button styles.
