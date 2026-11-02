@@ -1,9 +1,10 @@
 //! The Agent panel: a small, transparent prompt-to-command surface.
 
-use egui::{RichText, Ui};
+use egui::{CornerRadius, Frame, RichText, Stroke, Ui};
 use undesign_agent::{DEFAULT_MAX_TOKENS, Replay, run_turn};
 
 use crate::FigApp;
+use crate::i18n::tr;
 use crate::theme::Tokens;
 use crate::widgets;
 
@@ -25,7 +26,7 @@ pub struct AgentUi {
 
 pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     let tokens = Tokens::get(ui.ctx());
-    ui.heading(RichText::new("Agent").color(tokens.text));
+    ui.heading(RichText::new(tr("AI Generator")).color(tokens.text));
     ui.label(RichText::new("Describe a design or animation. The Agent applies editable engine commands.").color(tokens.text_secondary));
     ui.add_space(8.0);
 
@@ -40,12 +41,33 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     ui.add_space(8.0);
 
     ui.label(RichText::new("Prompt").strong().color(tokens.text));
-    let edit = egui::TextEdit::multiline(&mut app.ui.agent.prompt).desired_rows(4).hint_text("e.g. logo bola memantul lalu teks Undesign fade-in");
-    ui.add_sized([ui.available_width(), 88.0], edit);
+    let prompt_width = ui.available_width();
+    Frame::NONE
+        .fill(tokens.field)
+        .stroke(Stroke::new(1.0, tokens.accent))
+        .corner_radius(CornerRadius::same(12))
+        .inner_margin(egui::Margin::same(8))
+        .show(ui, |ui| {
+            let edit = egui::TextEdit::multiline(&mut app.ui.agent.prompt)
+                .desired_rows(3)
+                .frame(false)
+                .hint_text("e.g. logo bola memantul lalu teks Undesign fade-in");
+            ui.add_sized([prompt_width - 16.0, 64.0], edit);
+            ui.horizontal_wrapped(|ui| {
+                for chip in [tr("Text"), tr("Image"), tr("Effect"), tr("Layout")] {
+                    if ui.small_button(chip).clicked() {
+                        if !app.ui.agent.prompt.is_empty() {
+                            app.ui.agent.prompt.push(' ');
+                        }
+                        app.ui.agent.prompt.push_str(chip);
+                    }
+                }
+            });
+        });
     ui.add_space(6.0);
 
     let can_run = !app.ui.agent.prompt.trim().is_empty();
-    if widgets::button(ui, "Run Agent", true, can_run).clicked() {
+    if widgets::button(ui, tr("Send"), true, can_run).clicked() {
         run_prompt(app);
     }
     if !app.ui.agent.status.is_empty() {
