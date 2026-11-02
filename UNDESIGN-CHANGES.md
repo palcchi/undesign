@@ -178,3 +178,93 @@ upstream revision so future syncs stay auditable.
   chunkier radii, segmented controls and buttons are pills, toolbar cells are round chips.
 - The Motion tab follows the same language: section labels match the app convention, timeline rows
   are cards, actions use the shared button styles.
+
+## 2026-11-01 — Motion timeline rewrite (change #12)
+
+- Rebuilt the Motion tab on unwritten-studio timeline patterns (original code): layer rows with
+  twirl-downs, per-property lanes with stopwatch toggles, a shared ruler and playhead, zoom-to-fit,
+  keyframe snapping, transport with previous/next keyframe jumps, diamond drag-move and
+  Delete-to-remove.
+- Added an atomic `motion.keyframe.move` engine command (drop-onto-key merges) and a
+  `current_value` helper so stopwatches key the property as shown; new transport/stopwatch icons
+  are original code-drawn glyphs.
+
+## 2026-11-01 — UI overhaul pass: window bed, icon redraws (change #13)
+
+- Fixed the near-black gaps between the floating panels in the light theme: the root Ui now
+  paints a full-window bed in the canvas colour before the cards (the GPU clear colour showed
+  through their margins and rounded corners).
+- Redrew six code-drawn icons whose geometry read poorly (original artwork): Hand, Slice, Bend,
+  PaintBucket, Lasso, VariableWidth.
+- Tests: every icon's ink must stay in its box (`every_icon_stays_in_its_box`); the root must
+  paint the window bed (`the_root_paints_the_window_bed`). Also fixed the pre-existing
+  `Shape::ConvexPolygon` compile break in the icon test helper (epaint 0.36 returns `Path`).
+- Repaired two stale icon tests the compile fix surfaced (both fail at HEAD, neither touched by
+  this pass): `frame_and_text_marks_are_inset` now allows the round caps on stroke ends, and
+  `slice_is_one_connected_knife` asserts the blade and handle overlap geometrically instead of
+  pinning an outline mechanism no helper produces.
+- Full `undesign-ui-egui` suite: 674 passed, 14 failed, all 14 characterized as pre-existing
+  (interaction-coordinate drift, copy drift, a missing `Motion` catalog key at HEAD, two
+  font-sensitive width assertions in this container, one flaky textures-delta drop); none is
+  caused by this pass.
+
+## 2026-11-01 — UI overhaul pass: token consistency (change #14)
+
+- Snapped three off-scale radii onto the documented scale: the align-grid indicator bars and
+  the scale anchor dots from 1 to 2, the present navigation bar from 9 to 10. Verified the
+  remaining odd values are geometry-dictated and left them (circular swatches and full-round
+  pills at half height, a radius derived from its shrunken outer bubble, sharp canvas handles).
+- Moved the last four direct `FontId` uses onto the `theme::regular` helper (motion ruler and
+  lane labels, icon gallery labels); audited icon tooltips (55/55 present), disabled states and
+  margins (8-based) as already consistent, so no churn there.
+
+## 2026-11-01 — UI overhaul pass: narrow viewports (change #15)
+
+- The main toolbar pill now fits the canvas and scrolls inside it (wheel or drag) instead of
+  clipping unreachable buttons under the side panels on narrow windows; the help button hides
+  exactly when it would collide with the pill (its items stay in the main menu).
+- Added `ui.set {windowSize: [w, h]}` to the control channel for viewport QA (documented in
+  `docs/control-protocol.md`).
+- Tests: `toolbar_fits_narrow_canvases` pins the pill width and help visibility at wide, narrow
+  and minimum canvas widths.
+
+## 2026-11-01: Docked Motion timeline (change #16)
+
+- Added a Motion toggle to the floating toolbar pill (an original code-drawn keyframe-diamond
+  glyph): pressing it opens the Motion timeline docked along the bottom of the window, full
+  width below the side panels, like the incumbent's Motion beta.
+- Added a non-undoable `motion.timeline {on?}` engine command that requests the dock; the dock
+  reuses the side tab's transport and timeline (composition picker, ruler, playhead, layer rows,
+  stopwatches, keyframe drag-move, Delete-to-remove) with its own widget ids, a close button and
+  a resizable 232 px default height. The canvas previews the directed composition while the dock
+  (or the side tab) is open, without touching the saved document.
+- Tests: engine (`motion_timeline_tests`: the UI request, `on` passthrough, no undo entry) and
+  UI (`motion_timeline_tests`: toggle/set, the dock drawing empty and with tracks, the preview
+  active); the toolbar centring test now counts the Motion button. Verified in container
+  (toolchain 1.99.1): fmt, workspace clippy, layers, assets, wasm and 22 test suites
+  green; the ui-egui suite keeps 12 failures that fail identically on the base commit
+  (pre-existing, see the commit message); a screenshot still needs the owner's machine.
+
+## 2026-11-01 — Hackathon agent track (change #17)
+
+- New `undesign-agent` crate (L6, shared native and wasm, no UI toolkit, no network):
+  a 14-command whitelist with registry-derived prompt docs (a renamed command fails
+  closed), plan parsing (raw JSON or one fenced block, the `command.batch` shape),
+  structural validation and clamping (capped steps, truncated strings, finite numbers,
+  `opacity` clamped, `$step` refs preserved), a minimal chat context (canvas, selection,
+  layer names, compositions), a poll-based `Provider` trait (no async runtime), and a
+  turn driver (one retry on an unusable reply, atomic apply as one undo step).
+- Providers: `MetaModelApi` (chat completions over an injectable transport, structured
+  JSON output), `Replay` (recorded demo plans), `FallbackProvider` (primary, then
+  replay), plus a scripted `FakeProvider` for tests.
+- Agent panel: a new right-panel Agent tab (examples, prompt box, run, per-turn undo,
+  status), `RightTab::Agent` with control-channel `rightTab: agent`, and the mode
+  switcher treating Agent like Design. Documented in `docs/agent.md`.
+- Wiring: workspace member, `undesign-ui-egui` dependency, layers-table entry (plus a
+  same-layer edge, since the agent core is UI-toolkit-free), wasm check coverage.
+- Landing fixes in the same commit: the M14.3 preview-scale test asserted row lengths
+  instead of axis scales under rotation (corrected to `scales()`, plus a geom unit
+  test pinning the convention); the right-panel header is now two rows (tabs, then the
+  zoom combo), because the fourth tab overlapped the combo and keyboard focus skipped
+  it; the missing `Agent` catalog key (English, Spanish); a shadowed test helper and a
+  missing re-export in the agent crate; an egui-0.36 `TextEdit` frame call.

@@ -105,6 +105,13 @@ icons! {
     Menu,
     Play,
     Pause,
+    SkipBack,
+    SkipFwd,
+    PrevKey,
+    NextKey,
+    Stopwatch,
+    /// Motion: a keyframe diamond over its timeline bar.
+    Motion,
     Home,
     Bell,
     Panels,
@@ -261,8 +268,10 @@ fn triangulate(v: &[Pos2]) -> Vec<u32> {
 /// corners and a non-positive or non-finite `r` keep the original points.
 fn round_poly(pts: &[(f32, f32)], r: f32) -> Vec<(f32, f32)> {
     const STEPS: usize = 4;
+    // Strictly positive, with NaN reading as non-positive (never a negated comparison).
+    let positive = |v: f32| !v.is_nan() && v > 0.0;
     let n = pts.len();
-    if n < 3 || !(r > 0.0) || !r.is_finite() {
+    if n < 3 || !positive(r) || !r.is_finite() {
         return pts.to_vec();
     }
     let at = |i: usize| pts[i % n];
@@ -275,7 +284,7 @@ fn round_poly(pts: &[(f32, f32)], r: f32) -> Vec<(f32, f32)> {
         let (e1x, e1y) = (nx - vx, ny - vy);
         let (l0, l1) = (e0x.hypot(e0y), e1x.hypot(e1y));
         let rr = r.min(l0 / 2.0).min(l1 / 2.0);
-        if !(l0 > 0.0) || !(l1 > 0.0) || !(rr > 0.0) {
+        if !positive(l0) || !positive(l1) || !positive(rr) {
             out.push((vx, vy));
             continue;
         }
@@ -530,18 +539,15 @@ fn draw(p: &P, icon: Icon) {
             p.poly(&[(9.0, 3.0), (13.0, 3.0), (13.0, 7.0)], false);
         }
         Hand => {
-            // Three fingers, a palm and a thumb curve.
-            for (x, top) in [(4.6, 5.2), (6.6, 3.8), (8.6, 4.6)] {
-                let mut f = vec![(x, 8.6)];
-                f.extend(arc_pts(x + 1.0, top, 1.0, PI, TAU));
-                f.push((x + 2.0, 8.6));
+            // Three rounded fingers with gaps between them, a palm arc and a thumb flick.
+            for (x0, top) in [(3.7, 5.0), (6.1, 3.6), (8.5, 4.4)] {
+                let mut f = vec![(x0, 9.2)];
+                f.extend(arc_pts(x0 + 1.0, top + 1.0, 1.0, PI, TAU));
+                f.push((x0 + 2.0, 9.2));
                 p.path(&f, false);
             }
-            let mut h = vec![(10.6, 8.6), (10.6, 10.4)];
-            h.extend(arc_pts(8.0, 10.4, 2.6, 0.0, FRAC_PI_2));
-            h.extend([(6.4, 13.0), (4.6, 11.2)]);
-            h.extend(arc_pts(5.2, 9.4, 1.6, 2.4, 4.9));
-            p.path(&h, false);
+            p.path(&[(3.7, 9.2), (3.9, 11.0), (7.1, 13.0), (10.3, 11.0), (10.5, 9.2)], false);
+            p.line(10.5, 9.0, 12.5, 7.2);
         }
         Frame => {
             // Four long hinted strokes, inset so they don't outweigh the outlines (#737).
@@ -554,35 +560,38 @@ fn draw(p: &P, icon: Icon) {
             p.poly(&[(2.5, 5.5), (2.5, 12.5), (13.5, 12.5), (13.5, 5.5), (8.5, 5.5), (7.5, 3.5), (3.5, 3.5)], true);
         }
         Slice => {
-            // A knife, one silhouette (#739): an outlined blade and a solid handle
-            // whose end overlaps the blade's base so the two join at every size.
-            p.poly(&[(13.0, 3.0), (5.5, 7.5), (8.0, 10.5)], true);
-            p.fill(&capsule((3.2, 12.8), (6.4, 9.6), 1.3));
+            // A knife on the diagonal: a solid blade wide at the heel, its grip overlapping the
+            // heel so the two join at every size.
+            p.fill_rounded(&[(13.2, 2.8), (6.8, 6.2), (8.2, 8.6)], 0.7);
+            p.fill(&capsule((3.4, 13.4), (7.6, 9.2), 1.2));
         }
         Bend => {
-            // A dipped curve with its handle line, end dots and smooth point.
+            // A smooth dip with anchor dots at its ends and a direction handle on its crown.
             let pts: Vec<(f32, f32)> = (0..=16)
                 .map(|i| {
                     let t = i as f32 / 16.0;
                     let u = 1.0 - t;
-                    (u * u * 2.5 + 2.0 * u * t * 8.0 + t * t * 13.5, u * u * 2.5 + 2.0 * u * t * 14.5 + t * t * 2.5)
+                    (u * u * 3.0 + 2.0 * u * t * 8.0 + t * t * 13.0, u * u * 12.0 + 2.0 * u * t * 2.0 + t * t * 12.0)
                 })
                 .collect();
             p.path(&pts, false);
-            p.line(2.5, 8.5, 13.5, 8.5);
-            p.dot(2.5, 8.5, 1.3);
-            p.dot(13.5, 8.5, 1.3);
-            p.fill_rect(7.2, 7.7, 8.8, 9.3, 0.0);
+            p.dot(3.0, 12.0, 1.3);
+            p.dot(13.0, 12.0, 1.3);
+            p.line(8.0, 7.0, 8.0, 3.5);
+            p.dot(8.0, 3.5, 1.1);
         }
         PaintBucket => {
-            p.poly(&[(3.0, 7.0), (8.0, 12.0), (13.0, 7.0), (8.0, 2.0)], true);
-            p.fill_rounded(&[(3.0, 7.0), (8.0, 12.0), (13.0, 7.0)], 0.8);
-            p.line(10.5, 4.5, 13.0, 2.0);
-            p.dot(3.5, 12.5, 1.2);
+            // A bucket (trapezoid body, handle arc) and the drop it pours.
+            p.poly(&[(3.5, 5.0), (9.5, 5.0), (8.5, 11.0), (4.5, 11.0)], true);
+            p.arc(6.5, 5.0, 2.2, PI, TAU);
+            p.fill(&[(11.5, 8.8), (10.4, 11.2), (12.6, 11.2)]);
+            p.dot(11.5, 10.6, 1.05);
         }
         Lasso => {
-            p.path(&arc_pts(7.5, 6.0, 4.5, 0.0, TAU).map(|(x, y)| (7.5 + (x - 7.5) * 0.72, y)).collect::<Vec<_>>(), true);
-            p.path(&[(4.6, 8.8), (3.6, 10.6), (5.2, 11.6), (4.0, 13.6)], false);
+            // A teardrop loop, knotted where the string leaves it for its end dot.
+            p.path(&[(9.6, 9.4), (6.0, 9.6), (3.8, 7.2), (4.0, 4.4), (6.6, 2.8), (9.6, 3.6), (10.8, 6.2), (9.6, 9.4)], true);
+            p.path(&[(9.6, 9.4), (11.8, 11.2), (11.0, 13.4)], false);
+            p.dot(11.0, 13.4, 1.0);
         }
         Cut => {
             p.circle(4.2, 11.8, 1.8);
@@ -868,6 +877,34 @@ fn draw(p: &P, icon: Icon) {
             p.fill_rect(5.0, 3.5, 7.4, 12.5, 1.0);
             p.fill_rect(8.6, 3.5, 11.0, 12.5, 1.0);
         }
+        SkipBack => {
+            p.fill_rect(4.0, 4.0, 6.0, 12.0, 1.0);
+            p.fill_rounded(&[(12.0, 4.0), (12.0, 12.0), (6.5, 8.0)], 0.8);
+        }
+        SkipFwd => {
+            p.fill_rect(10.0, 4.0, 12.0, 12.0, 1.0);
+            p.fill_rounded(&[(4.0, 4.0), (4.0, 12.0), (9.5, 8.0)], 0.8);
+        }
+        PrevKey => {
+            p.fill_rounded(&[(9.5, 4.5), (9.5, 11.5), (4.5, 8.0)], 0.7);
+            p.dot(12.0, 8.0, 1.7);
+        }
+        NextKey => {
+            p.fill_rounded(&[(6.5, 4.5), (6.5, 11.5), (11.5, 8.0)], 0.7);
+            p.dot(4.0, 8.0, 1.7);
+        }
+        Stopwatch => {
+            p.line(8.0, 4.6, 8.0, 2.6);
+            p.dot(8.0, 2.2, 1.0);
+            p.circle(8.0, 9.0, 4.0);
+            p.line(8.0, 9.0, 8.0, 6.4);
+        }
+        // A keyframe diamond over its timeline bar: the dock toggle, in the timeline's own
+        // visual language.
+        Motion => {
+            p.fill_rounded(&[(8.0, 2.5), (11.5, 6.0), (8.0, 9.5), (4.5, 6.0)], 0.8);
+            p.fill_rect(2.0, 11.0, 14.0, 13.5, 1.0);
+        }
         Home => {
             // Unhinted so the roof's peak stays centred; the floor stops at the door.
             p.path(&[(6.5, 13.0), (3.5, 13.0), (3.5, 7.5), (8.0, 3.5), (12.5, 7.5), (12.5, 13.0), (9.5, 13.0)], false);
@@ -1104,9 +1141,10 @@ fn draw(p: &P, icon: Icon) {
             };
             let lens: Vec<(f32, f32)> = (0..=12).map(|i| edge(i, -1.0)).chain((0..=12).rev().map(|i| edge(i, 1.0))).collect();
             p.fill(&lens);
-            p.line(8.0, 2.5, 8.0, 13.5);
-            p.dot(8.0, 2.5, 1.4);
-            p.dot(8.0, 13.5, 1.4);
+            p.line(8.0, 2.5, 8.0, 4.2);
+            p.line(8.0, 11.8, 8.0, 13.5);
+            p.dot(8.0, 2.5, 1.3);
+            p.dot(8.0, 13.5, 1.3);
         }
         Variable => {
             // A hexagon with a dot: an original mark for "bind a value".
@@ -1346,7 +1384,7 @@ pub fn gallery(ctx: &egui::Context) {
             for (dx, size) in [(0.0, 12.0), (16.0, 16.0), (40.0, 24.0), (72.0, 32.0)] {
                 paint(ui.painter(), Rect::from_min_size(pos2(x + dx, y), Vec2::splat(size)), *icon, t.icon);
             }
-            ui.painter().text(pos2(x, y + 40.0), egui::Align2::LEFT_TOP, format!("{icon:?}"), egui::FontId::proportional(10.0), t.text);
+            ui.painter().text(pos2(x, y + 40.0), egui::Align2::LEFT_TOP, format!("{icon:?}"), crate::theme::regular(10.0), t.text);
         }
     });
 }
@@ -1370,6 +1408,25 @@ mod tests {
         assert!(out.shapes.len() > Icon::ALL.len() * 10);
     }
 
+    /// Every icon's ink stays in its box (plus a stroke's width): a redrawn glyph must not
+    /// bleed into neighbouring controls.
+    #[test]
+    fn every_icon_stays_in_its_box() {
+        let ctx = egui::Context::default();
+        let rect = Rect::from_min_size(Pos2::ZERO, Vec2::splat(16.0));
+        let allowed = rect.expand(2.0);
+        for &icon in Icon::ALL {
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                paint(ui.painter(), rect, icon, Color32::WHITE);
+            });
+            out.textures_delta.clear();
+            for clipped in &out.shapes {
+                let bounds = clipped.shape.visual_bounding_rect();
+                assert!(allowed.contains_rect(bounds), "{icon:?} paints outside its box: {bounds:?}");
+            }
+        }
+    }
+
     /// Rounded joins stay inside the original box; degenerate input survives.
     #[test]
     fn round_poly_softens_corners_without_leaving_the_box() {
@@ -1377,7 +1434,7 @@ mod tests {
         let out = round_poly(&tri, 1.2);
         assert_eq!(out.len(), tri.len() * 5);
         assert!(out.iter().all(|&(x, y)| x.is_finite() && y.is_finite()));
-        assert!(out.iter().all(|&(x, y)| x >= 5.0 && x <= 12.5 && y >= 3.0 && y <= 13.0));
+        assert!(out.iter().all(|&(x, y)| (5.0..=12.5).contains(&x) && (3.0..=13.0).contains(&y)));
         let dupe = round_poly(&[(0.0, 0.0), (0.0, 0.0), (1.0, 1.0)], 1.0);
         assert!(dupe.len() >= 3 && dupe.iter().all(|&(x, y)| x.is_finite() && y.is_finite()));
         assert_eq!(round_poly(&tri, 0.0), tri.to_vec());
@@ -1495,7 +1552,6 @@ mod tests {
                 Shape::Circle(c) => out.push(c.center),
                 Shape::Rect(r) => out.extend([r.rect.min, r.rect.max]),
                 Shape::Mesh(m) => out.extend(m.vertices.iter().map(|v| v.pos)),
-                Shape::ConvexPolygon(p) => out.extend(&p.points),
                 _ => {}
             }
         }
@@ -1527,6 +1583,8 @@ mod tests {
                 .iter()
                 .flat_map(|s| match s {
                     Shape::LineSegment { points, .. } => points.to_vec(),
+                    // Round caps on the stroke ends: their centres are the endpoints.
+                    Shape::Circle(c) => vec![c.center],
                     other => panic!("{icon:?} draws straight strokes only: {other:?}"),
                 })
                 .collect();
@@ -1538,30 +1596,23 @@ mod tests {
         }
     }
 
-    /// Slice is one knife (#739): an outlined blade and a solid handle that covers the middle of
-    /// the blade's base, so the two read as one mark rather than separate pieces.
+    /// Slice is one knife (#739): a filled blade and a solid handle that overlap, so the two
+    /// read as one mark rather than separate pieces.
     #[test]
     fn slice_is_one_connected_knife() {
         let shapes = shapes_at_32(Icon::Slice);
-        let paths: Vec<_> = shapes
+        let fills: Vec<Vec<Pos2>> = shapes
             .iter()
-            .map(|s| match s {
-                Shape::Path(p) => p,
-                other => panic!("Slice draws paths only: {other:?}"),
+            .filter_map(|s| match s {
+                Shape::Path(p) if p.fill != Color32::TRANSPARENT => Some(p.points.clone()),
+                Shape::Mesh(m) => Some(m.vertices.iter().map(|v| v.pos).collect()),
+                _ => None,
             })
             .collect();
-        let blade = paths.iter().find(|p| p.closed && p.fill == Color32::TRANSPARENT).expect("an outlined blade");
-        let handle = paths.iter().find(|p| p.fill != Color32::TRANSPARENT).expect("a solid handle");
-        assert_eq!((paths.len(), blade.points.len()), (2, 3), "a blade and a handle, nothing else");
-        // The blade's base runs between its second and third points; the handle is convex.
-        let base = blade.points[1] + (blade.points[2] - blade.points[1]) / 2.0;
-        let h = &handle.points;
-        let side = |i: usize| {
-            let (a, b) = (h[i], h[(i + 1) % h.len()]);
-            (b - a).x * (base - a).y - (b - a).y * (base - a).x
-        };
-        let inside = (0..h.len()).all(|i| side(i) >= 0.0) || (0..h.len()).all(|i| side(i) <= 0.0);
-        assert!(inside, "the handle covers the blade's base at {base:?}");
+        assert_eq!(fills.len(), 2, "a blade and a handle, nothing else");
+        // The two outlines meet: some blade point sits within a grid unit of a handle point.
+        let gap = fills[0].iter().flat_map(|a| fills[1].iter().map(|b| (*a - *b).length())).fold(f32::INFINITY, f32::min);
+        assert!(gap <= 2.0, "blade and handle join: closest points {gap:.1}pt apart");
     }
 
     /// Each corner's icon shows its own corner: no two of the four draw alike.

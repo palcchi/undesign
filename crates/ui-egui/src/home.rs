@@ -1,6 +1,9 @@
 //! The home screen: Recents (new file, open, join with a code, the Getting started tips, open and
 //! recent files ([`crate::home_recents`])) and Online (your online files: [`crate::online`]).
 
+use std::collections::BTreeMap;
+use std::path::Path;
+
 use egui::{Align2, Color32, CornerRadius, Id, Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 use serde_json::json;
 
@@ -46,7 +49,9 @@ pub struct Home {
     pub recents: crate::home_recents::Recents,
 }
 
-const SIDEBAR: f32 = 240.0;
+const RAIL: f32 = 64.0;
+const SIDEBAR: f32 = 260.0;
+const NAV: f32 = RAIL + SIDEBAR;
 const CARD_W: f32 = 248.0;
 const GAP: f32 = 20.0;
 
@@ -124,7 +129,7 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
     dropped(app, ui.ctx());
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.panel)).show(ui, |ui| {
         let rect = ui.max_rect();
-        let left = Rect::from_min_size(rect.min, vec2(SIDEBAR, rect.height()));
+        let left = Rect::from_min_size(rect.min, vec2(NAV, rect.height()));
         ui.painter().line_segment([left.right_top(), left.right_bottom()], Stroke::new(1.0, t.border));
         sidebar(app, ui, &t, left);
         if app.ui.home_view.file_query.trim().is_empty() && app.ui.home_view.section == Section::Online {
@@ -168,11 +173,32 @@ fn dropped(app: &mut FigApp, ctx: &egui::Context) {
 }
 
 fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
-    let mut y = left.min.y + 20.0;
-    crate::theme::paint_app_icon(ui, Rect::from_min_size(pos2(left.min.x + 12.0, y - 4.0), vec2(32.0, 32.0)));
-    crate::theme::paint_wordmark(ui.painter(), pos2(left.min.x + 52.0, y + 12.0), 16.0, t);
-    y += 52.0;
-    let search = Rect::from_min_size(pos2(left.min.x + 8.0, y), vec2(SIDEBAR - 16.0, widgets::FIELD_H));
+    let rail = Rect::from_min_size(left.min, vec2(RAIL, left.height()));
+    let panel = Rect::from_min_size(pos2(left.min.x + RAIL, left.min.y), vec2(SIDEBAR, left.height()));
+    ui.painter().line_segment([rail.right_top(), rail.right_bottom()], Stroke::new(1.0, t.border));
+    crate::theme::paint_app_icon(ui, Rect::from_min_size(pos2(rail.min.x + 16.0, rail.min.y + 16.0), vec2(32.0, 32.0)));
+    let mut rail_y = rail.min.y + 72.0;
+    for (section, icon, label) in Section::ALL {
+        let r = Rect::from_min_size(pos2(rail.min.x + 12.0, rail_y), vec2(RAIL - 24.0, 40.0));
+        let resp = ui.interact(r, ui.id().with(("home_rail", label)), Sense::click());
+        let current = app.ui.home_view.file_query.trim().is_empty() && app.ui.home_view.section == section;
+        a11y::tab(&resp, tr(label), current);
+        if current || resp.hovered() {
+            ui.painter().rect_filled(r, CornerRadius::same(10), if current { t.selected_row } else { t.hover });
+        }
+        focus_ring(ui, t, r, &resp, 10);
+        icons::paint(ui.painter(), r.shrink(10.0), icon, if current { t.accent_text } else { t.icon });
+        if resp.clicked() {
+            app.ui.home_view.section = section;
+            app.ui.home_view.file_query.clear();
+        }
+        rail_y += 48.0;
+    }
+
+    let mut y = panel.min.y + 20.0;
+    ui.painter().text(pos2(panel.min.x + 20.0, y + 8.0), Align2::LEFT_CENTER, tr("Recent files"), semibold(15.0), t.text);
+    y += 36.0;
+    let search = Rect::from_min_size(pos2(panel.min.x + 12.0, y), vec2(SIDEBAR - 24.0, widgets::FIELD_H));
     ui.scope_builder(egui::UiBuilder::new().max_rect(search), |ui| {
         let response = widgets::text_input(ui, Id::new("home_file_search"), &mut app.ui.home_view.file_query, search.width(), tr("Search files"));
         a11y::text(&response, tr("Search files"), &app.ui.home_view.file_query);
@@ -181,22 +207,28 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
         }
     });
     y += widgets::FIELD_H + 12.0;
-    for (section, icon, label) in Section::ALL {
-        let r = Rect::from_min_size(pos2(left.min.x + 8.0, y), vec2(SIDEBAR - 16.0, 32.0));
-        let resp = ui.interact(r, ui.id().with(("home_section", label)), Sense::click());
-        let current = app.ui.home_view.file_query.trim().is_empty() && app.ui.home_view.section == section;
-        a11y::tab(&resp, tr(label), current);
-        if current || resp.hovered() {
-            ui.painter().rect_filled(r, CornerRadius::same(5), if current { t.selected_row } else { t.hover });
+    folder_tree(ui, t, &app.session.prefs.recent_files, pos2(panel.min.x + 12.0, y));
+}
+
+fn folder_tree(ui: &mut Ui, t: &Tokens, paths: &[String], origin: egui::Pos2) {
+    let mut folders = BTreeMap::<String, usize>::new();
+    for path in paths {
+        let Some(parent) = Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()) else { continue };
+        *folders.entry(parent.display().to_string()).or_default() += 1;
+    }
+    ui.painter().text(origin, Align2::LEFT_TOP, tr("Folders"), semibold(12.0), t.text_secondary);
+    let mut y = origin.y + 28.0;
+    for (folder, count) in folders {
+        let name = Path::new(&folder).file_name().and_then(|n| n.to_str()).unwrap_or(&folder);
+        let r = Rect::from_min_size(pos2(origin.x, y), vec2(SIDEBAR - 24.0, 28.0));
+        let resp = ui.interact(r, ui.id().with(("home_folder", &folder)), Sense::click());
+        if resp.hovered() {
+            ui.painter().rect_filled(r, CornerRadius::same(8), t.hover);
         }
-        focus_ring(ui, t, r, &resp, 5);
-        icons::paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 10.0, r.center().y - 8.0), vec2(16.0, 16.0)), icon, t.icon);
-        ui.painter().text(pos2(r.min.x + 36.0, r.center().y), Align2::LEFT_CENTER, tr(label), regular(12.0), t.text);
-        if resp.clicked() {
-            app.ui.home_view.section = section;
-            app.ui.home_view.file_query.clear();
-        }
-        y += 34.0;
+        icons::paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0)), Icon::Page, t.icon_secondary);
+        ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, name, regular(12.0), t.text);
+        ui.painter().text(pos2(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, count.to_string(), regular(11.0), t.text_secondary);
+        y += 30.0;
     }
 }
 

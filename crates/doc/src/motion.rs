@@ -57,10 +57,7 @@ impl Composition {
         if !frame.is_finite() {
             return Vec::new();
         }
-        self.tracks
-            .iter()
-            .filter_map(|t| t.sample(frame).map(|value| SampledTrack { target: t.target, property: t.property, value }))
-            .collect()
+        self.tracks.iter().filter_map(|t| t.sample(frame).map(|value| SampledTrack { target: t.target, property: t.property, value })).collect()
     }
 
     /// Check values that must be valid before playback or export.

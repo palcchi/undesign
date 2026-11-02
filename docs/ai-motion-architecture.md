@@ -121,8 +121,14 @@ not create undo entries, mark the document dirty on every frame, or change the s
 - **M14.3 Timeline UI:** playback slice done. The Motion tab plays and loops at the composition's
   fps with a time readout; while it is active the canvas renders the composition evaluated at the
   playhead without touching the saved document, creating undo entries or marking it dirty.
-  Selection outlines and hit-testing stay on base values. A dockable timeline and auto-keyframing
-  from canvas edits remain; bezier editing is M14.4.
+  Selection outlines and hit-testing stay on base values. Timeline rewrite in progress
+  (unwritten-studio patterns): layer rows twirl open to property lanes with stopwatch toggles,
+  one shared ruler and playhead (CTI), zoom-to-fit, keyframe snapping, transport with
+  previous/next keyframe jumps, diamond drag-move (atomic `motion.keyframe.move`) and
+  Delete-to-remove. The data model is unchanged. The timeline also docks along the bottom of
+  the window (a Motion toggle in the toolbar pill, `motion.timeline {on?}`, resizable, with the
+  same transport and timeline); auto-keyframing from canvas edits remains; bezier editing is
+  M14.4.
 - **M14.4 Graph editor:** Bezier editing and interpolation preview.
 - **M14.5 Export:** image sequence, then browser/native video encoders.
 - **M13.1 AI foundation:** provider configuration and secure credential storage for desktop and

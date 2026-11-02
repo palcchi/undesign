@@ -96,7 +96,7 @@ fn anchor_picker(ui: &mut Ui, cur: (u8, u8)) -> Option<(u8, u8)> {
                 ui.painter().rect_filled(Rect::from_center_size(c, vec2(7.0, 7.0)), CornerRadius::same(2), t.accent);
             } else {
                 let dot = Rect::from_center_size(c, vec2(if resp.hovered() { 6.0 } else { 4.0 }, if resp.hovered() { 6.0 } else { 4.0 }));
-                ui.painter().rect_filled(dot, CornerRadius::same(1), if resp.hovered() { t.icon } else { t.icon_secondary });
+                ui.painter().rect_filled(dot, CornerRadius::same(2), if resp.hovered() { t.icon } else { t.icon_secondary });
             }
             if resp.clicked() {
                 out = Some((col, row));

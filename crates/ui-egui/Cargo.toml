@@ -17,6 +17,7 @@ undesign-layout = { workspace = true }
 undesign-render = { workspace = true }
 undesign-pathops = { workspace = true }
 undesign-engine = { workspace = true }
+undesign-agent = { workspace = true }
 undesign-format = { workspace = true }
 egui = { workspace = true }
 serde = { workspace = true }
