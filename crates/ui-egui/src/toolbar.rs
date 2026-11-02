@@ -16,7 +16,7 @@ use crate::theme::{Tokens, regular};
 const GLYPH: f32 = 18.0;
 /// The flyout carets: smaller than the marks, but on a box whose stroke rounds to the same width
 /// as theirs at 1×, 1.5× and 2× (a 10-point box drew them one physical pixel thinner).
-const CARET: f32 = 14.0;
+const CARET: f32 = GLYPH;
 
 /// `GLYPH`'s box centred in `r`.
 fn glyph_rect(r: Rect) -> Rect {
