@@ -50,7 +50,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
         .show(ui, |ui| {
             let edit = egui::TextEdit::multiline(&mut app.ui.agent.prompt)
                 .desired_rows(3)
-                .frame(false)
+                .frame(egui::Frame::NONE)
                 .hint_text("e.g. logo bola memantul lalu teks Undesign fade-in");
             ui.add_sized([prompt_width - 16.0, 64.0], edit);
             ui.horizontal_wrapped(|ui| {
