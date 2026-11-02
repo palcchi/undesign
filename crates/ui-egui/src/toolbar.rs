@@ -144,7 +144,7 @@ fn toolbar_layout(canvas_w: f32, full: f32) -> (f32, bool) {
 }
 
 /// The main toolbar pill: the tool groups with their flyouts, Resources and Actions, then the
-/// Draw · Design · Prototype · Inspect mode switcher (on a board, the Design panel's button).
+/// Draw · Design · Motion · Developer Mode switcher.
 fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: bool) {
     let groups = if board { BOARD_GROUPS } else { GROUPS };
     let full = main_width(groups, board);
@@ -285,31 +285,46 @@ fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) 
     x
 }
 
-/// The mode switcher from `x`: Draw · Design · Prototype · Inspect (code).
+/// The mode switcher from `x`: Draw · Design · Motion · Developer Mode.
 fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
-    let modes = [(Icon::Pencil, tr("Draw")), (Icon::Frame, tr("Design")), (Icon::Prototype, tr("Prototype")), (Icon::Code, tr("Inspect"))];
+    let modes = [
+        (Icon::Pencil, tr("Draw")),
+        (Icon::Frame, tr("Design")),
+        (Icon::Motion, tr("Motion")),
+        (Icon::Code, tr("Developer Mode")),
+    ];
     let active = match app.ui.right_tab {
         crate::RightTab::Design if app.session.tool.tool == ToolId::Pencil => 0,
         crate::RightTab::Design => 1,
-        crate::RightTab::Prototype => 2,
-        crate::RightTab::Inspect => 3,
-        crate::RightTab::Motion => 1,
+        crate::RightTab::Motion => 2,
+        crate::RightTab::Prototype | crate::RightTab::Inspect => 1,
         crate::RightTab::Agent => 1,
     };
     let seg = Rect::from_min_size(pos2(x, cy - 18.0), vec2(4.0 * 34.0 + 4.0, 36.0));
     ui.painter().rect_filled(seg, CornerRadius::same(8), t.field);
     for (i, (icon, tip)) in modes.iter().enumerate() {
         let r = Rect::from_min_size(pos2(seg.min.x + 2.0 + i as f32 * 34.0, seg.min.y + 2.0), vec2(34.0, 32.0));
-        let resp = ui.interact(r, ui.id().with(("mode", i)), Sense::click()).on_hover_text(*tip);
+        let disabled = i == 3;
+        let resp = if disabled {
+            ui.interact(r, ui.id().with(("mode", i)), Sense::hover()).on_hover_text(tr("Coming soon"))
+        } else {
+            ui.interact(r, ui.id().with(("mode", i)), Sense::click()).on_hover_text(*tip)
+        };
         a11y::toggle(&resp, tip, i == active);
+        if disabled {
+            a11y::disabled(&resp);
+        }
         if i == active {
             ui.painter().rect_filled(r, CornerRadius::same(6), t.panel);
             ui.painter().rect_stroke(r, CornerRadius::same(6), Stroke::new(1.0, t.border), StrokeKind::Inside);
         } else if resp.hovered() {
             ui.painter().rect_filled(r, CornerRadius::same(6), t.hover);
         }
-        icons::paint(ui.painter(), glyph_rect(r), *icon, if i == active { t.accent_text } else { t.icon_secondary });
-        if resp.clicked() {
+        icons::paint(ui.painter(), glyph_rect(r), *icon, if disabled { t.text_tertiary } else if i == active { t.accent_text } else { t.icon_secondary });
+        if i == active && !disabled {
+            ui.painter().circle_filled(pos2(r.center().x, r.max.y + 2.0), 2.0, t.accent);
+        }
+        if resp.clicked() && !disabled {
             pick_mode(app, i);
         }
     }
@@ -328,8 +343,16 @@ fn pick_mode(app: &mut FigApp, i: usize) {
                 app.run("tool.set", json!({"tool": "move"}));
             }
         }
-        2 => app.ui.right_tab = crate::RightTab::Prototype,
-        _ => app.ui.right_tab = crate::RightTab::Inspect,
+        2 => {
+            if app.ui.right_tab == crate::RightTab::Motion {
+                app.ui.right_tab = crate::RightTab::Design;
+                app.run("motion.timeline", json!({"on": false}));
+            } else {
+                app.ui.right_tab = crate::RightTab::Motion;
+                app.run("motion.timeline", json!({"on": true}));
+            }
+        }
+        _ => {}
     }
 }
 
