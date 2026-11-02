@@ -50,7 +50,7 @@ pub struct Home {
 }
 
 const RAIL: f32 = 64.0;
-const SIDEBAR: f32 = 260.0;
+const SIDEBAR: f32 = 216.0;
 const NAV: f32 = RAIL + SIDEBAR;
 const CARD_W: f32 = 248.0;
 const GAP: f32 = 20.0;
@@ -134,7 +134,7 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
         sidebar(app, ui, &t, left);
         if app.ui.home_view.file_query.trim().is_empty() && app.ui.home_view.section == Section::Online {
             // Your online files lay themselves out in the area (and scroll their own list).
-            let area = Rect::from_min_max(pos2(left.max.x + 40.0, rect.min.y + 24.0), rect.max - vec2(40.0, 24.0));
+            let area = Rect::from_min_max(pos2(left.max.x, rect.min.y + 24.0), rect.max - vec2(40.0, 24.0));
             crate::online::section(app, ui, area, &t);
             opened_join(app);
             return;
@@ -179,7 +179,7 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
     crate::theme::paint_app_icon(ui, Rect::from_min_size(pos2(rail.min.x + 16.0, rail.min.y + 16.0), vec2(32.0, 32.0)));
     let mut rail_y = rail.min.y + 72.0;
     for (section, icon, label) in Section::ALL {
-        let r = Rect::from_min_size(pos2(rail.min.x + 12.0, rail_y), vec2(RAIL - 24.0, 40.0));
+        let r = Rect::from_min_size(pos2(rail.min.x + 12.0, rail_y), vec2(RAIL - 24.0, 64.0));
         let resp = ui.interact(r, ui.id().with(("home_rail", label)), Sense::click());
         let current = app.ui.home_view.file_query.trim().is_empty() && app.ui.home_view.section == section;
         a11y::tab(&resp, tr(label), current);
@@ -188,11 +188,12 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
         }
         focus_ring(ui, t, r, &resp, 10);
         icons::paint(ui.painter(), r.shrink(10.0), icon, if current { t.accent_text } else { t.icon });
+        ui.painter().text(pos2(r.center().x, r.max.y - 8.0), Align2::CENTER_BOTTOM, tr(label), regular(10.0), t.text_secondary);
         if resp.clicked() {
             app.ui.home_view.section = section;
             app.ui.home_view.file_query.clear();
         }
-        rail_y += 48.0;
+        rail_y += 72.0;
     }
 
     let mut y = panel.min.y + 20.0;
@@ -207,10 +208,15 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
         }
     });
     y += widgets::FIELD_H + 12.0;
-    folder_tree(ui, t, &app.session.prefs.recent_files, pos2(panel.min.x + 12.0, y));
+    let tree_rect = Rect::from_min_max(pos2(panel.min.x + 12.0, y), pos2(panel.max.x - 12.0, panel.max.y - 12.0));
+    let paths = app.session.prefs.recent_files.clone();
+    egui::ScrollArea::vertical().id_salt("home_folders").max_height(tree_rect.height()).show_viewport(ui, |ui, viewport| {
+        ui.set_min_width(tree_rect.width());
+        folder_tree(app, ui, t, &paths, pos2(tree_rect.min.x, viewport.min.y));
+    });
 }
 
-fn folder_tree(ui: &mut Ui, t: &Tokens, paths: &[String], origin: egui::Pos2) {
+fn folder_tree(app: &mut FigApp, ui: &mut Ui, t: &Tokens, paths: &[String], origin: egui::Pos2) {
     let mut folders = BTreeMap::<String, usize>::new();
     for path in paths {
         let Some(parent) = Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()) else { continue };
@@ -222,12 +228,17 @@ fn folder_tree(ui: &mut Ui, t: &Tokens, paths: &[String], origin: egui::Pos2) {
         let name = Path::new(&folder).file_name().and_then(|n| n.to_str()).unwrap_or(&folder);
         let r = Rect::from_min_size(pos2(origin.x, y), vec2(SIDEBAR - 24.0, 28.0));
         let resp = ui.interact(r, ui.id().with(("home_folder", &folder)), Sense::click());
+        a11y::button(&resp, name);
         if resp.hovered() {
             ui.painter().rect_filled(r, CornerRadius::same(8), t.hover);
         }
+        focus_ring(ui, t, r, &resp, 8);
         icons::paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0)), Icon::Page, t.icon_secondary);
         ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, name, regular(12.0), t.text);
         ui.painter().text(pos2(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, count.to_string(), regular(11.0), t.text_secondary);
+        if resp.clicked() {
+            app.ui.home_view.file_query = folder.clone();
+        }
         y += 30.0;
     }
 }
