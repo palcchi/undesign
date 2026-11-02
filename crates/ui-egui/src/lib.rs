@@ -6,6 +6,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod a11y;
+pub mod agent_panel;
 pub mod assets_panel;
 pub mod bidi;
 pub mod board_bar;
@@ -166,6 +167,8 @@ mod menu_contrast_tests;
 mod menu_input_tests;
 #[cfg(test)]
 mod missing_fonts_tests;
+#[cfg(test)]
+mod motion_timeline_tests;
 #[cfg(test)]
 mod online_tests;
 #[cfg(test)]
@@ -420,6 +423,7 @@ pub enum RightTab {
     Prototype,
     Inspect,
     Motion,
+    Agent,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -505,6 +509,8 @@ pub struct UiState {
     pub left_width: f32,
     pub right_width: f32,
     pub right_tab: RightTab,
+    /// Prompt-to-command Agent panel state.
+    pub agent: agent_panel::AgentUi,
     /// Motion Studio timeline selection and playhead state.
     pub motion_composition: Option<u64>,
     pub motion_frame: u32,
@@ -516,6 +522,16 @@ pub struct UiState {
     pub motion_play_acc: f64,
     /// egui clock time of the last playback advance (0 before the first tick).
     pub motion_play_last: f64,
+    /// Motion timeline rows folded shut (target layer ids; everything twirls open by default).
+    pub motion_closed: BTreeSet<NodeId>,
+    /// Timeline zoom in pixels per frame (`None` fits the composition).
+    pub motion_ppf: Option<f32>,
+    /// Selected keyframe (track, frame) for delete and drag.
+    pub motion_selected: Option<(u64, u32)>,
+    /// Keyframe drag in progress (track, from-frame).
+    pub motion_drag: Option<(u64, u32)>,
+    /// The Motion timeline docked along the bottom (`motion.timeline`).
+    pub motion_timeline: bool,
     /// The tab of the previous frame, to see the right panel change mode.
     pub last_right_tab: RightTab,
     pub left_tab: LeftTab,
@@ -543,6 +559,8 @@ pub struct UiState {
     pub palette_armed: bool,
     /// This frame's Actions toolbar button rect: presses on it toggle, never dismiss.
     pub actions_rect: Option<egui::Rect>,
+    /// How far the main toolbar pill has scrolled (a narrow canvas shows part of the row).
+    pub toolbar_scroll: f32,
     /// The Variables editor, when open.
     pub variables: Option<variables_panel::Editor>,
     pub about: bool,
@@ -704,6 +722,7 @@ impl Default for UiState {
             left_width: PANEL_DEFAULT,
             right_width: PANEL_DEFAULT,
             right_tab: RightTab::Design,
+            agent: agent_panel::AgentUi::default(),
             motion_composition: None,
             motion_frame: 0,
             motion_property: AnimatedProperty::PositionX,
@@ -711,6 +730,11 @@ impl Default for UiState {
             motion_playing: false,
             motion_play_acc: 0.0,
             motion_play_last: 0.0,
+            motion_closed: BTreeSet::new(),
+            motion_ppf: None,
+            motion_selected: None,
+            motion_drag: None,
+            motion_timeline: false,
             last_right_tab: RightTab::Design,
             left_tab: LeftTab::File,
             pages_open: true,
@@ -728,6 +752,7 @@ impl Default for UiState {
             palette_hi: 0,
             palette_armed: false,
             actions_rect: None,
+            toolbar_scroll: 0.0,
             variables: None,
             about: false,
             about_tab: dialogs::AboutTab::About,
@@ -1058,6 +1083,9 @@ impl FigApp {
                     }
                 }
                 "panel.prototype" => self.ui.right_tab = RightTab::Prototype,
+                "panel.motionTimeline" => {
+                    self.ui.motion_timeline = r.data.get("on").and_then(Value::as_bool).unwrap_or(!self.ui.motion_timeline);
+                }
                 "panel.designPrototype" => {
                     self.ui.right_tab = if self.ui.right_tab == RightTab::Prototype { RightTab::Design } else { RightTab::Prototype };
                 }
@@ -1630,6 +1658,9 @@ impl FigApp {
     pub(crate) fn frame(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let t = theme::Tokens::get(&ctx);
+        // Bed behind the floating cards: nothing else paints the root, so the panels' margins
+        // and rounded corners would show the GPU clear colour (near-black) without this.
+        ui.painter().rect_filled(ui.available_rect_before_wrap(), 0.0, t.canvas);
         // A field that had the keyboard when the frame began keeps its keys from the shortcuts
         // even if it lets go during the frame (Enter commits it), or as it began (egui drops the
         // focus on Escape before the frame, which cancels the field's edit and nothing else).
@@ -1679,6 +1710,23 @@ impl FigApp {
         }
         let hidden = self.session.ds().map(|d| d.view.ui_hidden).unwrap_or(false);
         let right_open = self.right_panel_shown(hidden);
+        // The panels float like cards (their resize edges sit on the visible edge).
+        let gap = 8.0;
+        let card = || {
+            egui::Frame::NONE
+                .fill(t.panel)
+                .stroke(egui::Stroke::new(1.0, t.border))
+                .corner_radius(egui::CornerRadius::same(12))
+                .outer_margin(egui::Margin::same(8))
+                .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
+        };
+        // The docked Motion timeline spans the full width below the side panels, so it claims
+        // its strip before they do.
+        if !hidden && self.ui.motion_timeline {
+            egui::Panel::bottom("motion_timeline").resizable(true).default_size(232.0).frame(card()).show(ui, |ui| {
+                motion_panel::dock(self, ui);
+            });
+        }
         if !hidden {
             egui::Panel::left("left_rail")
                 .exact_size(56.0)
@@ -1694,42 +1742,31 @@ impl FigApp {
         let (left_w, right_w) = fit_panels(ui.available_width(), left_open.then_some(self.ui.left_width), right_open.then_some(self.ui.right_width));
         let rows = ui.available_rect_before_wrap().y_range();
         let mut edges: Vec<(&str, f32, f32, f32)> = Vec::new();
-        // The side panels float like cards (their resize edges sit on the visible edge).
-        let gap = 8.0;
-        let card = || {
-            egui::Frame::NONE
-                .fill(t.panel)
-                .stroke(egui::Stroke::new(1.0, t.border))
-                .corner_radius(egui::CornerRadius::same(12))
-                .outer_margin(egui::Margin::same(8))
-                .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
-        };
         if left_open {
             edges.push(("left", ui.available_rect_before_wrap().min.x + left_w - gap, left_w, 1.0));
-            egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card())
-                .show(ui, |ui| {
-                    let label = match self.ui.left_tab {
-                        _ if self.ui.versions.open => i18n::tr("Version history"),
-                        LeftTab::File => i18n::tr("Layers"),
-                        LeftTab::Assets => i18n::tr("Assets"),
-                    };
-                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
-                    layers::left_panel(self, ui)
-                });
+            egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card()).show(ui, |ui| {
+                let label = match self.ui.left_tab {
+                    _ if self.ui.versions.open => i18n::tr("Version history"),
+                    LeftTab::File => i18n::tr("Layers"),
+                    LeftTab::Assets => i18n::tr("Assets"),
+                };
+                a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
+                layers::left_panel(self, ui)
+            });
         }
         if right_open {
             edges.push(("right", ui.available_rect_before_wrap().max.x - right_w + gap, right_w, -1.0));
-            egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card())
-                .show(ui, |ui| {
-                    let label = match self.ui.right_tab {
-                        RightTab::Design => i18n::tr("Design"),
-                        RightTab::Prototype => i18n::tr("Prototype"),
-                        RightTab::Inspect => i18n::tr("Dev Mode"),
-                        RightTab::Motion => i18n::tr("Motion"),
-                    };
-                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
-                    right::right_panel(self, ui)
-                });
+            egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card()).show(ui, |ui| {
+                let label = match self.ui.right_tab {
+                    RightTab::Design => i18n::tr("Design"),
+                    RightTab::Prototype => i18n::tr("Prototype"),
+                    RightTab::Inspect => i18n::tr("Dev Mode"),
+                    RightTab::Motion => i18n::tr("Motion"),
+                    RightTab::Agent => i18n::tr("Agent"),
+                };
+                a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
+                right::right_panel(self, ui)
+            });
         }
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |ui| {
             let worker = self.worker.take();

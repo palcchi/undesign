@@ -126,7 +126,7 @@ pub struct MotionPreview {
 
 impl FigApp {
     fn motion_preview_key(&self) -> Option<(Arc<Document>, u64, u32)> {
-        if self.ui.right_tab != crate::RightTab::Motion {
+        if self.ui.right_tab != crate::RightTab::Motion && !self.ui.motion_timeline {
             return None;
         }
         let ds = self.session.ds().ok()?;

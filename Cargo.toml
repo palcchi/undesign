@@ -30,6 +30,7 @@ undesign-engine = { path = "crates/engine" }
 undesign-ui-egui = { path = "crates/ui-egui" }
 undesign-collab-net = { path = "crates/collab-net" }
 undesign-plugin = { path = "crates/plugin" }
+undesign-agent = { path = "crates/agent" }
 
 # Which paths stored in a document may be followed (craft-libs).
 craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "82a24b006eefa036b43c09a67fb9a3fbd17ffe63" }
