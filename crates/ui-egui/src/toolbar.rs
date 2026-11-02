@@ -287,12 +287,7 @@ fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) 
 
 /// The mode switcher from `x`: Draw · Design · Motion · Developer Mode.
 fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
-    let modes = [
-        (Icon::Pencil, tr("Draw")),
-        (Icon::Frame, tr("Design")),
-        (Icon::Motion, tr("Motion")),
-        (Icon::Code, tr("Developer Mode")),
-    ];
+    let modes = [(Icon::Pencil, tr("Draw")), (Icon::Frame, tr("Design")), (Icon::Motion, tr("Motion")), (Icon::Code, tr("Developer Mode"))];
     let active = match app.ui.right_tab {
         crate::RightTab::Design if app.session.tool.tool == ToolId::Pencil => 0,
         crate::RightTab::Design => 1,
@@ -320,7 +315,18 @@ fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
         } else if resp.hovered() {
             ui.painter().rect_filled(r, CornerRadius::same(6), t.hover);
         }
-        icons::paint(ui.painter(), glyph_rect(r), *icon, if disabled { t.text_tertiary } else if i == active { t.accent_text } else { t.icon_secondary });
+        icons::paint(
+            ui.painter(),
+            glyph_rect(r),
+            *icon,
+            if disabled {
+                t.text_tertiary
+            } else if i == active {
+                t.accent_text
+            } else {
+                t.icon_secondary
+            },
+        );
         if i == active && !disabled {
             ui.painter().circle_filled(pos2(r.center().x, r.max.y + 2.0), 2.0, t.accent);
         }
