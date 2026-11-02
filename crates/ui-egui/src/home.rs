@@ -225,7 +225,7 @@ fn folder_tree(ui: &mut Ui, t: &Tokens, paths: &[String], origin: egui::Pos2) {
         if resp.hovered() {
             ui.painter().rect_filled(r, CornerRadius::same(8), t.hover);
         }
-        icons::paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0)), Icon::Folder, t.icon_secondary);
+        icons::paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0)), Icon::Page, t.icon_secondary);
         ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, name, regular(12.0), t.text);
         ui.painter().text(pos2(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, count.to_string(), regular(11.0), t.text_secondary);
         y += 30.0;
