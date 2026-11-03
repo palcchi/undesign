@@ -39,10 +39,12 @@ Produksi harus menggunakan HTTPS dan mengisi semua hal berikut; bila tidak, endp
 | `PUBLIC_ORIGIN` | Satu origin kanonis HTTPS, misalnya `https://showcase.example`; origin permintaan harus sama persis. Tidak ada allow-list CORS atau refleksi origin. |
 | `SESSION_SECRET` | Rahasia acak kuat minimal 32 byte untuk tanda tangan sesi dan CSRF. |
 | `IP_HASH_SECRET` | Rahasia acak minimal 32 byte yang **berbeda** dari `SESSION_SECRET`; hanya HMAC IP yang dipakai pada kuota, bukan IP mentah. |
-| `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY` | Koneksi HTTPS ke proyek Supabase untuk kuota persisten. Kredensial service-role hanya berada di server. Kuota memori lokal tidak pernah menjadi fallback produksi. |
+| `SUPABASE_URL` dan `SUPABASE_SECRET_KEY` | URL proyek dan Supabase Secret API Key berformat `sb_secret_...` untuk kuota persisten. Simpan key hanya di environment server. Kuota memori lokal tidak pernah menjadi fallback produksi. |
 | `RATE_LIMIT_PER_MIN` | Batas permintaan per IP-hash per menit; default 6. Berlaku sama untuk setiap key BYO. |
 | `DAILY_BUDGET_REQUESTS` | Batas global per hari UTC; default 100 dan berlaku untuk semua panggilan. |
 | `MAX_COMPLETION_TOKENS` | Batas atas token keluaran jika payload memilikinya; default 2000. Model tidak ditetapkan oleh server. |
+
+Di Supabase, buka **Settings > API Keys** dan salin Secret API Key yang diawali `sb_secret_`. Isi `SUPABASE_URL` dan `SUPABASE_SECRET_KEY` di environment server. Kode mengirim Secret API Key hanya melalui header `apikey`, bukan `Authorization: Bearer`, karena key baru bukan JWT. Key ini memberi akses backend dengan role Postgres `service_role`, jadi grant pada migrasi tetap berlaku. Supabase menjadwalkan deprecasi key legacy `service_role` pada akhir 2026; aplikasi ini hanya membaca `SUPABASE_SECRET_KEY` dan tidak beralih ke key legacy ([panduan API keys](https://supabase.com/docs/guides/api/api-keys), [panduan migrasi](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys)).
 
 Cookie sesi produksi memakai atribut `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, dan masa berlaku terbatas. CSRF dikaitkan secara kriptografis dengan sesi dan memiliki masa berlaku lebih pendek. Klien harus mengirim token respons sesi pada header `X-CSRF-Token` di setiap panggilan agent. Cookie bukan identitas akun dan tidak disimpan dalam local/session storage.
 
@@ -71,7 +73,7 @@ Installer menyalin aset hasil build ke `public/app/`. Jangan membuat sendiri `ru
 
 ## Vercel
 
-Paket ini dapat dijadikan proyek Vercel dengan **Root Directory = `showcase`**, Node.js 22, build command `npm run build`, dan output direktori `dist`. Fungsi Node berasal dari `api/`; `vercel.json` mengatur MIME `application/wasm`, cache aset ber-hash, SPA fallback, serta header keamanan/CSP. Jika nantinya dideploy, isi seluruh konfigurasi produksi di atas terlebih dahulu dan jangan gunakan fallback kuota memori. Paket/relay ini **belum dideploy** dan perilaku Vercel pada deployment nyata belum diverifikasi.
+Paket ini dapat dijadikan proyek Vercel dengan **Root Directory = `showcase`**, Node.js 22, build command `npm run build`, dan output direktori `dist`. Fungsi Node berasal dari `api/`; `vercel.json` mengatur MIME `application/wasm`, cache aset ber-hash, SPA fallback, serta header keamanan/CSP. Di Vercel, tambahkan `SUPABASE_URL` dan `SUPABASE_SECRET_KEY` pada **Project Settings > Environment Variables** untuk Production, bersama variabel produksi lain pada tabel di atas. Ambil Secret API Key `sb_secret_...` dari pengaturan API Keys proyek Supabase; jangan isi `SUPABASE_SERVICE_ROLE_KEY` atau masukkan key ke source code. Setelah mengatur environment, deploy proyek. Paket/relay ini **belum dideploy** dan perilaku Vercel pada deployment nyata belum diverifikasi.
 
 Video demo bersifat opsional: letakkan file yang disediakan pemilik sebagai `public/demo.mp4`. Jika file belum ada, halaman menampilkan keadaan kosong yang dirancang tanpa menggagalkan build.
 
