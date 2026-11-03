@@ -23,11 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Undesign
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: undesign
       - name: Check out craft-fonts next to it
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Same pin as ci.yml/release.yml: needs fonts/latin-manifest.txt (Inter),
           # without which the web build can't draw text.
@@ -50,7 +50,7 @@ jobs:
         working-directory: undesign/apps/undesign-web
         run: trunk build --release
       - name: Upload the site
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: undesign/dist/web
 
@@ -63,4 +63,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
