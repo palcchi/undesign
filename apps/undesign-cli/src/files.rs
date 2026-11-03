@@ -38,7 +38,7 @@ fn image_format(e: &str) -> Option<ExportFormat> {
 /// writing through it to its target -- a change of behaviour for anyone whose output path is a
 /// link, and nothing to do with confinement. Inside a root the staged write is the right one:
 /// `Roots::check` has already refused a link that leads out of the root.
-fn write(path: &str, bytes: &[u8]) -> CliResult<()> {
+pub(crate) fn write(path: &str, bytes: &[u8]) -> CliResult<()> {
     if let Some(dir) = Path::new(path).parent().filter(|d| !d.as_os_str().is_empty()) {
         undesign_engine::file_access::create_dir_all(dir).map_err(|e| CliError::Failed(e.to_string()))?;
     }
