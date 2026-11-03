@@ -6,7 +6,10 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod a11y;
+pub mod agent;
 pub mod agent_panel;
+pub mod agent_provider;
+pub mod agent_ui;
 pub mod assets_panel;
 pub mod bidi;
 pub mod board_bar;
@@ -318,6 +321,24 @@ pub trait Services {
     /// player asks every frame while its prototype has gamepad triggers.
     fn gamepad_held(&mut self) -> u32 {
         0
+    }
+    /// Provider transports are opt-in per host; a browser needs the secure same-origin relay.
+    fn agent_provider_availability(&self) -> agent_provider::AgentProviderAvailability {
+        agent_provider::AgentProviderAvailability::Unsupported
+    }
+    fn agent_provider_connected(&self) -> bool {
+        false
+    }
+    fn agent_provider_model(&self) -> Option<&str> {
+        None
+    }
+    fn connect_agent_provider(&mut self, _config: agent_provider::AgentProviderConfig) -> Result<(), String> {
+        Err("Provider connections are unavailable on this platform.".to_string())
+    }
+    fn disconnect_agent_provider(&mut self) {}
+    /// Send one completion only after the user has connected a provider and pressed Send.
+    fn request_agent_completion(&mut self, _request: Value) -> Result<agent_provider::AgentProviderTask, String> {
+        Err("Connect your own provider in this session first.".to_string())
     }
 }
 
@@ -844,6 +865,8 @@ impl Default for UiState {
 pub struct FigApp {
     pub session: Session,
     pub ui: UiState,
+    /// Ephemeral Agent state, intentionally separate from documents and preferences.
+    pub agent_panel: agent_ui::AgentPanelState,
     pub canvas: canvas::CanvasState,
     pub services: Box<dyn Services>,
     worker: Option<render_worker::Worker>,
@@ -891,6 +914,7 @@ impl FigApp {
         Self {
             ui: UiState { left_width, right_width, pages_height, ..UiState::default() },
             session,
+            agent_panel: agent_ui::AgentPanelState::default(),
             canvas: canvas::CanvasState::default(),
             services,
             worker: None,

@@ -30,6 +30,22 @@ fn click(u: &mut Ui, p: Pos2, m: Modifiers) {
     }
 }
 
+/// The bounds of an accessible button, optionally the one at a row's y-position.
+fn accessible_button(u: &mut Ui, label: &str, near_y: Option<f32>) -> Pos2 {
+    u.ctx.enable_accesskit();
+    let nodes = u.frame_output(vec![]).platform_output.accesskit_update.unwrap().nodes;
+    let node = nodes
+        .iter()
+        .map(|(_, node)| node)
+        .find(|node| {
+            node.label() == Some(label)
+                && node.bounds().is_some_and(|bounds| near_y.is_none_or(|y| (((bounds.y0 + bounds.y1) / 2.0) as f32 - y).abs() < 5.0))
+        })
+        .unwrap_or_else(|| panic!("accessible button {label:?} at {near_y:?}"));
+    let bounds = node.bounds().unwrap();
+    Pos2::new(((bounds.x0 + bounds.x1) / 2.0) as f32, ((bounds.y0 + bounds.y1) / 2.0) as f32)
+}
+
 fn rect(s: &mut Session, name: &str, x: f64, parent: Option<NodeId>) -> NodeId {
     let mut p = json!({"x": x, "y": 0, "width": 20, "height": 20, "props": {"name": name}});
     if let Some(parent) = parent {
@@ -85,9 +101,10 @@ fn expanding_collapsing_and_revealing() {
     // Alt-click on a disclosure arrow opens everything inside (silent, pinned); again closes it.
     let row = u.row_at(f);
     // The arrow sits at the row's left, after the panel's inset.
-    let arrow = Pos2::new(74.0, row.y);
+    let arrow = accessible_button(&mut u, "Expand", Some(row.y));
     click(&mut u, arrow, ALT);
     assert!(u.app.ui.expanded.contains(&f) && u.app.ui.expanded.contains(&g), "silent: Alt-click on an arrow expands every layer inside (pinned)");
+    let arrow = accessible_button(&mut u, "Collapse", Some(row.y));
     click(&mut u, arrow, ALT);
     assert!(!u.app.ui.expanded.contains(&f) && !u.app.ui.expanded.contains(&g), "silent: Alt-click again collapses them all (pinned)");
     // Selecting on the canvas opens the rows down to the layer (silent, pinned).
@@ -206,7 +223,8 @@ fn pages_search_button_opens_the_filter_and_escape_clears_it() {
     let mut u = Ui::new(s);
 
     // The search icon in the Pages header opens the page-name field, not Find and Replace.
-    click(&mut u, Pos2::new(246.0, 124.0), Modifiers::NONE);
+    let search = accessible_button(&mut u, "Search pages", None);
+    click(&mut u, search, Modifiers::NONE);
     assert!(u.app.ui.page_search, "the Pages search is open");
     assert!(u.app.ui.find.is_none(), "page search does not open Find and Replace");
     u.frame(vec![Event::Text("COMPON".into())]);
@@ -239,7 +257,8 @@ fn escape_in_the_pages_search_does_not_reach_the_canvas() {
     let r = rect(&mut s, "r", 0.0, None);
     s.execute("select.set", &json!({"ids": [r]})).unwrap();
     let mut u = Ui::new(s);
-    click(&mut u, Pos2::new(246.0, 124.0), Modifiers::NONE);
+    let search = accessible_button(&mut u, "Search pages", None);
+    click(&mut u, search, Modifiers::NONE);
     assert!(u.app.ui.page_search);
     u.frame(vec![Event::Text("x".into())]);
     u.frame(vec![Event::Key { key: egui::Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }]);
