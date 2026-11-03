@@ -52,18 +52,17 @@ pub struct Tokens {
     pub focus: Color32,
 }
 
-/// Undesign's brand green for solid surfaces.
-pub const BRAND: Color32 = Color32::from_rgb(0x02, 0xDA, 0x96);
-/// Contrast-safe green for thin selection outlines and white-on-green labels.
-/// It reaches 4.5:1 on white and 3:1 on the dark canvas.
-pub const ACCENT: Color32 = Color32::from_rgb(0x00, 0x87, 0x5F);
-/// Ink on the bright green brand surface (white would not have enough contrast).
-pub const ACCENT_ON: Color32 = Color32::from_rgb(0x07, 0x35, 0x2A);
-/// Id of the canvas overlays' green for this frame ([`set_canvas_page`]).
+/// Light grayscale surface used for brand marks and canvas overlays on dark pages.
+pub const BRAND: Color32 = Color32::from_rgb(0xD8, 0xD8, 0xD8);
+/// Contrast-safe dark grayscale for selection outlines and labels on light surfaces.
+pub const ACCENT: Color32 = Color32::from_rgb(0x44, 0x44, 0x44);
+/// Ink on the light grayscale brand surface.
+pub const ACCENT_ON: Color32 = Color32::from_rgb(0x17, 0x17, 0x17);
+/// Id of the canvas overlay grayscale selected for this frame ([`set_canvas_page`]).
 const CANVAS_ACCENT: &str = "undesign-canvas-accent";
 
 /// Remember the page colour the canvas shows. Its overlays (outlines, handles, arrows) take
-/// whichever green contrasts more with it: the bright one on a dark page, the darker on a light one.
+/// whichever grayscale contrasts more with it: the lighter one on a dark page, the darker on a light one.
 pub fn set_canvas_page(ctx: &Context, page: Color32) {
     let pick = if c(BRAND).contrast(c(page)) > c(ACCENT).contrast(c(page)) { BRAND } else { ACCENT };
     ctx.data_mut(|d| d.insert_temp(egui::Id::new(CANVAS_ACCENT), pick));
@@ -74,21 +73,21 @@ fn c(x: Color32) -> undesign_color::Color {
     undesign_color::Color::new(f32::from(x.r()) / 255.0, f32::from(x.g()) / 255.0, f32::from(x.b()) / 255.0, 1.0)
 }
 
-/// The green for overlays drawn on the page ([`set_canvas_page`]); [`ACCENT`] before a page shows.
+/// The neutral overlay color drawn on the page ([`set_canvas_page`]); [`ACCENT`] before a page shows.
 pub fn canvas_accent(ctx: &Context) -> Color32 {
     ctx.data(|d| d.get_temp(egui::Id::new(CANVAS_ACCENT))).unwrap_or(ACCENT)
 }
 
-/// A fill under white text: the darker green stands in for the bright one.
+/// A darker fill under white text when the light grayscale brand surface is used.
 pub fn under_white(c: Color32) -> Color32 {
     if c == BRAND { ACCENT } else { c }
 }
 
-pub const COMPONENT: Color32 = Color32::from_rgb(0x97, 0x47, 0xFF);
+pub const COMPONENT: Color32 = Color32::from_rgb(0x85, 0x85, 0x85);
 /// Handoff status badges (white text on these, in both themes).
-pub const DEV_READY: Color32 = Color32::from_rgb(0x08, 0x7D, 0x4F);
-pub const DEV_CHANGED: Color32 = Color32::from_rgb(0xA7, 0x5B, 0x00);
-pub const DEV_COMPLETED: Color32 = Color32::from_rgb(0x6E, 0x6E, 0x73);
+pub const DEV_READY: Color32 = Color32::from_rgb(0x66, 0x66, 0x66);
+pub const DEV_CHANGED: Color32 = Color32::from_rgb(0x55, 0x55, 0x55);
+pub const DEV_COMPLETED: Color32 = Color32::from_rgb(0x70, 0x70, 0x70);
 
 impl Tokens {
     pub fn light() -> Self {
@@ -96,39 +95,39 @@ impl Tokens {
             dark: false,
             bg: Color32::from_rgb(0xFF, 0xFF, 0xFF),
             panel: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-            canvas: Color32::from_rgb(0xF4, 0xF6, 0xF4),
-            border: Color32::from_rgb(0xDC, 0xE3, 0xDD),
-            border_strong: Color32::from_rgb(0xC2, 0xCC, 0xC4),
-            control_border: Color32::from_rgb(0x7C, 0x88, 0x7F),
-            text: Color32::from_rgb(0x18, 0x21, 0x1B),
-            text_secondary: Color32::from_rgb(0x59, 0x65, 0x5D),
-            text_tertiary: Color32::from_rgb(0x62, 0x6D, 0x64),
-            icon: Color32::from_rgb(0x18, 0x21, 0x1B),
-            icon_secondary: Color32::from_rgb(0x59, 0x65, 0x5D),
-            hover: Color32::from_rgb(0xEF, 0xF3, 0xEF),
-            pressed: Color32::from_rgb(0xE7, 0xEC, 0xE8),
-            field: Color32::from_rgb(0xF8, 0xFA, 0xF8),
-            field_hover_border: Color32::from_rgb(0x7C, 0x88, 0x7F),
-            accent: Color32::from_rgb(0x00, 0x7A, 0x56),
-            accent_hover: Color32::from_rgb(0x00, 0x65, 0x48),
+            canvas: Color32::from_rgb(0xF4, 0xF4, 0xF4),
+            border: Color32::from_rgb(0xDC, 0xDC, 0xDC),
+            border_strong: Color32::from_rgb(0xC2, 0xC2, 0xC2),
+            control_border: Color32::from_rgb(0x7C, 0x7C, 0x7C),
+            text: Color32::from_rgb(0x18, 0x18, 0x18),
+            text_secondary: Color32::from_rgb(0x59, 0x59, 0x59),
+            text_tertiary: Color32::from_rgb(0x62, 0x62, 0x62),
+            icon: Color32::from_rgb(0x18, 0x18, 0x18),
+            icon_secondary: Color32::from_rgb(0x59, 0x59, 0x59),
+            hover: Color32::from_rgb(0xEF, 0xEF, 0xEF),
+            pressed: Color32::from_rgb(0xE7, 0xE7, 0xE7),
+            field: Color32::from_rgb(0xF8, 0xF8, 0xF8),
+            field_hover_border: Color32::from_rgb(0x7C, 0x7C, 0x7C),
+            accent: Color32::from_rgb(0x36, 0x36, 0x36),
+            accent_hover: Color32::from_rgb(0x24, 0x24, 0x24),
             accent_on: Color32::WHITE,
-            accent_text: Color32::from_rgb(0x00, 0x6B, 0x4D),
-            selected_row: Color32::from_rgb(0xE8, 0xF3, 0xEC),
-            selected_row_child: Color32::from_rgb(0xF4, 0xF8, 0xF5),
+            accent_text: Color32::from_rgb(0x34, 0x34, 0x34),
+            selected_row: Color32::from_rgb(0xE8, 0xE8, 0xE8),
+            selected_row_child: Color32::from_rgb(0xF4, 0xF4, 0xF4),
             component: COMPONENT,
-            component_row: Color32::from_rgb(0xF1, 0xE9, 0xFF),
-            danger: Color32::from_rgb(0xF2, 0x48, 0x22),
+            component_row: Color32::from_rgb(0xF1, 0xF1, 0xF1),
+            danger: Color32::from_rgb(0x5F, 0x5F, 0x5F),
             success: DEV_READY,
-            warning: Color32::from_rgb(0xFF, 0xCD, 0x29),
-            guide: Color32::from_rgb(0xF2, 0x48, 0x22),
-            tab_bar: Color32::from_rgb(0xF8, 0xFA, 0xF8),
+            warning: Color32::from_rgb(0x70, 0x70, 0x70),
+            guide: Color32::from_rgb(0x5F, 0x5F, 0x5F),
+            tab_bar: Color32::from_rgb(0xF8, 0xF8, 0xF8),
             tab_active: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-            shadow: Color32::from_rgba_unmultiplied(0x08, 0x14, 0x0C, 20),
+            shadow: Color32::from_rgba_unmultiplied(0x00, 0x00, 0x00, 20),
             menu: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-            menu_text: Color32::from_rgb(0x18, 0x21, 0x1B),
-            menu_hover: Color32::from_rgb(0xE8, 0xF3, 0xEC),
-            menu_dim: Color32::from_rgb(0x62, 0x6D, 0x64),
-            focus: Color32::from_rgb(0x34, 0x89, 0x66),
+            menu_text: Color32::from_rgb(0x18, 0x18, 0x18),
+            menu_hover: Color32::from_rgb(0xE8, 0xE8, 0xE8),
+            menu_dim: Color32::from_rgb(0x62, 0x62, 0x62),
+            focus: Color32::from_rgb(0x44, 0x44, 0x44),
         }
     }
 
@@ -136,40 +135,40 @@ impl Tokens {
         Self {
             dark: true,
             bg: Color32::from_rgb(0x1B, 0x1B, 0x1B),
-            panel: Color32::from_rgb(0x1D, 0x23, 0x1F),
-            canvas: Color32::from_rgb(0x15, 0x19, 0x16),
-            border: Color32::from_rgb(0x3B, 0x46, 0x3F),
-            border_strong: Color32::from_rgb(0x59, 0x66, 0x5F),
-            control_border: Color32::from_rgb(0x6F, 0x7C, 0x73),
-            text: Color32::from_rgb(0xF2, 0xF5, 0xF2),
-            text_secondary: Color32::from_rgb(0xBE, 0xC8, 0xC1),
-            text_tertiary: Color32::from_rgb(0xA7, 0xB2, 0xAA),
-            icon: Color32::from_rgb(0xF2, 0xF5, 0xF2),
-            icon_secondary: Color32::from_rgb(0xBE, 0xC8, 0xC1),
-            hover: Color32::from_rgb(0x2A, 0x31, 0x2C),
-            pressed: Color32::from_rgb(0x31, 0x3A, 0x34),
-            field: Color32::from_rgb(0x20, 0x27, 0x22),
-            field_hover_border: Color32::from_rgb(0x6F, 0x7C, 0x73),
-            accent: Color32::from_rgb(0x58, 0xD4, 0x9A),
-            accent_hover: Color32::from_rgb(0x68, 0xDD, 0xA6),
-            accent_on: Color32::from_rgb(0x10, 0x21, 0x17),
-            accent_text: Color32::from_rgb(0x58, 0xD4, 0x9A),
-            selected_row: Color32::from_rgb(0x20, 0x39, 0x2D),
-            selected_row_child: Color32::from_rgb(0x17, 0x2A, 0x20),
-            component: Color32::from_rgb(0xD2, 0x7C, 0xFF),
-            component_row: Color32::from_rgb(0x2C, 0x23, 0x40),
-            danger: Color32::from_rgb(0xF2, 0x48, 0x22),
+            panel: Color32::from_rgb(0x1D, 0x1D, 0x1D),
+            canvas: Color32::from_rgb(0x15, 0x15, 0x15),
+            border: Color32::from_rgb(0x3B, 0x3B, 0x3B),
+            border_strong: Color32::from_rgb(0x59, 0x59, 0x59),
+            control_border: Color32::from_rgb(0x73, 0x73, 0x73),
+            text: Color32::from_rgb(0xF2, 0xF2, 0xF2),
+            text_secondary: Color32::from_rgb(0xBE, 0xBE, 0xBE),
+            text_tertiary: Color32::from_rgb(0xA7, 0xA7, 0xA7),
+            icon: Color32::from_rgb(0xF2, 0xF2, 0xF2),
+            icon_secondary: Color32::from_rgb(0xBE, 0xBE, 0xBE),
+            hover: Color32::from_rgb(0x2A, 0x2A, 0x2A),
+            pressed: Color32::from_rgb(0x31, 0x31, 0x31),
+            field: Color32::from_rgb(0x20, 0x20, 0x20),
+            field_hover_border: Color32::from_rgb(0x73, 0x73, 0x73),
+            accent: Color32::from_rgb(0xD9, 0xD9, 0xD9),
+            accent_hover: Color32::from_rgb(0xF0, 0xF0, 0xF0),
+            accent_on: Color32::from_rgb(0x18, 0x18, 0x18),
+            accent_text: Color32::from_rgb(0xE0, 0xE0, 0xE0),
+            selected_row: Color32::from_rgb(0x33, 0x33, 0x33),
+            selected_row_child: Color32::from_rgb(0x29, 0x29, 0x29),
+            component: COMPONENT,
+            component_row: Color32::from_rgb(0x2C, 0x2C, 0x2C),
+            danger: Color32::from_rgb(0xB0, 0xB0, 0xB0),
             success: DEV_READY,
-            warning: Color32::from_rgb(0xFF, 0xCD, 0x29),
-            guide: Color32::from_rgb(0xF2, 0x48, 0x22),
-            tab_bar: Color32::from_rgb(0x20, 0x27, 0x22),
-            tab_active: Color32::from_rgb(0x24, 0x2B, 0x26),
+            warning: Color32::from_rgb(0xA0, 0xA0, 0xA0),
+            guide: Color32::from_rgb(0xB0, 0xB0, 0xB0),
+            tab_bar: Color32::from_rgb(0x20, 0x20, 0x20),
+            tab_active: Color32::from_rgb(0x24, 0x24, 0x24),
             shadow: Color32::from_black_alpha(61),
-            menu: Color32::from_rgb(0x24, 0x2B, 0x26),
-            menu_text: Color32::from_rgb(0xF2, 0xF5, 0xF2),
-            menu_hover: Color32::from_rgb(0x2A, 0x31, 0x2C),
-            menu_dim: Color32::from_rgb(0xA7, 0xB2, 0xAA),
-            focus: Color32::from_rgb(0x68, 0xDD, 0xA6),
+            menu: Color32::from_rgb(0x24, 0x24, 0x24),
+            menu_text: Color32::from_rgb(0xF2, 0xF2, 0xF2),
+            menu_hover: Color32::from_rgb(0x2A, 0x2A, 0x2A),
+            menu_dim: Color32::from_rgb(0xA7, 0xA7, 0xA7),
+            focus: Color32::from_rgb(0xF0, 0xF0, 0xF0),
         }
     }
 
@@ -227,8 +226,8 @@ fn visuals(t: Tokens) -> Visuals {
     v.window_corner_radius = egui::CornerRadius::same(12);
     v.menu_corner_radius = egui::CornerRadius::same(12);
     v.selection.bg_fill = t.selected_row;
-    // Also the colour of selected text on that highlight (and a focused text box's outline): the
-    // theme's readable green, not the darker one that sinks into the dark theme's highlight.
+    // Also the color of selected text on that highlight (and a focused text box's outline): use
+    // the theme's high-contrast neutral token in both modes.
     v.selection.stroke = Stroke::new(1.0, t.accent_text);
     v.hyperlink_color = t.accent_text;
     for w in [&mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active, &mut v.widgets.open, &mut v.widgets.noninteractive] {
@@ -408,11 +407,11 @@ pub fn paint_wordmark(painter: &egui::Painter, left_center: egui::Pos2, size: f3
     painter.text(egui::pos2(left_center.x + un_width, left_center.y), egui::Align2::LEFT_CENTER, "design", font, t.accent_text);
 }
 
-/// Paint the app icon from the existing app asset.
+/// Paint the monochrome app icon from the neutral app asset.
 pub fn paint_app_icon(ui: &egui::Ui, rect: egui::Rect) {
     static ICON: OnceLock<Option<egui::ColorImage>> = OnceLock::new();
     let image = ICON.get_or_init(|| {
-        let rgba = image::load_from_memory(include_bytes!("../../../assets/app-icon/undesign-64.png")).ok()?.to_rgba8();
+        let rgba = image::load_from_memory(include_bytes!("../../../assets/app-icon/undesign-64-mono.png")).ok()?.to_rgba8();
         Some(egui::ColorImage::from_rgba_unmultiplied([rgba.width() as usize, rgba.height() as usize], rgba.as_raw()))
     });
     let Some(image) = image else {
@@ -420,9 +419,9 @@ pub fn paint_app_icon(ui: &egui::Ui, rect: egui::Rect) {
         crate::icons::paint(ui.painter(), rect.shrink(rect.width() * 0.22), crate::icons::Icon::Logo, ACCENT_ON);
         return;
     };
-    let id = egui::Id::new("undesign_original_app_icon");
+    let id = egui::Id::new("undesign_monochrome_app_icon");
     let texture = ui.ctx().data(|data| data.get_temp::<egui::TextureHandle>(id)).unwrap_or_else(|| {
-        let texture = ui.ctx().load_texture("undesign-original-app-icon", image.clone(), egui::TextureOptions::LINEAR);
+        let texture = ui.ctx().load_texture("undesign-monochrome-app-icon", image.clone(), egui::TextureOptions::LINEAR);
         ui.ctx().data_mut(|data| data.insert_temp(id, texture.clone()));
         texture
     });
@@ -461,18 +460,69 @@ mod tests {
     use super::*;
 
     #[test]
-    fn canvas_overlays_take_the_green_that_stands_out_on_the_page() {
+    fn canvas_overlays_choose_the_grayscale_with_stronger_contrast() {
         let ctx = Context::default();
         assert_eq!(canvas_accent(&ctx), ACCENT, "before any page shows");
         set_canvas_page(&ctx, Color32::from_rgb(0x1E, 0x1E, 0x1E));
-        assert_eq!(canvas_accent(&ctx), BRAND, "the bright green on a dark page");
+        assert_eq!(canvas_accent(&ctx), BRAND, "the lighter gray on a dark page");
         set_canvas_page(&ctx, Color32::WHITE);
-        assert_eq!(canvas_accent(&ctx), ACCENT, "the darker green on a light page");
+        assert_eq!(canvas_accent(&ctx), ACCENT, "the darker gray on a light page");
         set_canvas_page(&ctx, Color32::from_rgb(0xF5, 0xF5, 0xF5));
         assert_eq!(canvas_accent(&ctx), ACCENT);
-        // White text never sits on the bright green.
+        // White text never sits on the light-gray brand fill.
         assert_eq!(under_white(BRAND), ACCENT);
         assert_eq!(under_white(COMPONENT), COMPONENT);
+    }
+
+    #[test]
+    fn general_theme_tokens_are_grayscale_and_live_peer_colors_remain_independent() {
+        for t in [Tokens::light(), Tokens::dark()] {
+            let colors = [
+                t.bg,
+                t.panel,
+                t.canvas,
+                t.border,
+                t.border_strong,
+                t.control_border,
+                t.text,
+                t.text_secondary,
+                t.text_tertiary,
+                t.icon,
+                t.icon_secondary,
+                t.hover,
+                t.pressed,
+                t.field,
+                t.field_hover_border,
+                t.accent,
+                t.accent_hover,
+                t.accent_on,
+                t.accent_text,
+                t.selected_row,
+                t.selected_row_child,
+                t.component,
+                t.component_row,
+                t.danger,
+                t.success,
+                t.warning,
+                t.guide,
+                t.tab_bar,
+                t.tab_active,
+                t.shadow,
+                t.menu,
+                t.menu_text,
+                t.menu_hover,
+                t.menu_dim,
+                t.focus,
+            ];
+            for color in colors {
+                assert_eq!(color.r(), color.g(), "general UI token must be grayscale: {color:?}");
+                assert_eq!(color.g(), color.b(), "general UI token must be grayscale: {color:?}");
+            }
+        }
+
+        let peer = crate::live::color("#14AE5C");
+        assert_eq!(peer, Color32::from_rgb(0x14, 0xAE, 0x5C));
+        assert_ne!(peer, Tokens::light().accent, "live participant color stays separate from neutral UI chrome");
     }
 
     /// `fill` (premultiplied, maybe translucent) painted over the opaque `bg`.

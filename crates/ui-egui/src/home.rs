@@ -9,6 +9,7 @@ use serde_json::json;
 
 use crate::FigApp;
 use crate::a11y;
+use crate::app_glyphs::{self, Glyph};
 use crate::i18n::{tr, tr_noop};
 use crate::icons::{self, Icon};
 use crate::theme::{ACCENT, Tokens, regular, semibold};
@@ -47,6 +48,8 @@ pub struct Home {
     pub file_query: String,
     /// The recent files: what is known about each, and the selection.
     pub recents: crate::home_recents::Recents,
+    /// A Home quick action can request focus in the existing join-code field.
+    pub join_code_focus: bool,
 }
 
 const RAIL: f32 = 64.0;
@@ -88,7 +91,10 @@ pub(crate) fn file_row(ui: &Ui, t: &Tokens, r: Rect, resp: &Response, row: &File
         ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
     }
     if let Some((icon, tint)) = row.mark {
-        icons::paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0)), icon, tint);
+        let icon_rect = Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0));
+        if !app_glyphs::paint_compat(ui.painter(), icon_rect, icon, tint) {
+            icons::paint(ui.painter(), icon_rect, icon, tint);
+        }
     }
     let (name_font, detail_font) = (regular(12.0), regular(row.detail_size));
     let width = |s: &str, font: &egui::FontId| ui.painter().layout_no_wrap(s.to_string(), font.clone(), Color32::WHITE).size().x;
@@ -187,7 +193,9 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
             ui.painter().rect_filled(r, CornerRadius::same(10), if current { t.selected_row } else { t.hover });
         }
         focus_ring(ui, t, r, &resp, 10);
-        icons::paint(ui.painter(), r.shrink(10.0), icon, if current { t.accent_text } else { t.icon });
+        if !app_glyphs::paint_compat(ui.painter(), r.shrink(10.0), icon, if current { t.accent_text } else { t.icon }) {
+            icons::paint(ui.painter(), r.shrink(10.0), icon, if current { t.accent_text } else { t.icon });
+        }
         ui.painter().text(pos2(r.center().x, r.max.y - 8.0), Align2::CENTER_BOTTOM, tr(label), regular(10.0), t.text_secondary);
         if resp.clicked() {
             app.ui.home_view.section = section;
@@ -233,7 +241,12 @@ fn folder_tree(app: &mut FigApp, ui: &mut Ui, t: &Tokens, paths: &[String], orig
             ui.painter().rect_filled(r, CornerRadius::same(8), t.hover);
         }
         focus_ring(ui, t, r, &resp, 8);
-        icons::paint(ui.painter(), Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0)), Icon::Page, t.icon_secondary);
+        app_glyphs::paint(
+            ui.painter(),
+            Rect::from_min_size(pos2(r.min.x + 8.0, r.center().y - 8.0), vec2(16.0, 16.0)),
+            Glyph::Folder,
+            t.icon_secondary,
+        );
         ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, name, regular(12.0), t.text);
         ui.painter().text(pos2(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, count.to_string(), regular(11.0), t.text_secondary);
         if resp.clicked() {
@@ -293,9 +306,9 @@ fn focus_ring(ui: &Ui, t: &Tokens, rect: Rect, resp: &Response, radius: u8) {
 
 /// A card's background and border (lit on hover, ringed with the keyboard on it).
 fn card_frame(ui: &Ui, t: &Tokens, rect: Rect, resp: &Response) {
-    ui.painter().rect_filled(rect, CornerRadius::same(8), if resp.hovered() { t.hover } else { t.panel });
-    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.border), StrokeKind::Inside);
-    focus_ring(ui, t, rect, resp, 8);
+    ui.painter().rect_filled(rect, CornerRadius::same(12), if resp.hovered() { t.hover } else { t.panel });
+    ui.painter().rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0, t.border), StrokeKind::Inside);
+    focus_ring(ui, t, rect, resp, 12);
 }
 
 fn heading(ui: &mut Ui, t: &Tokens, text: &str) {
@@ -322,7 +335,9 @@ fn action_card(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, sub: &str) -> b
     card_frame(ui, t, r, &resp);
     let ir = Rect::from_min_size(pos2(r.min.x + 16.0, r.center().y - 16.0), vec2(32.0, 32.0));
     ui.painter().rect_filled(ir, CornerRadius::same(6), t.accent);
-    icons::paint(ui.painter(), ir.shrink(8.0), icon, t.accent_on);
+    if !app_glyphs::paint_compat(ui.painter(), ir.shrink(8.0), icon, t.accent_on) {
+        icons::paint(ui.painter(), ir.shrink(8.0), icon, t.accent_on);
+    }
     ui.painter().text(pos2(r.min.x + 60.0, r.center().y - 8.0), Align2::LEFT_CENTER, title_shown, semibold(12.0), t.text);
     ui.painter().text(pos2(r.min.x + 60.0, r.center().y + 9.0), Align2::LEFT_CENTER, sub_shown, regular(11.0), t.text_secondary);
     resp.clicked()
@@ -330,24 +345,29 @@ fn action_card(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, sub: &str) -> b
 
 fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
     heading(ui, t, tr("Recents"));
-    let (mut new_file, mut new_board, mut open) = (false, false, false);
+    let (mut new_file, mut new_board, mut import_file, mut join_team) = (false, false, false, false);
     ui.horizontal_wrapped(|ui| {
-        new_file = action_card(ui, t, Icon::PenNib, tr("New design file"), tr("Start from a blank canvas"));
+        new_file = action_card(ui, t, Icon::PenNib, tr("New design"), tr("Start from a blank canvas"));
         new_board = action_card(ui, t, Icon::Board, tr("New board"), tr("Sticky notes, shapes and connectors"));
-        open = action_card(ui, t, Icon::Page, tr("Open file"), tr("Open .undesign, .svg or images"));
+        import_file = action_card(ui, t, Icon::Page, tr("Import file"), tr("Bring in a local design"));
+        join_team = action_card(ui, t, Icon::Online, tr("Join team"), tr("Enter a code or invite link"));
     });
     if new_file || new_board {
         app.run(if new_board { "file.newBoard" } else { "file.new" }, json!({}));
         app.ui.home = false;
     }
-    if open {
+    if import_file {
         app.open_dialog();
+    }
+    if join_team {
+        app.ui.home_view.join_code_focus = true;
     }
     // Join a file someone shared: the join field, and what the join is doing.
     subheading(ui, t, tr("Join with a code"));
     ui.scope(|ui| {
         ui.set_max_width(540.0);
-        if let Some(session) = crate::live::join_row(app, ui, 260.0) {
+        let focus = std::mem::take(&mut app.ui.home_view.join_code_focus);
+        if let Some(session) = crate::live::join_row_focused(app, ui, 260.0, focus) {
             app.ui.live.home_join = Some(session);
         }
         if let Some(session) = app.ui.live.home_join {

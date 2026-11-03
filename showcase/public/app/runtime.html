@@ -5,17 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Undesign</title>
 
-<script type="module">
-import init, * as bindings from '/app/undesign-web-1ac64c3fc4c42e4.js';
-const wasm = await init({ module_or_path: '/app/undesign-web-afe79d6d7be906e4_bg.wasm' });
-
-
-window.wasmBindings = bindings;
-
-
-dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
-
-</script>
+<script type="module" src="/app/trunk-bootstrap-BgaJ-5mnb0A9qV_FYbEj5nEjdDquAAb7_iLIKmhwfKG6I7bKWPBRQtK5Z7YnvfdQ.js" integrity="sha384-BgaJ+5mnb0A9qV/FYbEj5nEjdDquAAb7/iLIKmhwfKG6I7bKWPBRQtK5Z7YnvfdQ" crossorigin="anonymous"></script>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #f5f5f5; }
     #undesign_canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -26,7 +16,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
       #undesign_loading { color: #b8b8b8; }
     }
   </style>
-<link rel="modulepreload" href="/app/undesign-web-1ac64c3fc4c42e4.js" crossorigin="anonymous" integrity="sha384-8GE4U6FHp8qzdtRcdbUSzf5r0UZn783HA1kD+c7xJPb0taICcT8cw+LvQmVndGHL"><link rel="preload" href="/app/undesign-web-afe79d6d7be906e4_bg.wasm" crossorigin="anonymous" integrity="sha384-AhSwuvyYzwBJVubwokGvA0R5BC5T0bwrxZBW1KKb9GdJ9Ky5ylPY27gQ4gCKPu18" as="fetch" type="application/wasm">  <meta name="undesign-runtime" content="true">
+<link rel="modulepreload" href="./undesign-web-1b88d857c5225d1.js" crossorigin="anonymous" integrity="sha384-QZ1NNO17LKi3vk/HRGA+1Z4kkz3WUaCu/QrcMZZ2S96elo500gI4EzC83EO42lS2"><link rel="preload" href="./undesign-web-f24e125d8cd5aaa3_bg.wasm" crossorigin="anonymous" integrity="sha384-5CB0lPkEU8NdddJbjhxVtUiHWRjDSy64fjRJSM11eNt6ka+RH5Pah9mKCJDQ9Gix" as="fetch" type="application/wasm">  <meta name="undesign-runtime" content="true">
 </head>
 <body>
   <canvas id="undesign_canvas"></canvas>

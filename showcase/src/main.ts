@@ -255,7 +255,7 @@ function buildAppShell(): void {
       toggle.setAttribute("aria-expanded", "false");
       toggle.focus();
     });
-  }, 320);
+  }, 0);
 }
 
 async function findInstalledRuntime(): Promise<boolean> {
@@ -270,8 +270,14 @@ async function findInstalledRuntime(): Promise<boolean> {
 }
 
 function renderCurrentRoute(): void {
-  if (window.location.pathname === "/app" || window.location.pathname.startsWith("/app/")) {
+  const pathname = window.location.pathname;
+  if (pathname === "/showcase" || pathname.startsWith("/showcase/")) {
+    renderHome();
+  } else if (pathname === "/" || pathname === "/app" || pathname.startsWith("/app/")) {
     buildAppShell();
+    root.querySelectorAll<HTMLAnchorElement>(".app-back, #app-message a").forEach((link) => {
+      link.href = "/showcase/";
+    });
   } else {
     renderHome();
   }

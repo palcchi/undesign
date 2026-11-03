@@ -12,7 +12,7 @@
     "build:api": "tsc -p tsconfig.build.json --noEmit",
     "build": "npm run typecheck && npm run build:api && vite build",
     "build:test": "tsc -p tsconfig.test.json",
-    "test": "npm run build:test && node --test .test-dist/tests/*.test.js",
+    "test": "npm run build:test && node --test .test-dist/tests/*.test.js scripts/install-wasm.test.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "install:wasm": "node scripts/install-wasm.mjs"
   },

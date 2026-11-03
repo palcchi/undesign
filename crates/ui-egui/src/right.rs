@@ -7,6 +7,7 @@ use undesign_doc::*;
 use undesign_engine::cmd::lists::{moved_index, removed_index};
 
 use crate::a11y::{self, Tip};
+use crate::app_glyphs::{self, Glyph};
 use crate::i18n::{tr, trf, trn};
 use crate::icons::{self, Icon};
 use crate::list_drag::{ListDrag, move_flags, remove_flags};
@@ -102,9 +103,8 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
         ui.painter().rect_filled(play, CornerRadius::same(5), t.hover);
     }
     let tri = Rect::from_center_size(play.center() - vec2(7.0, 0.0), vec2(16.0, 16.0));
-    let c = tri.center();
-    ui.painter().add(egui::Shape::closed_line(vec![c + vec2(-5.0, -7.0), c + vec2(7.0, 0.0), c + vec2(-5.0, 7.0)], Stroke::new(1.4, t.icon)));
-    icons::paint(ui.painter(), Rect::from_center_size(play.center() + vec2(12.0, 0.0), vec2(10.0, 10.0)), Icon::Chevron, t.icon_secondary);
+    app_glyphs::paint(ui.painter(), tri, Glyph::Play, t.icon);
+    app_glyphs::paint(ui.painter(), Rect::from_center_size(play.center() + vec2(12.0, 0.0), vec2(10.0, 10.0)), Glyph::ChevronDown, t.icon_secondary);
     crate::live::people_bar(app, ui, Rect::from_min_max(pos2(top.min.x + 12.0, top.min.y), pos2(play.min.x - 6.0, top.max.y)));
     if presp.clicked() {
         app.run("proto.present", json!({}));
@@ -120,35 +120,47 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
             ui.close();
         }
     });
-    // Tabs row, with the zoom combo on its own line below: four tabs and the combo
-    // no longer share one row (overlapping controls break keyboard focus: tab order
-    // skips a control whose rect covers the focused one).
-    let (tabs, _) = ui.allocate_exact_size(vec2(w, 60.0), Sense::hover());
+    // Reference layout: a 36px icon-and-label tab row, then a separate 32px zoom row. This also
+    // keeps the controls' hit regions distinct for keyboard focus and screen readers.
+    let (tabs, _) = ui.allocate_exact_size(vec2(w, 68.0), Sense::hover());
     ui.painter().line_segment([tabs.left_top(), tabs.right_top()], Stroke::new(1.0, t.border));
-    let mut x = tabs.min.x + 8.0;
-    for (tab, label) in
-        [(RightTab::Design, tr("Design")), (RightTab::Prototype, tr("Prototype")), (RightTab::Motion, tr("Motion")), (RightTab::Agent, tr("Agent"))]
-    {
-        let galley = ui.painter().layout_no_wrap(label.into(), semibold(11.0), t.text);
-        let r = Rect::from_min_size(pos2(x, tabs.min.y + 4.0), vec2(galley.size().x + 8.0, 24.0));
+    let mut x = tabs.min.x + 6.0;
+    for (tab, icon, label) in [
+        (RightTab::Design, Glyph::Design, tr("Design")),
+        (RightTab::Prototype, Glyph::Prototype, tr("Prototype")),
+        (RightTab::Motion, Glyph::Motion, tr("Motion")),
+        (RightTab::Agent, Glyph::Agent, tr("Agent")),
+    ] {
+        let galley = ui.painter().layout_no_wrap(label.into(), semibold(9.5), t.text);
+        let r = Rect::from_min_size(pos2(x, tabs.min.y + 6.0), vec2(galley.size().x + 20.0, 24.0));
         let resp = ui.interact(r, ui.id().with(("rtab", label)), Sense::click());
         let active = app.ui.right_tab == tab;
         a11y::tab(&resp, label, active);
         if active {
-            ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
+            ui.painter().rect_filled(r, CornerRadius::same(6), t.selected_row);
+            let indicator = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(10.0, 2.0));
+            ui.painter().rect_filled(indicator, CornerRadius::same(1), t.accent);
+        } else if resp.hovered() || resp.has_focus() {
+            ui.painter().rect_filled(r, CornerRadius::same(6), t.hover);
         }
-        ui.painter().galley(pos2(r.min.x + 4.0, r.center().y - galley.size().y / 2.0), galley, if active { t.text } else { t.text_secondary });
+        app_glyphs::paint(
+            ui.painter(),
+            Rect::from_center_size(pos2(r.min.x + 8.0, r.center().y), vec2(12.0, 12.0)),
+            icon,
+            if active { t.accent_text } else { t.icon_secondary },
+        );
+        ui.painter().galley(pos2(r.min.x + 16.0, r.center().y - galley.size().y / 2.0), galley, if active { t.text } else { t.text_secondary });
         if resp.clicked() {
             if tab == RightTab::Prototype && app.ui.right_tab != tab {
                 crate::proto_panel::open_editor(ui.ctx(), None);
             }
             app.ui.right_tab = tab;
         }
-        x = r.max.x + 2.0;
+        x = r.max.x + 1.0;
     }
     // Zoom menu.
     let zoom = app.session.ds().map(|d| d.view.zoom).unwrap_or(1.0);
-    let zr = Rect::from_min_size(pos2(tabs.max.x - 64.0, tabs.min.y + 32.0), vec2(56.0, 24.0));
+    let zr = Rect::from_min_size(pos2(tabs.max.x - 64.0, tabs.min.y + 38.0), vec2(56.0, 28.0));
     let zresp = ui.interact(zr, ui.id().with("zoommenu"), Sense::click());
     // The value is only spelled out while a screen reader reads the tree.
     let value = if a11y::active(&zresp.ctx) { format!("{}%", (zoom * 100.0).round()) } else { String::new() };
@@ -156,9 +168,14 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
     if zresp.hovered() {
         ui.painter().rect_filled(zr, CornerRadius::same(5), t.hover);
     }
-    // The readout carries the accent, as Figma's blue zoom does.
+    // Use the same neutral selected-text token as other active controls.
     ui.painter().text(pos2(zr.min.x + 6.0, zr.center().y), Align2::LEFT_CENTER, format!("{}%", (zoom * 100.0).round()), regular(11.0), t.accent_text);
-    icons::paint(ui.painter(), Rect::from_center_size(pos2(zr.max.x - 9.0, zr.center().y), vec2(10.0, 10.0)), Icon::Chevron, t.icon_secondary);
+    app_glyphs::paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(zr.max.x - 9.0, zr.center().y), vec2(10.0, 10.0)),
+        Glyph::ChevronDown,
+        t.icon_secondary,
+    );
     menu_popup(&zresp).width(200.0).show(|ui| {
         for (label, cmd) in [
             (tr("Zoom in"), "view.zoomIn"),

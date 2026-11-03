@@ -241,7 +241,7 @@ fn the_home_screen_draws_no_frames_once_settled() {
 fn a_first_run_offers_action_cards_and_no_templates() {
     let mut u = first_run();
     let s = settle(&mut u);
-    assert!(has_text(&s, "New design file") && has_text(&s, "New board") && has_text(&s, "Open file"));
+    assert!(has_text(&s, "New design") && has_text(&s, "New board") && has_text(&s, "Import file") && has_text(&s, "Join team"));
     assert!(!has_text(&s, "Templates") && !has_text(&s, "Mobile app"));
     assert!(!has_text(&s, "Open files"), "nothing is open yet");
     // With a recent file, the list shows.
@@ -307,7 +307,7 @@ fn the_getting_started_card_closes_stays_closed_and_comes_back_from_help() {
     assert!(u.app.session.prefs.getting_started_dismissed);
     let s = settle(&mut u);
     assert!(!has_text(&s, "Getting started") && !has_text(&s, "Draw a frame"));
-    assert!(has_text(&s, "New design file"), "the rest of the screen stays");
+    assert!(has_text(&s, "New design"), "the rest of the screen stays");
     // The preference is kept with the others, so it stays closed next time.
     let kept: undesign_engine::Prefs = serde_json::from_value(serde_json::to_value(&u.app.session.prefs).unwrap()).unwrap();
     assert!(kept.getting_started_dismissed);
@@ -341,7 +341,7 @@ fn tab_walks_the_sidebar_in_order_before_a_sections_controls() {
         }
     }
     let at = |name: &str| names.iter().position(|n| n == name).unwrap_or_else(|| panic!("Tab never reached {name:?}: {names:?}"));
-    assert!(at("Recents") < at("Online") && at("Online") < at("Open file"), "{names:?}");
+    assert!(at("Recents") < at("Online") && at("Online") < at("Import file"), "{names:?}");
 }
 
 /// A temporary directory of its own for a test's files, removed with them when dropped.
