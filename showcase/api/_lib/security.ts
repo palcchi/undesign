@@ -41,8 +41,8 @@ export function sessionSecret(env: Environment): string | undefined {
 
 export function isDurableQuotaConfigured(env: Environment): boolean {
   const url = env.SUPABASE_URL?.trim();
-  const key = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return false;
+  const secretKey = env.SUPABASE_SECRET_KEY?.trim();
+  if (!url || !secretKey?.startsWith('sb_secret_')) return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === 'https:' && parsed.origin === url.replace(/\/$/, '')

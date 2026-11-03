@@ -5,12 +5,12 @@ const MAX_QUOTA_RESPONSE_BYTES = 16_384;
 
 export class SupabaseUsageStore implements UsageStore {
   private readonly rpcUrl: string;
-  private readonly serviceRoleKey: string;
+  private readonly secretKey: string;
   private readonly fetchImpl: typeof fetch;
 
-  constructor(url: string, serviceRoleKey: string, fetchImpl: typeof fetch = fetch) {
+  constructor(url: string, secretKey: string, fetchImpl: typeof fetch = fetch) {
     this.rpcUrl = `${url.replace(/\/$/, '')}/rest/v1/rpc/reserve_agent_usage`;
-    this.serviceRoleKey = serviceRoleKey;
+    this.secretKey = secretKey;
     this.fetchImpl = fetchImpl;
   }
 
@@ -21,8 +21,7 @@ export class SupabaseUsageStore implements UsageStore {
     const response = await this.fetchImpl(this.rpcUrl, {
       method: 'POST',
       headers: {
-        apikey: this.serviceRoleKey,
-        Authorization: `Bearer ${this.serviceRoleKey}`,
+        apikey: this.secretKey,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -77,13 +76,13 @@ async function readQuotaResponse(response: Response): Promise<string> {
 
 export function createSupabaseUsageStore(env: Environment, fetchImpl: typeof fetch = fetch): UsageStore | undefined {
   const url = env.SUPABASE_URL?.trim();
-  const key = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return undefined;
+  const secretKey = env.SUPABASE_SECRET_KEY?.trim();
+  if (!url || !secretKey?.startsWith('sb_secret_')) return undefined;
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:' || parsed.origin !== url.replace(/\/$/, '') || !parsed.hostname.endsWith('.supabase.co')) return undefined;
   } catch {
     return undefined;
   }
-  return new SupabaseUsageStore(url, key, fetchImpl);
+  return new SupabaseUsageStore(url, secretKey, fetchImpl);
 }
