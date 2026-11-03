@@ -235,12 +235,9 @@ fn number_field_impl(
     // The label scrubs with the pointer; the keyboard stops at the value only.
     let lead_resp = ui.interact(lead_rect, id.with("lead"), Sense::CLICK | Sense::DRAG);
     let hovered = field_resp.hovered() || lead_resp.hovered() || editing.is_some();
-    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
-    if editing.is_some() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
-    } else if hovered {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
-    }
+    ui.painter().rect_filled(rect, CornerRadius::same(8), if hovered { t.hover } else { t.field });
+    let border = if editing.is_some() { t.focus } else { t.control_border };
+    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, border), StrokeKind::Inside);
     match lead {
         Lead::Text(s) => {
             let galley = crate::bidi::name_galley(ui.painter(), s, regular(11.0), t.text_secondary, lead_w - 12.0);
@@ -537,11 +534,8 @@ fn text_field_in(ui: &mut Ui, id: Id, value: &str, rect: Rect, placeholder: &str
     let resp = ui.interact(rect, id.with("click"), Sense::click());
     a11y::text(&resp, name, value);
     ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
-    if editing.is_some() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
-    } else if resp.hovered() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
-    }
+    let border = if editing.is_some() { t.focus } else { t.control_border };
+    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, border), StrokeKind::Inside);
     let started = editing.is_none() && resp.clicked();
     if started {
         editing = Some(value.to_string());
@@ -600,11 +594,8 @@ pub fn text_input(ui: &mut Ui, id: Id, text: &mut String, width: f32, hint: &str
     let (rect, _) = ui.allocate_exact_size(vec2(width, FIELD_H), Sense::hover());
     ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
     let r = field_editor(ui, rect, id, text, hint);
-    if r.has_focus() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
-    } else if ui.rect_contains_pointer(rect) {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
-    }
+    let border = if r.has_focus() { t.focus } else { t.control_border };
+    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, border), StrokeKind::Inside);
     r
 }
 
@@ -618,8 +609,8 @@ fn keep_focus(r: &Response, started: bool) {
 }
 
 /// Selects all of a one-line editor's `text` when it gains the keyboard (a click, Tab or a focus
-/// request), so what is typed replaces the value, as in Figma's fields. Call it after adding the
-/// editor (`r` is its response). egui puts the caret where the press landed, so the selection is
+/// request), so what is typed replaces the value. Call it after adding the editor (`r` is its
+/// response). egui puts the caret where the press landed, so the selection is
 /// laid again until the button is released; a drag from the press selects what it covers instead.
 pub fn select_all_on_focus(ui: &Ui, r: &Response, text: &str) {
     let pending = select_all_id(r.id);
@@ -911,7 +902,7 @@ pub fn drag_ghost(ctx: &egui::Context, at: egui::Pos2, galley: std::sync::Arc<eg
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, Id::new("drag_ghost")));
     let r = Rect::from_min_size(at + vec2(14.0, 10.0), galley.size() + vec2(16.0, 8.0));
     painter.rect_filled(r, CornerRadius::same(8), t.panel);
-    painter.rect_stroke(r, CornerRadius::same(8), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
+    painter.rect_stroke(r, CornerRadius::same(8), Stroke::new(1.0, t.focus), StrokeKind::Inside);
     painter.galley(r.min + vec2(8.0, 4.0), galley, t.text);
 }
 
@@ -1023,7 +1014,7 @@ pub fn radio(ui: &mut Ui, on: bool, label: &str) -> bool {
         ui.painter().circle_filled(c, 7.0, t.accent);
         ui.painter().circle_filled(c, 2.5, t.accent_on);
     } else {
-        ui.painter().circle_stroke(c, 6.5, Stroke::new(1.0, if resp.hovered() { crate::theme::ACCENT } else { t.border_strong }));
+        ui.painter().circle_stroke(c, 6.5, Stroke::new(1.0, if resp.hovered() { t.focus } else { t.control_border }));
     }
     ui.painter().text(pos2(rect.min.x + 22.0, rect.center().y), Align2::LEFT_CENTER, label, regular(11.0), t.text);
     resp.clicked()
@@ -1077,7 +1068,7 @@ pub fn text_field_inline(ui: &mut Ui, id: Id, value: &str, rect: Rect, font: egu
     match buf {
         Some(mut text) => {
             ui.painter().rect_filled(rect.expand(2.0), CornerRadius::same(6), t.panel);
-            ui.painter().rect_stroke(rect.expand(2.0), CornerRadius::same(6), Stroke::new(1.0, crate::theme::ACCENT), StrokeKind::Inside);
+            ui.painter().rect_stroke(rect.expand(2.0), CornerRadius::same(6), Stroke::new(1.0, t.focus), StrokeKind::Inside);
             let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
             let r = crate::bidi::single_line(&mut child, te_id, &mut text, font, rect.width());
             a11y::own_focus(&r);

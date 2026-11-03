@@ -1,5 +1,7 @@
 //! The browser shell: web `Services` and the eframe web runner.
 
+#[cfg(feature = "agent-relay")]
+use serde_json::Value;
 use undesign_engine::Session;
 use undesign_ui_egui::{ContentsFuture, FigApp, Services};
 use wasm_bindgen::JsCast as _;
@@ -40,7 +42,15 @@ pub fn start() {
                     // on the socket wakes the page for a frame.
                     let ctx = cc.egui_ctx.clone();
                     session.live.install(Box::new(undesign_collab_net::NetLink::new(std::sync::Arc::new(move || ctx.request_repaint()))));
-                    let mut fig = FigApp::new(session, Box::new(WebServices { reduce_motion, ctx: cc.egui_ctx.clone() }));
+                    let mut fig = FigApp::new(
+                        session,
+                        Box::new(WebServices {
+                            reduce_motion,
+                            ctx: cc.egui_ctx.clone(),
+                            #[cfg(feature = "agent-relay")]
+                            agent_provider: None,
+                        }),
+                    );
                     // `#join=<link>`: join that session, as opening an invite link does on the desktop.
                     let hash = web_sys::window().and_then(|w| w.location().hash().ok()).unwrap_or_default();
                     if let Some(link) = crate::query::join_link(&hash) {
@@ -83,6 +93,8 @@ struct WebServices {
     /// `prefers-reduced-motion: reduce` (it follows the setting while the page is open).
     reduce_motion: Option<web_sys::MediaQueryList>,
     ctx: egui::Context,
+    #[cfg(feature = "agent-relay")]
+    agent_provider: Option<undesign_ui_egui::agent_provider::AgentProviderConfig>,
 }
 
 impl Services for WebServices {
@@ -145,6 +157,142 @@ impl Services for WebServices {
         }
         held
     }
+    fn agent_provider_availability(&self) -> undesign_ui_egui::agent_provider::AgentProviderAvailability {
+        #[cfg(feature = "agent-relay")]
+        {
+            undesign_ui_egui::agent_provider::AgentProviderAvailability::BrowserMetaRelay
+        }
+        #[cfg(not(feature = "agent-relay"))]
+        {
+            undesign_ui_egui::agent_provider::AgentProviderAvailability::BrowserRelayRequired
+        }
+    }
+    #[cfg(feature = "agent-relay")]
+    fn agent_provider_connected(&self) -> bool {
+        self.agent_provider.is_some()
+    }
+    #[cfg(feature = "agent-relay")]
+    fn agent_provider_model(&self) -> Option<&str> {
+        self.agent_provider.as_ref().map(undesign_ui_egui::agent_provider::AgentProviderConfig::model)
+    }
+    #[cfg(feature = "agent-relay")]
+    fn connect_agent_provider(&mut self, config: undesign_ui_egui::agent_provider::AgentProviderConfig) -> Result<(), String> {
+        if config.endpoint() != undesign_ui_egui::agent_provider::META_RELAY_ENDPOINT {
+            return Err("The browser relay uses a fixed Meta API endpoint.".to_string());
+        }
+        undesign_ui_egui::agent_provider::validate_model_id(config.model())?;
+        self.agent_provider = Some(config);
+        Ok(())
+    }
+    #[cfg(feature = "agent-relay")]
+    fn disconnect_agent_provider(&mut self) {
+        self.agent_provider = None;
+    }
+    #[cfg(feature = "agent-relay")]
+    fn request_agent_completion(&mut self, request: Value) -> Result<undesign_ui_egui::agent_provider::AgentProviderTask, String> {
+        use undesign_ui_egui::agent_provider::{AgentProviderTask, MAX_PROVIDER_REQUEST_BYTES};
+
+        let config = self.agent_provider.as_ref().ok_or_else(|| "Connect your own Meta API key before sending.".to_string())?;
+        if request.get("model").and_then(Value::as_str) != Some(config.model()) {
+            return Err("The request model does not match the connected Meta model ID.".to_string());
+        }
+        let body = serde_json::to_string(&request).map_err(|_| "Could not encode the relay request.".to_string())?;
+        if body.len() > MAX_PROVIDER_REQUEST_BYTES {
+            return Err("The chat and current-page context exceed the relay request limit.".to_string());
+        }
+        let secret = config.duplicate_secret_for_request();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = browser_relay_completion(body, secret).await;
+            let _ = sender.send(result);
+        });
+        Ok(AgentProviderTask::new(receiver))
+    }
+}
+
+#[cfg(feature = "agent-relay")]
+async fn browser_relay_completion(
+    body: String,
+    secret: undesign_ui_egui::agent_provider::AgentSecret,
+) -> Result<undesign_ui_egui::agent_provider::AgentProviderReply, String> {
+    use undesign_ui_egui::agent_provider::{MAX_PROVIDER_RESPONSE_BYTES, parse_openai_response};
+    use wasm_bindgen_futures::JsFuture;
+    use zeroize::Zeroizing;
+
+    let window = web_sys::window().ok_or_else(|| "The browser relay is unavailable.".to_string())?;
+    let session_init = web_sys::RequestInit::new();
+    session_init.set_method("POST");
+    session_init.set_credentials(web_sys::RequestCredentials::SameOrigin);
+    session_init.set_redirect(web_sys::RequestRedirect::Error);
+    let session_request =
+        web_sys::Request::new_with_str_and_init("/api/session", &session_init).map_err(|_| "Could not start a secure relay session.".to_string())?;
+    let session_response = JsFuture::from(window.fetch_with_request(&session_request))
+        .await
+        .map_err(|_| "Could not start a secure relay session.".to_string())?
+        .dyn_into::<web_sys::Response>()
+        .map_err(|_| "The secure relay returned an invalid session response.".to_string())?;
+    if !session_response.ok() {
+        return Err("Could not start a secure relay session.".to_string());
+    }
+    let session_text = JsFuture::from(session_response.text().map_err(|_| "Could not read the secure relay session.".to_string())?)
+        .await
+        .map_err(|_| "Could not read the secure relay session.".to_string())?
+        .as_string()
+        .ok_or_else(|| "The secure relay returned an invalid session response.".to_string())?;
+    if session_text.len() > 16 * 1024 {
+        return Err("The secure relay session response is too large.".to_string());
+    }
+    let session: Value = serde_json::from_str(&session_text).map_err(|_| "The secure relay returned an invalid session response.".to_string())?;
+    let csrf_token = session
+        .get("csrfToken")
+        .and_then(Value::as_str)
+        .filter(|token| !token.is_empty() && token.len() <= 4096)
+        .ok_or_else(|| "The secure relay returned an invalid session token.".to_string())?;
+
+    let key = Zeroizing::new(String::from_utf8(secret.expose_bytes().to_vec()).map_err(|_| "The API key is invalid.".to_string())?);
+    let headers = web_sys::Headers::new().map_err(|_| "Could not prepare the secure relay request.".to_string())?;
+    headers
+        .set("Content-Type", "application/json")
+        .and_then(|_| headers.set("X-CSRF-Token", csrf_token))
+        .and_then(|_| headers.set("X-User-Key", key.as_str()))
+        .map_err(|_| "Could not prepare the secure relay request.".to_string())?;
+    let agent_init = web_sys::RequestInit::new();
+    agent_init.set_method("POST");
+    agent_init.set_credentials(web_sys::RequestCredentials::SameOrigin);
+    agent_init.set_redirect(web_sys::RequestRedirect::Error);
+    agent_init.set_headers(&headers);
+    agent_init.set_body(&wasm_bindgen::JsValue::from_str(&body));
+    let agent_request = match web_sys::Request::new_with_str_and_init("/api/agent", &agent_init) {
+        Ok(request) => request,
+        Err(_) => {
+            let _ = headers.delete("X-User-Key");
+            let _ = headers.delete("X-CSRF-Token");
+            return Err("Could not prepare the secure relay request.".to_string());
+        }
+    };
+    let response_result = JsFuture::from(window.fetch_with_request(&agent_request)).await;
+    // Headers are copied into Request by the web platform; clear both JS header maps promptly.
+    let _ = headers.delete("X-User-Key");
+    let _ = agent_request.headers().delete("X-User-Key");
+    let _ = headers.delete("X-CSRF-Token");
+    let _ = agent_request.headers().delete("X-CSRF-Token");
+    drop(key);
+    let response = response_result
+        .map_err(|_| "The secure relay request failed.".to_string())?
+        .dyn_into::<web_sys::Response>()
+        .map_err(|_| "The secure relay returned an invalid response.".to_string())?;
+    if !response.ok() {
+        return Err("The secure relay could not complete the request.".to_string());
+    }
+    let text = JsFuture::from(response.text().map_err(|_| "Could not read the relay response.".to_string())?)
+        .await
+        .map_err(|_| "Could not read the relay response.".to_string())?
+        .as_string()
+        .ok_or_else(|| "The relay returned an invalid response.".to_string())?;
+    if text.len() > MAX_PROVIDER_RESPONSE_BYTES {
+        return Err("The provider response exceeds the size limit.".to_string());
+    }
+    parse_openai_response(&text)
 }
 
 /// The file picked in the browser's file picker (`accept`: the extensions it offers), with its

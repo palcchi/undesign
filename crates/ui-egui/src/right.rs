@@ -211,7 +211,7 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
             RightTab::Design => design(app, ui),
             RightTab::Prototype => crate::proto_panel::prototype(app, ui),
             RightTab::Motion => crate::motion_panel::panel(app, ui),
-            RightTab::Agent => crate::agent_panel::panel(app, ui),
+            RightTab::Agent => crate::agent_ui::panel(app, ui),
             RightTab::Inspect => inspect(app, ui),
         }
         ui.add_space(80.0);

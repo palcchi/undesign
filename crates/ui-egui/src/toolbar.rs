@@ -125,7 +125,7 @@ pub(crate) fn bar_width(app: &FigApp) -> f32 {
     main_width(if board { BOARD_GROUPS } else { GROUPS }, board)
 }
 
-/// The main toolbar pill's width: the tool groups with their flyout carets, Resources,
+/// The main toolbar pill's width: the tool groups with their flyout carets, Components,
 /// Actions and Motion, and the mode switcher (boards: the Design panel's button instead). The
 /// content starts 8 px in and the tail below leaves the same 8 px out, so the pill reads centred.
 fn main_width(groups: &[Group], board: bool) -> f32 {
@@ -143,7 +143,7 @@ fn toolbar_layout(canvas_w: f32, full: f32) -> (f32, bool) {
     (shown, canvas_w / 2.0 + shown / 2.0 + 8.0 <= canvas_w - 48.0)
 }
 
-/// The main toolbar pill: the tool groups with their flyouts, Resources and Actions, then the
+/// The main toolbar pill: the tool groups with their flyouts, Components and Actions, then the
 /// Draw · Design · Motion · Developer Mode switcher.
 fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: bool) {
     let groups = if board { BOARD_GROUPS } else { GROUPS };
@@ -199,7 +199,8 @@ fn group_cell(app: &mut FigApp, ui: &mut Ui, g: &Group, at: egui::Pos2, top: f32
     let shown = if in_group { current } else { remembered(ui, g.key, g.tools.first().map(|x| x.0).unwrap_or(ToolId::Move)) };
     let icon = g.tools.iter().find(|(tid, _)| *tid == shown).map(|(_, i)| *i).unwrap_or(Icon::Move);
     let r = Rect::from_center_size(pos2(at.x + TOOL_CELL / 2.0, at.y), vec2(TOOL_CELL, TOOL_CELL));
-    let resp = tool_cell(ui, t, r, ("tool", g.key), icon, in_group, &format!("{}  {}", tr(shown.label()), pretty_shortcut(shown.shortcut())));
+    let tool_name = if g.key == "move" && shown == ToolId::Move { tr("Select") } else { tr(shown.label()) };
+    let resp = tool_cell(ui, t, r, ("tool", g.key), icon, in_group, &format!("{}  {}", tool_name, pretty_shortcut(shown.shortcut())));
     if in_group {
         a11y::prefer(&mut app.ui.nav, Region::Toolbar, resp.id);
     }
@@ -248,12 +249,12 @@ fn flyout_caret(app: &mut FigApp, ui: &mut Ui, g: &Group, at: egui::Pos2, t: &To
     }
 }
 
-/// Resources (components, plugins: the Assets panel), the Actions palette's button and the
+/// Components (plugins: the Assets panel), the Actions palette's button and the
 /// Motion timeline's toggle, from `x`. Where the next part starts.
 fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) -> f32 {
     for (icon, id) in [(Icon::Assets, "resources"), (Icon::Actions, "actions"), (Icon::Motion, "motion")] {
         let tip: &str = match id {
-            "resources" => crate::shortcuts::key_tip(tr("Resources"), "Shift+I"),
+            "resources" => crate::shortcuts::key_tip(tr("Components"), "Shift+I"),
             "actions" => crate::shortcuts::tip(tr("Actions"), "app.actions"),
             _ => tr("Motion"),
         };

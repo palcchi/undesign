@@ -70,7 +70,7 @@ fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     find(&nodes, Role::Pane, "Layers");
     find(&nodes, Role::Pane, "Design");
     // Tools: toggle buttons with their key, the current one pressed.
-    let mv = find(&nodes, Role::Button, "Move");
+    let mv = find(&nodes, Role::Button, "Select");
     assert_eq!(mv.toggled(), Some(Toggled::True));
     assert_eq!(mv.keyboard_shortcut(), Some("V"));
     assert_eq!(find(&nodes, Role::Button, "Rectangle").toggled(), Some(Toggled::False));
@@ -86,6 +86,8 @@ fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     // Tabs and dropdowns.
     assert_eq!(find(&nodes, Role::Tab, "Design").is_selected(), Some(true));
     assert_eq!(find(&nodes, Role::Tab, "Prototype").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Motion").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Agent").is_selected(), Some(false));
     assert_eq!(find(&nodes, Role::ComboBox, "Zoom").is_expanded(), Some(false));
     // Icon buttons are named by their tooltip.
     find(&nodes, Role::Button, "Add new page");
@@ -104,7 +106,7 @@ fn f6_cycles_the_regions_and_lands_on_the_active_tool_and_the_selected_row() {
     assert!(u.app.ui.nav.keyboard, "keyboard mode: the focus ring shows");
     assert!(!name(&u).is_empty(), "a control in the properties panel has the keyboard");
     f6(&mut u, false);
-    assert_eq!((region(&u), name(&u)), (Region::Toolbar, "Move".to_string()));
+    assert_eq!((region(&u), name(&u)), (Region::Toolbar, "Select".to_string()));
     f6(&mut u, false);
     assert_eq!((region(&u), name(&u)), (Region::Layers, "Rect A".to_string()));
     f6(&mut u, false);
@@ -183,8 +185,8 @@ fn arrows_and_enter_pick_a_toolbar_tool() {
     let (mut u, ..) = setup();
     f6(&mut u, true);
     f6(&mut u, true);
-    assert_eq!((region(&u), name(&u)), (Region::Toolbar, "Move".to_string()));
-    // Move, its flyout button, Frame, its flyout button, Rectangle.
+    assert_eq!((region(&u), name(&u)), (Region::Toolbar, "Select".to_string()));
+    // Select, its flyout button, Frame, its flyout button, Rectangle.
     for _ in 0..4 {
         press(&mut u, Key::ArrowRight, Modifiers::NONE);
     }
@@ -193,9 +195,9 @@ fn arrows_and_enter_pick_a_toolbar_tool() {
     assert_eq!(u.app.session.tool.tool, ToolId::Rectangle);
     // Left wraps past the first control to the last; Home goes back to the first.
     press(&mut u, Key::Home, Modifiers::NONE);
-    assert_eq!(name(&u), "Move");
+    assert_eq!(name(&u), "Select");
     press(&mut u, Key::ArrowLeft, Modifiers::NONE);
-    assert_ne!(name(&u), "Move");
+    assert_ne!(name(&u), "Select");
     assert_eq!(region(&u), Region::Toolbar);
 }
 

@@ -4413,11 +4413,13 @@ dependencies = [
  "undesign-format",
  "undesign-text",
  "undesign-ui-egui",
+ "url",
  "wat",
  "webbrowser",
  "windows",
  "winit",
  "winresource",
+ "zeroize",
 ]
 
 [[package]]
@@ -4676,6 +4678,7 @@ dependencies = [
  "undesign-text",
  "wat",
  "web-time",
+ "zeroize",
 ]
 
 [[package]]
@@ -4686,12 +4689,14 @@ dependencies = [
  "egui",
  "js-sys",
  "log",
+ "serde_json",
  "undesign-collab-net",
  "undesign-engine",
  "undesign-ui-egui",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "zeroize",
 ]
 
 [[package]]

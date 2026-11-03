@@ -35,7 +35,12 @@ fn mode_button(u: &mut Ui, label: &str) -> Pos2 {
     u.frame(vec![]);
     let out = u.frame_output(vec![]);
     let nodes = out.platform_output.accesskit_update.expect("an AccessKit update").nodes;
-    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == Role::Button && n.label() == Some(label)).expect(label);
+    let (wanted, role) = match label {
+        "Prototype" => (label, Role::Tab),
+        "Inspect" => ("Developer Mode", Role::Button),
+        _ => (label, Role::Button),
+    };
+    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == role && n.label() == Some(wanted)).expect(wanted);
     let b = n.bounds().expect("bounds");
     pos2(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32)
 }

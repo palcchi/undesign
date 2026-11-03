@@ -79,6 +79,7 @@ blockers.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-02 | minor | Added Design and Motion skill contracts plus a typed backend catalog for compact page context, bounded tools, proposals, approval and undoable batches. No provider setup or model transport is connected, so no AI request can be sent; no shared/default provider is used. AI readiness unchanged. |
 | 2026-11-01 | minor | Motion Studio M14.3 playback slice: play/pause with frame-accurate advance and looping at the composition's fps, and a render-only canvas preview while the Motion tab is active (sampled values apply like manual edits; no undo entries, no dirty document). Selection outlines and hit-testing stay on base values. |
 | 2026-11-01 | minor | Motion Studio M14: composition/track/keyframe commands are undoable and registered in the engine; the first Motion tab supports composition creation, property tracks, frame scrubbing and keyframe entry. Engine command tests pass in an Ubuntu 22.04 test container because the host is GLIBC 2.34 while the installed Rust toolchains require GLIBC 2.35. Playback, graph editor, effects and export remain. |
 | 2026-10-31 | minor | Added M13 AI Assistant with provider-neutral API support and M14 Motion Studio; the first motion document model slice landed with serializable compositions, property tracks, keyframes, interpolation and validation. See `ai-motion-architecture.md` |

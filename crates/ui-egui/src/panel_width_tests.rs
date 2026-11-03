@@ -34,9 +34,13 @@ fn ui() -> (Ui, Kept) {
     (u, kept)
 }
 
-/// The x of the left panel's edge (the canvas's left) and of the right panel's (its right).
+/// The visible edges of the floating panel cards, set back from the canvas by their 8 px margin.
 fn edges(u: &Ui) -> (f32, f32) {
-    (u.app.canvas.rect.min.x, u.app.canvas.rect.max.x)
+    const CARD_MARGIN: f32 = 8.0;
+    let hidden = u.app.session.ds().is_ok_and(|d| d.view.ui_hidden);
+    let left_margin = if hidden || u.app.ui.left_collapsed { 0.0 } else { CARD_MARGIN };
+    let right_margin = if hidden { 0.0 } else { CARD_MARGIN };
+    (u.app.canvas.rect.min.x - left_margin, u.app.canvas.rect.max.x + right_margin)
 }
 
 fn widths(u: &Ui) -> (f32, f32) {
@@ -113,7 +117,7 @@ fn dragging_an_edge_sizes_its_panel_within_its_limits_and_keeps_the_views_centre
     // The view keeps its centre and zoom: the page doesn't jump, the canvas is just narrower.
     let v = u.app.session.ds().unwrap().view.clone();
     assert_eq!((v.cx, v.cy, v.zoom), centre);
-    assert_eq!(v.vw, f64::from(right - left - 100.0));
+    assert_eq!(v.vw, f64::from(u.app.canvas.rect.width()));
     // Kept in the preferences, once per drag (not on every move).
     assert_eq!(u.app.session.prefs.panel_widths, (300.0, 280.0));
     assert_eq!(*kept.lock().unwrap(), [(300.0, 240.0), (300.0, 280.0)]);
@@ -177,15 +181,14 @@ fn the_widths_come_back_with_the_preferences() {
     let mut u = Ui::new(s);
     u.frame(vec![]);
     assert_eq!(widths(&u), (360.0, 300.0));
-    let (left, right) = edges(&u);
-    assert_eq!(right - left, 1440.0 - 56.0 - 360.0 - 300.0, "the canvas between them (the icon rail is 56 wide)");
+    assert_eq!(u.app.canvas.rect.width(), 1440.0 - 56.0 - 360.0 - 300.0, "the canvas between them (the icon rail is 56 wide)");
     // Widths from a damaged file are brought within the limits when drawn.
     let mut s = Session::new();
     s.prefs.panel_widths = (-5.0, f32::NAN);
     let mut u = Ui::new(s);
     u.frame(vec![]);
     let (left, right) = edges(&u);
-    assert_eq!((left, 1440.0 - right), (56.0 + *LEFT_PANEL.start(), PANEL_DEFAULT));
+    assert_eq!((left, 1440.0 - right), (56.0 + *LEFT_PANEL.start() - 8.0, PANEL_DEFAULT - 8.0));
 }
 
 #[test]

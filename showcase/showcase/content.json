@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "title": "Undesign — open-source design, prototyping, and motion",
+    "description": "Undesign is an open-source, offline-first design and prototyping app built in Rust for native and web use.",
+    "socialImage": "/og-image.png",
+    "socialImageAlt": "Undesign wordmark beside a neutral workspace preview with a green motion timeline"
+  },
+  "nav": {
+    "brand": "Undesign",
+    "brandHomeAria": "Undesign home",
+    "mainNavigationLabel": "Main navigation",
+    "features": "Features",
+    "judges": "For judges",
+    "privacy": "Privacy",
+    "tryIt": "Try it now",
+    "skipToContent": "Skip to content"
+  },
+  "home": {
+    "eyebrow": "Open-source · Built in Rust · Offline-first",
+    "headline": "An open-source design and prototyping app, built in Rust.",
+    "intro": "Work natively or in the browser. Shape a design, make a prototype, and bring it to life with an editable motion timeline.",
+    "primaryAction": "Try it now",
+    "secondaryAction": "Explore the features",
+    "previewLabel": "Undesign workspace preview",
+    "previewProject": "Lumen team",
+    "previewDocument": "Lumen Mobile — Onboarding",
+    "previewFolderHeading": "Folders",
+    "previewFolderNames": ["Product design", "Brand system", "Launch campaign"],
+    "previewCanvasHeading": "Welcome to Lumen",
+    "previewCanvasCopy": "Your product screens, prototypes, and design system in one workspace.",
+    "previewCanvasAction": "Continue",
+    "previewArtboardName": "Lumen",
+    "previewArtboardTabs": ["Overview", "Plans", "Insights"],
+    "previewTimelineLabel": "Motion timeline",
+    "previewTimelineLayers": ["Headline", "Supporting copy", "Continue button"],
+    "previewTimelineMarkers": ["Start", "Middle", "End"],
+    "videoEyebrow": "A closer look",
+    "videoHeading": "See Undesign in motion",
+    "videoIntro": "A short walkthrough of the workspace and its motion tools.",
+    "videoEmptyTitle": "Demo video not supplied",
+    "videoEmptyCopy": "Add the supplied demo.mp4 file to public/ to show it here.",
+    "videoAccessibleLabel": "Undesign product demonstration"
+  },
+  "features": {
+    "eyebrow": "The workspace",
+    "title": "Design, motion, and agent work together.",
+    "intro": "A single Rust engine powers the native and web app, with changes that remain editable.",
+    "items": [
+      {
+        "id": "design",
+        "number": "01",
+        "title": "Design",
+        "description": "Create interface designs and prototypes in an offline-first workspace that runs natively and on the web."
+      },
+      {
+        "id": "motion",
+        "number": "02",
+        "title": "Motion timeline",
+        "description": "Build 2D motion with keyframes on a timeline. Keep the result editable in the same design workspace."
+      },
+      {
+        "id": "agent",
+        "number": "03",
+        "title": "AI Agent",
+        "description": "Connect a provider you own. Design and Motion edits are proposed first; review them before applying accepted changes as one undoable step."
+      }
+    ],
+    "motionNote": "Browser live requests are available only when the secure Meta relay is enabled. Native builds support user-configured OpenAI-compatible endpoints."
+  },
+  "judges": {
+    "eyebrow": "Demo guide",
+    "title": "For judges",
+    "intro": "Try a prompt in the app, or copy one to use in its Agent panel.",
+    "promptLabel": "Example prompts",
+    "copyAction": "Copy prompt",
+    "copySuccess": "Prompt copied.",
+    "copyFailure": "Copy was not available. Select the prompt text and copy it manually.",
+    "copyPromptAria": "Copy prompt: {prompt}",
+    "failureTitle": "If a provider request fails",
+    "failureCopy": "No changes are applied when a provider request fails. Check your provider settings; the error appears in chat so you can send a new message to retry.",
+    "action": "Open the app",
+    "prompts": [
+      "A bouncing ball logo with squash and stretch, then the text 'Lumen' fades in",
+      "A 3-second intro: three circles slide in one after another with ease-out",
+      "A looping loading spinner",
+      "A lower-third: a bar slides in, then the name text appears",
+      "A button with a pulse effect"
+    ]
+  },
+  "privacy": {
+    "eyebrow": "Privacy by default",
+    "title": "The Agent is optional.",
+    "copy": "Undesign is offline-first and does not require an account. Replay runs locally, and no shared provider or key is supplied. Native live requests send your prompt and bounded project context to the endpoint you configure; the key is held in memory only. When enabled, the browser relay supports Meta only and requires your own key for each request; it forwards the key without storing it. Its signed browser session is anonymous and does not verify your identity.",
+    "contextTitle": "What the app context can include",
+    "contextCopy": "The Agent context is limited to details such as canvas size, selection, layer names, and motion compositions."
+  },
+  "credits": {
+    "title": "Built on FigCraft",
+    "heading": "Undesign is built on open work.",
+    "copy": "Undesign is based on FigCraft. Both projects are available under MIT or Apache-2.0 terms; see the repository notices for attribution.",
+    "figcraftLinkLabel": "FigCraft on GitHub"
+  },
+  "links": {
+    "github": "https://github.com/palcchi/undesign",
+    "hackathon": "https://dev.meta.ai/events/global-hackathon",
+    "figcraft": "https://github.com/brydanforge/figcraft"
+  },
+  "footer": {
+    "hackathonLabel": "Meta Global AI Developer Hackathon 2026 · Indie Developer track · solo participant",
+    "githubLabel": "Source on GitHub",
+    "eventLabel": "Hackathon details",
+    "licenseLabel": "MIT OR Apache-2.0"
+  },
+  "app": {
+    "title": "Undesign Web",
+    "subtitle": "Editor / WebAssembly",
+    "backToShowcase": "Back to showcase",
+    "judgesButton": "For judges",
+    "judgePanelTitle": "For judges",
+    "judgePanelIntro": "Copy a prompt, then paste it into the Agent panel.",
+    "judgePanelClose": "Close judge prompts",
+    "providerTitle": "Agent setup",
+    "providerCopy": "The Agent is optional. Replay works offline. The browser relay is opt-in, Meta-only, and requires your own API key; no shared/default provider is used. Native builds support user-configured OpenAI-compatible endpoints.",
+    "desktopTitle": "Use a desktop to run the web app.",
+    "desktopCopy": "The Undesign web editor needs a wider screen. You can still read the showcase on this device.",
+    "unsupportedTitle": "This browser cannot run the web editor.",
+    "unsupportedCopy": "The current web build needs WebAssembly and WebGL 2 support. Try a recent desktop browser with graphics enabled.",
+    "loadingTitle": "Preparing the workspace",
+    "loadingCopy": "Checking browser support and the local WebAssembly bundle.",
+    "loadingAccessible": "Preparing Undesign workspace",
+    "stubBadge": "Development test shell",
+    "stubTitle": "WebAssembly build not installed",
+    "stubCopy": "This development shell tests layout, loading, browser checks, and prompt copying. It is not the Rust app.",
+    "stubCanvasLabel": "Static editor test shell, not the Undesign WebAssembly application",
+    "previewProject": "Lumen Mobile — Onboarding",
+    "previewTabDesign": "Design",
+    "previewTabPrototype": "Prototype",
+    "previewTabMotion": "Motion",
+    "previewLayerGroup": "Welcome screen",
+    "previewLayerProperties": ["Opacity", "Position", "Scale"],
+    "previewCanvasTitle": "A clearer view of your money.",
+    "previewCanvasCopy": "Understand today. Feel ready for what’s next.",
+    "previewCanvasButton": "Continue",
+    "previewSidebarTitle": "Motion properties",
+    "previewComposition": "Composition: Welcome reveal",
+    "previewSelectedLayer": "Selected layer: Headline",
+    "previewDuration": "Duration: 3 seconds",
+    "previewEasing": "Easing: Ease out",
+    "previewTimelineTitle": "Timeline",
+    "previewTimelineMarkers": ["Start", "Middle", "End"],
+    "previewLayerNames": ["Headline", "Supporting copy", "Continue button"],
+    "noRuntime": "No Trunk WebAssembly bundle is installed in this frontend handoff.",
+    "runtimeLoadError": "The WebAssembly app could not be opened. Check the installed Trunk bundle and try again.",
+    "copyAction": "Copy",
+    "copySuccess": "Prompt copied.",
+    "copyFailure": "Copy was not available. Select the prompt text and copy it manually.",
+    "copyPromptAria": "Copy prompt: {prompt}"
+  }
+}
