@@ -7,6 +7,7 @@ use undesign_engine::vectoredit::VTool;
 
 use crate::FigApp;
 use crate::a11y::{self, Nav, Region, Tip};
+use crate::app_glyphs::{self, Glyph};
 use crate::i18n::{tr, tr_noop, trf};
 use crate::icons::{self, Icon};
 use crate::theme::{Tokens, regular};
@@ -21,6 +22,12 @@ const CARET: f32 = GLYPH;
 /// `GLYPH`'s box centred in `r`.
 fn glyph_rect(r: Rect) -> Rect {
     Rect::from_center_size(r.center(), vec2(GLYPH, GLYPH))
+}
+
+fn paint_icon(painter: &egui::Painter, rect: Rect, icon: Icon, color: Color32) {
+    if !app_glyphs::paint_compat(painter, rect, icon, color) {
+        icons::paint(painter, rect, icon, color);
+    }
 }
 
 struct Group {
@@ -125,14 +132,14 @@ pub(crate) fn bar_width(app: &FigApp) -> f32 {
     main_width(if board { BOARD_GROUPS } else { GROUPS }, board)
 }
 
-/// The main toolbar pill's width: the tool groups with their flyout carets, Components,
-/// Actions and Motion, and the mode switcher (boards: the Design panel's button instead). The
-/// content starts 8 px in and the tail below leaves the same 8 px out, so the pill reads centred.
+/// The main toolbar pill's width: seven primary tools, their group carets, and the labeled
+/// three-mode switcher (boards retain their auxiliary controls). Both ends have 8 px of padding.
 fn main_width(groups: &[Group], board: bool) -> f32 {
     let (cell, gap) = (TOOL_CELL, 4.0);
     let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
-    let end = if board { cell + 8.0 } else { 4.0 * 34.0 + 12.0 };
-    groups.len() as f32 * (cell + gap) + carets + 3.0 * (cell + gap) + 16.0 + end
+    let side_buttons = if board { 3.0 } else { 1.0 };
+    let end = if board { cell + 8.0 } else { MODE_SWITCHER_WIDTH + 8.0 };
+    groups.len() as f32 * (cell + gap) + carets + side_buttons * (cell + gap) + 16.0 + end
 }
 
 /// The pill's width on a `canvas_w`-wide canvas for a `full`-wide row, and whether the help
@@ -143,8 +150,7 @@ fn toolbar_layout(canvas_w: f32, full: f32) -> (f32, bool) {
     (shown, canvas_w / 2.0 + shown / 2.0 + 8.0 <= canvas_w - 48.0)
 }
 
-/// The main toolbar pill: the tool groups with their flyouts, Components and Actions, then the
-/// Draw · Design · Motion · Developer Mode switcher.
+/// The main toolbar pill: six design tool groups plus Components, then the labeled mode switcher.
 fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: bool) {
     let groups = if board { BOARD_GROUPS } else { GROUPS };
     let full = main_width(groups, board);
@@ -169,7 +175,7 @@ fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: 
         for g in groups {
             x = group_cell(app, ui, g, pos2(x, cy), rect.min.y, t);
         }
-        x = side_buttons(app, ui, x, cy, t);
+        x = side_buttons(app, ui, x, cy, t, board);
         divider(ui, t, x, cy);
         x += 8.0;
         if board {
@@ -190,6 +196,7 @@ fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: 
 
 /// A toolbar button's size.
 const TOOL_CELL: f32 = 32.0;
+const MODE_SWITCHER_WIDTH: f32 = 232.0;
 
 /// Tool group `g` at `at` (its left edge, the pill's middle): the shown tool's button, its flyout
 /// caret and, while open, its flyout above the pill (whose top is `top`). Where the next starts.
@@ -243,17 +250,20 @@ fn flyout_caret(app: &mut FigApp, ui: &mut Ui, g: &Group, at: egui::Pos2, t: &To
     if cresp.hovered() {
         ui.painter().rect_filled(cr, CornerRadius::same(5), t.hover);
     }
-    icons::paint(ui.painter(), Rect::from_center_size(cr.center(), vec2(CARET, CARET)), Icon::Chevron, t.icon_secondary);
+    paint_icon(ui.painter(), Rect::from_center_size(cr.center(), vec2(CARET, CARET)), Icon::Chevron, t.icon_secondary);
     if cresp.clicked() {
         app.ui.tool_flyout = if open { None } else { Some(g.key) };
     }
 }
 
-/// Components (plugins: the Assets panel), the Actions palette's button and the
-/// Motion timeline's toggle, from `x`. Where the next part starts.
-fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) -> f32 {
-    for (icon, id) in [(Icon::Assets, "resources"), (Icon::Actions, "actions"), (Icon::Motion, "motion")] {
-        let tip: &str = match id {
+/// Components is the seventh primary tool. Boards retain quick Actions and Motion buttons because
+/// they do not use the design-file mode switcher; Actions remains available in the main menu.
+fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens, board: bool) -> f32 {
+    const DESIGN_BUTTONS: &[(Glyph, &str)] = &[(Glyph::Components, "resources")];
+    const BOARD_BUTTONS: &[(Glyph, &str)] = &[(Glyph::Components, "resources"), (Glyph::Actions, "actions"), (Glyph::Motion, "motion")];
+    let buttons = if board { BOARD_BUTTONS } else { DESIGN_BUTTONS };
+    for &(glyph, id) in buttons {
+        let tip = match id {
             "resources" => crate::shortcuts::key_tip(tr("Components"), "Shift+I"),
             "actions" => crate::shortcuts::tip(tr("Actions"), "app.actions"),
             _ => tr("Motion"),
@@ -263,15 +273,13 @@ fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) 
         if id == "actions" {
             app.ui.actions_rect = Some(r);
         }
-        // The Actions and Motion buttons read on while their panel is open; clicking one again
-        // closes it.
         let open = id == "actions" && app.ui.palette.is_some() || id == "motion" && app.ui.motion_timeline;
         if open {
-            ui.painter().rect_filled(r, CornerRadius::same(16), t.accent);
+            ui.painter().rect_filled(r, CornerRadius::same(8), t.accent);
         } else if resp.hovered() {
-            ui.painter().rect_filled(r, CornerRadius::same(16), t.hover);
+            ui.painter().rect_filled(r, CornerRadius::same(8), t.hover);
         }
-        icons::paint(ui.painter(), glyph_rect(r), icon, if open { t.accent_on } else { t.icon });
+        app_glyphs::paint(ui.painter(), glyph_rect(r), glyph, if open { t.accent_on } else { t.icon });
         if resp.clicked() {
             if id == "actions" {
                 crate::menus::toggle_palette(&mut app.ui);
@@ -286,77 +294,65 @@ fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens) 
     x
 }
 
-/// The mode switcher from `x`: Draw · Design · Motion · Developer Mode.
+/// Three labeled workspace modes: Design, Motion, and Developer Mode.
 fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
-    let modes = [(Icon::Pencil, tr("Draw")), (Icon::Frame, tr("Design")), (Icon::Motion, tr("Motion")), (Icon::Code, tr("Developer Mode"))];
+    let modes = [tr("Design"), tr("Motion"), tr("Developer Mode")];
+    let widths = [68.0, 64.0, 96.0];
     let active = match app.ui.right_tab {
-        crate::RightTab::Design if app.session.tool.tool == ToolId::Pencil => 0,
-        crate::RightTab::Design => 1,
-        crate::RightTab::Motion => 2,
-        crate::RightTab::Prototype | crate::RightTab::Inspect => 1,
-        crate::RightTab::Agent => 1,
+        crate::RightTab::Motion => 1,
+        crate::RightTab::Inspect => 2,
+        _ => 0,
     };
-    let seg = Rect::from_min_size(pos2(x, cy - 18.0), vec2(4.0 * 34.0 + 4.0, 36.0));
-    ui.painter().rect_filled(seg, CornerRadius::same(8), t.field);
-    for (i, (icon, tip)) in modes.iter().enumerate() {
-        let r = Rect::from_min_size(pos2(seg.min.x + 2.0 + i as f32 * 34.0, seg.min.y + 2.0), vec2(34.0, 32.0));
-        let disabled = i == 3;
-        let resp = if disabled {
-            ui.interact(r, ui.id().with(("mode", i)), Sense::hover()).on_hover_text(tr("Coming soon"))
-        } else {
-            ui.interact(r, ui.id().with(("mode", i)), Sense::click()).on_hover_text(*tip)
-        };
-        a11y::toggle(&resp, tip, i == active);
-        if disabled {
-            a11y::disabled(&resp);
+    let seg = Rect::from_min_size(pos2(x, cy - 18.0), vec2(MODE_SWITCHER_WIDTH, 36.0));
+    ui.painter().rect_filled(seg, CornerRadius::same(18), t.field);
+    let mut left = seg.min.x + 2.0;
+    for (i, label) in modes.into_iter().enumerate() {
+        let r = Rect::from_min_size(pos2(left, seg.min.y + 2.0), vec2(widths[i], 32.0));
+        let resp = ui.interact(r, ui.id().with(("mode", i)), Sense::click()).on_hover_text(label);
+        let selected = i == active;
+        a11y::toggle(&resp, label, selected);
+        if selected {
+            ui.painter().rect_filled(r, CornerRadius::same(14), t.panel);
+            ui.painter().rect_stroke(r, CornerRadius::same(14), Stroke::new(1.0, t.border), StrokeKind::Inside);
+            let indicator = Rect::from_center_size(pos2(r.center().x, r.max.y - 3.0), vec2(8.0, 2.0));
+            ui.painter().rect_filled(indicator, CornerRadius::same(1), t.accent);
+        } else if resp.hovered() || resp.has_focus() {
+            ui.painter().rect_filled(r, CornerRadius::same(14), t.hover);
         }
-        if i == active {
-            ui.painter().rect_filled(r, CornerRadius::same(6), t.panel);
-            ui.painter().rect_stroke(r, CornerRadius::same(6), Stroke::new(1.0, t.border), StrokeKind::Inside);
-        } else if resp.hovered() {
-            ui.painter().rect_filled(r, CornerRadius::same(6), t.hover);
-        }
-        icons::paint(
-            ui.painter(),
-            glyph_rect(r),
-            *icon,
-            if disabled {
-                t.text_tertiary
-            } else if i == active {
-                t.accent_text
-            } else {
-                t.icon_secondary
-            },
-        );
-        if i == active && !disabled {
-            ui.painter().circle_filled(pos2(r.center().x, r.max.y + 2.0), 2.0, t.accent);
-        }
-        if resp.clicked() && !disabled {
+        ui.painter().text(r.center(), Align2::CENTER_CENTER, label, regular(10.5), if selected { t.text } else { t.text_secondary });
+        if resp.clicked() {
             pick_mode(app, i);
         }
+        left += widths[i];
     }
 }
 
-/// Mode `i` of the switcher chosen.
+/// Mode `i` of the switcher chosen; keep the existing tool and document untouched.
 fn pick_mode(app: &mut FigApp, i: usize) {
     match i {
         0 => {
+            if app.ui.right_tab == crate::RightTab::Motion {
+                app.run("motion.timeline", json!({"on": false}));
+            }
             app.ui.right_tab = crate::RightTab::Design;
-            app.run("tool.set", json!({"tool": "pencil"}));
         }
         1 => {
-            app.ui.right_tab = crate::RightTab::Design;
-            if app.session.tool.tool == ToolId::Pencil {
-                app.run("tool.set", json!({"tool": "move"}));
-            }
-        }
-        2 => {
             if app.ui.right_tab == crate::RightTab::Motion {
                 app.ui.right_tab = crate::RightTab::Design;
                 app.run("motion.timeline", json!({"on": false}));
             } else {
                 app.ui.right_tab = crate::RightTab::Motion;
                 app.run("motion.timeline", json!({"on": true}));
+            }
+        }
+        2 => {
+            if app.ui.right_tab == crate::RightTab::Inspect {
+                app.ui.right_tab = crate::RightTab::Design;
+            } else {
+                if app.ui.right_tab == crate::RightTab::Motion {
+                    app.run("motion.timeline", json!({"on": false}));
+                }
+                app.ui.right_tab = crate::RightTab::Inspect;
             }
         }
         _ => {}
@@ -418,7 +414,7 @@ fn view_only_toolbar(app: &mut FigApp, ui: &mut Ui, why: &'static str) {
     let resp = ui.interact(badge, ui.id().with("view_only"), Sense::hover()).on_hover_text(why);
     a11y::status(&resp, label, why);
     ui.painter().rect_filled(badge, CornerRadius::same(13), t.field);
-    icons::paint(ui.painter(), Rect::from_center_size(pos2(badge.min.x + 12.0 + 7.0, cy), vec2(14.0, 14.0)), Icon::Eye, t.icon_secondary);
+    paint_icon(ui.painter(), Rect::from_center_size(pos2(badge.min.x + 12.0 + 7.0, cy), vec2(14.0, 14.0)), Icon::Eye, t.icon_secondary);
     ui.painter().galley(pos2(badge.min.x + 12.0 + 14.0 + 6.0, cy - text.size().y / 2.0), text, t.text);
 }
 
@@ -508,7 +504,7 @@ fn builder_toolbar(app: &mut FigApp, ui: &mut Ui) {
 
 /// Where a toolbar pill `width` wide sits: centred 12 px above the canvas's bottom edge.
 pub(crate) fn pill_rect(canvas: Rect, width: f32) -> Rect {
-    Rect::from_center_size(pos2(canvas.center().x, canvas.max.y - 12.0 - 24.0), vec2(width, 48.0))
+    Rect::from_center_size(pos2(canvas.center().x, canvas.max.y - 12.0 - 22.0), vec2(width, 44.0))
 }
 
 /// The floating pill (shadow, panel, border) `width` wide at the bottom centre of the canvas: the
@@ -524,10 +520,10 @@ fn pill(ui: &Ui, nav: &mut Nav, canvas: Rect, width: f32, t: &Tokens) -> (Rect, 
     a11y::container_bounds(ui, rect);
     let painter = ui.painter();
     for (i, a) in [(6.0, 10u8), (3.0, 16), (1.0, 24)] {
-        painter.rect_filled(rect.expand(i).translate(vec2(0.0, i * 0.5)), CornerRadius::same((13.0 + i) as u8), Color32::from_black_alpha(a));
+        painter.rect_filled(rect.expand(i).translate(vec2(0.0, i * 0.5)), CornerRadius::same((22.0 + i) as u8), Color32::from_black_alpha(a));
     }
-    painter.rect_filled(rect, CornerRadius::same(13), t.panel);
-    painter.rect_stroke(rect, CornerRadius::same(13), Stroke::new(1.0, t.border), StrokeKind::Inside);
+    painter.rect_filled(rect, CornerRadius::same(22), t.panel);
+    painter.rect_stroke(rect, CornerRadius::same(22), Stroke::new(1.0, t.border), StrokeKind::Inside);
     (rect, resp)
 }
 
@@ -544,8 +540,12 @@ pub(crate) fn tool_cell(ui: &mut Ui, t: &Tokens, r: Rect, id: impl egui::AsIdSal
     } else {
         Color32::TRANSPARENT
     };
-    ui.painter().rect_filled(r, CornerRadius::same(16), bg);
-    icons::paint(ui.painter(), glyph_rect(r), icon, if active { t.accent_on } else { t.icon });
+    ui.painter().rect_filled(r, CornerRadius::same(8), bg);
+    paint_icon(ui.painter(), glyph_rect(r), icon, if active { t.accent_on } else { t.icon });
+    if active {
+        let marker = Rect::from_center_size(pos2(r.center().x, r.max.y - 3.0), vec2(8.0, 2.0));
+        ui.painter().rect_filled(marker, CornerRadius::same(1), t.accent_on);
+    }
     resp
 }
 
@@ -621,9 +621,9 @@ fn flyout(app: &mut FigApp, ui: &mut Ui, g: &Group, bottom_left: egui::Pos2) {
                 ui.painter().rect_filled(r, CornerRadius::same(16), t.menu_hover);
             }
             if *tid == app.session.tool.tool {
-                icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 10.0, r.center().y), vec2(12.0, 12.0)), Icon::Check, t.menu_text);
+                paint_icon(ui.painter(), Rect::from_center_size(pos2(r.min.x + 10.0, r.center().y), vec2(12.0, 12.0)), Icon::Check, t.menu_text);
             }
-            icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 32.0, r.center().y), vec2(16.0, 16.0)), *icon, t.menu_text);
+            paint_icon(ui.painter(), Rect::from_center_size(pos2(r.min.x + 32.0, r.center().y), vec2(16.0, 16.0)), *icon, t.menu_text);
             ui.painter().text(pos2(r.min.x + 48.0, r.center().y), Align2::LEFT_CENTER, tr(tid.label()), regular(12.0), t.menu_text);
             ui.painter().text(pos2(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, pretty_shortcut(tid.shortcut()), regular(12.0), t.menu_dim);
             if resp.clicked() {
@@ -696,10 +696,9 @@ mod tests {
         w
     }
 
-    /// The flyout carets and the marks beside them draw with one stroke width (#737), and the
-    /// mode switcher's marks are the tool marks' size (#738).
+    /// The broader feature-icon renderer keeps its toolbar marks on a single stroke weight.
     #[test]
-    fn toolbar_marks_share_one_stroke_width() {
+    fn feature_icons_keep_one_toolbar_stroke_width() {
         for ppp in [1.0, 1.5, 2.0] {
             let mark = widths(ppp, Icon::Rectangle, GLYPH);
             assert_eq!(mark.len(), 1, "one width at {ppp}×: {mark:?}");
@@ -727,11 +726,20 @@ mod tests {
     /// files and on boards: the pill reads centred.
     #[test]
     fn pill_content_is_centred() {
-        for (groups, board, tail) in [(GROUPS, false, 4.0 * 34.0 + 4.0), (BOARD_GROUPS, true, TOOL_CELL)] {
+        for (groups, board, side_buttons, tail) in [(GROUPS, false, 1.0, MODE_SWITCHER_WIDTH), (BOARD_GROUPS, true, 3.0, TOOL_CELL)] {
             let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
-            let content = 8.0 + groups.len() as f32 * (TOOL_CELL + 4.0) + carets + 3.0 * (TOOL_CELL + 4.0) + 8.0 + tail;
+            let content = 8.0 + groups.len() as f32 * (TOOL_CELL + 4.0) + carets + side_buttons * (TOOL_CELL + 4.0) + 8.0 + tail;
             let trailing = main_width(groups, board) - content;
             assert!((trailing - 8.0).abs() < 0.001, "trailing {trailing}");
         }
+    }
+
+    #[test]
+    fn reference_toolbar_metrics_are_applied() {
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(1200.0, 800.0));
+        let pill = pill_rect(canvas, 560.0);
+        assert_eq!(pill.height(), 44.0);
+        assert_eq!(pill.max.y, canvas.max.y - 12.0);
+        assert_eq!(MODE_SWITCHER_WIDTH, 232.0);
     }
 }

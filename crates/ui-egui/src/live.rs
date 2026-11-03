@@ -664,8 +664,13 @@ fn online_note(app: &mut FigApp, ui: &mut Ui, t: &Tokens, server: &str) {
 /// The join field with its Join button, on one row: what is typed stays while the popover or the
 /// home screen is closed. The session of the join that started, if one did.
 pub fn join_row(app: &mut FigApp, ui: &mut Ui, width: f32) -> Option<SessionId> {
+    join_row_focused(app, ui, width, false)
+}
+
+/// The same join row with an optional focus request for a UI quick action.
+pub fn join_row_focused(app: &mut FigApp, ui: &mut Ui, width: f32, focus: bool) -> Option<SessionId> {
     let mut typed = std::mem::take(&mut app.ui.live.code);
-    let joined = ui.horizontal(|ui| join_field(app, ui, &mut typed, egui::Id::new("live_join_code"), width, false)).inner;
+    let joined = ui.horizontal(|ui| join_field(app, ui, &mut typed, egui::Id::new("live_join_code"), width, focus)).inner;
     app.ui.live.code = typed;
     joined
 }

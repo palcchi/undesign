@@ -303,10 +303,11 @@ fn cluster_rect(at: Pos2, n: usize) -> Rect {
     Rect::from_min_max(pos2(at.x, at.y - PIN), pos2(at.x + PIN + 7.0 * (digits - 1.0), at.y))
 }
 
-/// A stable colour per author.
+/// A stable neutral grayscale per comment author; participant hues are reserved for live sessions.
 pub fn author_color(name: &str) -> Color32 {
     let h = name.bytes().fold(5381u32, |h, b| h.wrapping_mul(33) ^ u32::from(b));
-    crate::live::people(h as usize)
+    let gray = 72 + (h % 4) as u8 * 12;
+    Color32::from_rgb(gray, gray, gray)
 }
 
 fn avatar(painter: &egui::Painter, center: Pos2, r: f32, name: &str) {

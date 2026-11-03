@@ -10,6 +10,7 @@ pub mod agent;
 pub mod agent_panel;
 pub mod agent_provider;
 pub mod agent_ui;
+pub mod app_glyphs;
 pub mod assets_panel;
 pub mod bidi;
 pub mod board_bar;

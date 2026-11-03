@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
@@ -28,12 +28,67 @@ if (!sourceHtml.includes("</head>")) {
   process.exit(1);
 }
 
+const maxWasmBytes = Number(process.env.UNDESIGN_WASM_MAX_BYTES ?? "25165824");
+if (!Number.isSafeInteger(maxWasmBytes) || maxWasmBytes < 1) {
+  console.error("UNDESIGN_WASM_MAX_BYTES must be a positive safe integer.");
+  process.exit(1);
+}
+
+const sourceEntries = await readdir(sourceDirectory, { withFileTypes: true });
+const wasmEntries = sourceEntries.filter((entry) => entry.isFile() && /\.wasm$/i.test(entry.name));
+if (wasmEntries.length === 0) {
+  console.error(`No .wasm files were found in ${sourceDirectory}`);
+  process.exit(1);
+}
+for (const entry of wasmEntries) {
+  const size = (await stat(resolve(sourceDirectory, entry.name))).size;
+  if (size > maxWasmBytes) {
+    console.error(`${entry.name} is ${size} bytes, over the ${maxWasmBytes}-byte WASM limit.`);
+    process.exit(1);
+  }
+}
+
 sourceHtml = sourceHtml.replace(/^[\t ]+$/gm, "");
+const marker = '<meta name="undesign-runtime" content="true">';
+let runtimeHtml = sourceHtml.includes('name="undesign-runtime"')
+  ? sourceHtml
+  : sourceHtml.replace("</head>", `  ${marker}\n</head>`);
+
+const scriptTags = [...runtimeHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
+const inlineScripts = scriptTags.filter(([, attributes]) => !/\bsrc\s*=/i.test(attributes));
+if (inlineScripts.length !== 1) {
+  console.error(`Expected exactly one inline Trunk bootstrap module; found ${inlineScripts.length}.`);
+  process.exit(1);
+}
+
+const [inlineBootstrap, bootstrapAttributes, bootstrapBody] = inlineScripts[0];
+if (!/\btype\s*=\s*(?:"module"|'module'|module)(?:\s|$)/i.test(bootstrapAttributes) || !bootstrapBody.trim()) {
+  console.error("The inline Trunk bootstrap must be a non-empty module script.");
+  process.exit(1);
+}
+if (scriptTags.some(([, attributes, body]) => /\bsrc\s*=/i.test(attributes) && body.trim())) {
+  console.error("Unsupported inline content was found inside an external script tag.");
+  process.exit(1);
+}
+
+const bootstrapBytes = Buffer.from(`${bootstrapBody.trim()}\n`, "utf8");
+const bootstrapDigest = createHash("sha384").update(bootstrapBytes).digest();
+const bootstrapIntegrity = `sha384-${bootstrapDigest.toString("base64")}`;
+const bootstrapFilename = `trunk-bootstrap-${bootstrapDigest.toString("base64url")}.js`;
+const externalBootstrap = `<script type="module" src="/app/${bootstrapFilename}" integrity="${bootstrapIntegrity}" crossorigin="anonymous"></script>`;
+runtimeHtml = runtimeHtml.replace(inlineBootstrap, externalBootstrap);
+
+const remainingInlineScripts = [...runtimeHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
+  .filter(([, attributes, body]) => !/\bsrc\s*=/i.test(attributes) && body.trim());
+if (remainingInlineScripts.length > 0) {
+  console.error("Inline executable scripts remain in the Trunk runtime HTML.");
+  process.exit(1);
+}
 
 await rm(publicApp, { recursive: true, force: true });
 await mkdir(publicApp, { recursive: true });
 
-for (const entry of await readdir(sourceDirectory, { withFileTypes: true })) {
+for (const entry of sourceEntries) {
   if (entry.name === "index.html" || entry.name === ".DS_Store" || entry.name === ".trunk-lock") continue;
   const source = resolve(sourceDirectory, entry.name);
   const target = resolve(publicApp, entry.name);
@@ -52,10 +107,7 @@ for (const entry of await readdir(sourceDirectory, { withFileTypes: true })) {
   }
 }
 
-const marker = '<meta name="undesign-runtime" content="true">';
-const runtimeHtml = sourceHtml.includes('name="undesign-runtime"')
-  ? sourceHtml
-  : sourceHtml.replace("</head>", `  ${marker}\n</head>`);
+await writeFile(resolve(publicApp, bootstrapFilename), bootstrapBytes);
 
 const installedFiles = (await readdir(publicApp)).filter((name) => name !== "runtime.html");
 if (installedFiles.some((name) => basename(name) === "index.html")) {

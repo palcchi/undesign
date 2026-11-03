@@ -4,6 +4,7 @@
 use egui::{Align2, Color32, CornerRadius, Id, Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 
 use crate::a11y::{self, Tip};
+use crate::app_glyphs;
 pub use crate::field_math::{Rel, Typed, eval, parse, stepped};
 use crate::i18n::tr;
 use crate::icons::{self, Icon};
@@ -851,7 +852,9 @@ pub fn icon_button_at(ui: &mut Ui, id: Id, rect: Rect, icon: Icon, tip: &str) ->
     if resp.hovered() {
         ui.painter().rect_filled(rect, CornerRadius::same(8), t.hover);
     }
-    icons::paint(ui.painter(), rect.shrink(5.0), icon, t.icon);
+    if !app_glyphs::paint_compat(ui.painter(), rect.shrink(5.0), icon, t.icon) {
+        icons::paint(ui.painter(), rect.shrink(5.0), icon, t.icon);
+    }
     resp.clicked()
 }
 
