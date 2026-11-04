@@ -53,10 +53,10 @@ pub struct Home {
 }
 
 const RAIL: f32 = 64.0;
-const SIDEBAR: f32 = 216.0;
+const SIDEBAR: f32 = 248.0;
 const NAV: f32 = RAIL + SIDEBAR;
 const CARD_W: f32 = 248.0;
-const GAP: f32 = 20.0;
+const GAP: f32 = 16.0;
 
 /// The Getting started tips: (title, what to do, the command whose shortcut shows).
 const TIPS: [(&str, &str, &str); 6] = [
@@ -148,7 +148,7 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
         let main = Rect::from_min_max(pos2(left.max.x, rect.min.y), rect.max);
         ui.scope_builder(egui::UiBuilder::new().max_rect(main), |ui| {
             egui::ScrollArea::vertical().id_salt("home").auto_shrink([false, false]).show(ui, |ui| {
-                egui::Frame::NONE.inner_margin(egui::Margin::symmetric(40, 24)).show(ui, |ui| {
+                egui::Frame::NONE.inner_margin(egui::Margin::symmetric(32, 28)).show(ui, |ui| {
                     ui.spacing_mut().item_spacing = vec2(GAP, 0.0);
                     if app.ui.home_view.file_query.trim().is_empty() {
                         recents(app, ui, &t);
@@ -205,7 +205,7 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
     }
 
     let mut y = panel.min.y + 20.0;
-    ui.painter().text(pos2(panel.min.x + 20.0, y + 8.0), Align2::LEFT_CENTER, tr("Recent files"), semibold(15.0), t.text);
+    ui.painter().text(pos2(panel.min.x + 20.0, y + 8.0), Align2::LEFT_CENTER, tr("Folders"), semibold(15.0), t.text);
     y += 36.0;
     let search = Rect::from_min_size(pos2(panel.min.x + 12.0, y), vec2(SIDEBAR - 24.0, widgets::FIELD_H));
     ui.scope_builder(egui::UiBuilder::new().max_rect(search), |ui| {
@@ -230,7 +230,7 @@ fn folder_tree(app: &mut FigApp, ui: &mut Ui, t: &Tokens, paths: &[String], orig
         let Some(parent) = Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()) else { continue };
         *folders.entry(parent.display().to_string()).or_default() += 1;
     }
-    ui.painter().text(origin, Align2::LEFT_TOP, tr("Folders"), semibold(12.0), t.text_secondary);
+    ui.painter().text(origin, Align2::LEFT_TOP, tr("On this device"), semibold(11.0), t.text_secondary);
     let mut y = origin.y + 28.0;
     for (folder, count) in folders {
         let name = Path::new(&folder).file_name().and_then(|n| n.to_str()).unwrap_or(&folder);
@@ -304,16 +304,9 @@ fn focus_ring(ui: &Ui, t: &Tokens, rect: Rect, resp: &Response, radius: u8) {
     }
 }
 
-/// A card's background and border (lit on hover, ringed with the keyboard on it).
-fn card_frame(ui: &Ui, t: &Tokens, rect: Rect, resp: &Response) {
-    ui.painter().rect_filled(rect, CornerRadius::same(12), if resp.hovered() { t.hover } else { t.panel });
-    ui.painter().rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0, t.border), StrokeKind::Inside);
-    focus_ring(ui, t, rect, resp, 12);
-}
-
 fn heading(ui: &mut Ui, t: &Tokens, text: &str) {
-    ui.label(egui::RichText::new(text).font(semibold(18.0)).color(t.text));
-    ui.add_space(24.0);
+    ui.label(egui::RichText::new(text).font(semibold(22.0)).color(t.text));
+    ui.add_space(16.0);
 }
 
 fn subheading(ui: &mut Ui, t: &Tokens, text: &str) {
@@ -322,35 +315,44 @@ fn subheading(ui: &mut Ui, t: &Tokens, text: &str) {
     ui.add_space(12.0);
 }
 
-/// A card with an icon tile, a title and a line under it; true when chosen.
-fn action_card(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, sub: &str) -> bool {
-    let (r, mut resp) = ui.allocate_exact_size(vec2(260.0, 72.0), Sense::click());
+/// A compact workspace action. The primary action is filled; secondary actions stay quiet.
+fn action_button(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, primary: bool) -> bool {
+    let width = (ui.available_width().min(176.0)).max(132.0);
+    let (r, mut resp) = ui.allocate_exact_size(vec2(width, 36.0), Sense::click());
     a11y::button(&resp, title);
-    // One line each inside the card; a long translation ends with an ellipsis, in full on hover.
-    let text_w = r.width() - 72.0;
-    let (title_shown, sub_shown) = (widgets::elide_font(ui, title, text_w, semibold(12.0)), widgets::elide(ui, sub, text_w));
-    if title_shown != title || sub_shown != sub {
-        resp = resp.on_hover_text(format!("{title}\n{sub}"));
+    let fill = if primary {
+        if resp.hovered() { t.accent_hover } else { t.accent }
+    } else if resp.hovered() {
+        t.hover
+    } else {
+        t.panel
+    };
+    ui.painter().rect_filled(r, CornerRadius::same(7), fill);
+    if !primary {
+        ui.painter().rect_stroke(r, CornerRadius::same(7), Stroke::new(1.0, t.border), StrokeKind::Inside);
     }
-    card_frame(ui, t, r, &resp);
-    let ir = Rect::from_min_size(pos2(r.min.x + 16.0, r.center().y - 16.0), vec2(32.0, 32.0));
-    ui.painter().rect_filled(ir, CornerRadius::same(6), t.accent);
-    if !app_glyphs::paint_compat(ui.painter(), ir.shrink(8.0), icon, t.accent_on) {
-        icons::paint(ui.painter(), ir.shrink(8.0), icon, t.accent_on);
+    let ink = if primary { t.accent_on } else { t.text };
+    let ir = Rect::from_min_size(pos2(r.min.x + 11.0, r.center().y - 8.0), vec2(16.0, 16.0));
+    if !app_glyphs::paint_compat(ui.painter(), ir, icon, ink) {
+        icons::paint(ui.painter(), ir, icon, ink);
     }
-    ui.painter().text(pos2(r.min.x + 60.0, r.center().y - 8.0), Align2::LEFT_CENTER, title_shown, semibold(12.0), t.text);
-    ui.painter().text(pos2(r.min.x + 60.0, r.center().y + 9.0), Align2::LEFT_CENTER, sub_shown, regular(11.0), t.text_secondary);
+    let label = widgets::elide_font(ui, title, r.width() - 42.0, semibold(11.0));
+    if label != title {
+        resp = resp.on_hover_text(title);
+    }
+    ui.painter().text(pos2(r.min.x + 34.0, r.center().y), Align2::LEFT_CENTER, label, semibold(11.0), ink);
+    focus_ring(ui, t, r, &resp, 7);
     resp.clicked()
 }
 
 fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
-    heading(ui, t, tr("Recents"));
+    heading(ui, t, tr("Workspace"));
     let (mut new_file, mut new_board, mut import_file, mut join_team) = (false, false, false, false);
     ui.horizontal_wrapped(|ui| {
-        new_file = action_card(ui, t, Icon::PenNib, tr("New design"), tr("Start from a blank canvas"));
-        new_board = action_card(ui, t, Icon::Board, tr("New board"), tr("Sticky notes, shapes and connectors"));
-        import_file = action_card(ui, t, Icon::Page, tr("Import file"), tr("Bring in a local design"));
-        join_team = action_card(ui, t, Icon::Online, tr("Join team"), tr("Enter a code or invite link"));
+        new_file = action_button(ui, t, Icon::PenNib, tr("New design"), true);
+        new_board = action_button(ui, t, Icon::Board, tr("New board"), false);
+        import_file = action_button(ui, t, Icon::Page, tr("Import file"), false);
+        join_team = action_button(ui, t, Icon::Online, tr("Join team"), false);
     });
     if new_file || new_board {
         app.run(if new_board { "file.newBoard" } else { "file.new" }, json!({}));
@@ -363,7 +365,7 @@ fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
         app.ui.home_view.join_code_focus = true;
     }
     // Join a file someone shared: the join field, and what the join is doing.
-    subheading(ui, t, tr("Join with a code"));
+    subheading(ui, t, tr("Join a workspace"));
     ui.scope(|ui| {
         ui.set_max_width(540.0);
         let focus = std::mem::take(&mut app.ui.home_view.join_code_focus);

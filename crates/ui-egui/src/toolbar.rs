@@ -10,6 +10,7 @@ use crate::a11y::{self, Nav, Region, Tip};
 use crate::app_glyphs::{self, Glyph};
 use crate::i18n::{tr, tr_noop, trf};
 use crate::icons::{self, Icon};
+use crate::right::{menu_check, menu_popup};
 use crate::theme::{Tokens, regular};
 
 /// Every mark in the toolbar row is painted in a box this size, so they share one optical size
@@ -123,6 +124,138 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
     }
     let board = app.session.doc().is_ok_and(undesign_engine::board::is_board);
     main_toolbar(app, ui, canvas, &t, board);
+    if !board {
+        selection_capsule(app, ui, canvas, &t);
+    }
+}
+
+/// Pencil-specific controls stay close to the canvas, like the selection capsule in Design mode.
+fn draw_capsule(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens) {
+    let brush = app.run("tool.pencilBrush", json!({})).and_then(|v| v.get("brush").cloned()).unwrap_or(serde_json::Value::Null);
+    let preset = brush.get("preset").and_then(serde_json::Value::as_str).unwrap_or("");
+    let label = match preset {
+        "" => tr("None"),
+        "taper" => tr("Taper"),
+        "ink" => tr("Ink"),
+        "ribbon" => tr("Ribbon"),
+        "bristle" => tr("Bristle"),
+        "dots" => tr("Dots"),
+        "stars" => tr("Stars"),
+        "confetti" => tr("Confetti"),
+        "leaves" => tr("Leaves"),
+        _ => tr("Custom"),
+    };
+    let pos = pos2(canvas.center().x - 116.0, canvas.max.y - 104.0);
+    egui::Area::new(egui::Id::new("draw_context_capsule")).fixed_pos(pos).order(egui::Order::Foreground).show(ui.ctx(), |ui| {
+        egui::Frame::NONE
+            .fill(t.panel)
+            .stroke(Stroke::new(1.0, t.border))
+            .corner_radius(CornerRadius::same(18))
+            .shadow(egui::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
+            .inner_margin(egui::Margin::symmetric(10, 5))
+            .show(ui, |ui| {
+                ui.set_width(196.0);
+                ui.set_height(32.0);
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tr("Brush")).size(11.0).color(t.text_secondary));
+                    let response = ui.add_sized(vec2(126.0, 27.0), egui::Button::new(format!("{label}  ▾")));
+                    menu_popup(&response).width(176.0).show(|ui| {
+                        for (name, value) in [
+                            (tr("None"), serde_json::Value::Null),
+                            (tr("Taper"), json!("taper")),
+                            (tr("Ink"), json!("ink")),
+                            (tr("Ribbon"), json!("ribbon")),
+                            (tr("Bristle"), json!("bristle")),
+                            (tr("Dots"), json!("dots")),
+                            (tr("Stars"), json!("stars")),
+                            (tr("Confetti"), json!("confetti")),
+                            (tr("Leaves"), json!("leaves")),
+                        ] {
+                            let selected = if value.is_null() { preset.is_empty() } else { value.as_str() == Some(preset) };
+                            if menu_check(ui, selected, name, "") {
+                                app.run("tool.pencilBrush", json!({"preset": value}));
+                                ui.close();
+                            }
+                        }
+                    });
+                });
+            });
+    });
+}
+
+/// A compact context capsule above the main toolbar. It reuses the same paint picker and
+/// number-field commands as the inspector, so quick edits remain real document edits with undo.
+fn selection_capsule(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens) {
+    if app.ui.right_tab != crate::RightTab::Design {
+        return;
+    }
+    if app.session.tool.tool == ToolId::Pencil {
+        draw_capsule(app, ui, canvas, t);
+        return;
+    }
+    if app.session.tool.tool != ToolId::Move {
+        return;
+    }
+    let ids = app.session.ds().map(|ds| ds.selection.clone()).unwrap_or_default();
+    if ids.is_empty() {
+        return;
+    }
+    let Ok(doc) = app.session.doc() else { return };
+    let fills = crate::right::common(doc, &ids, |n| n.fills.clone());
+    let strokes = crate::right::common(doc, &ids, |n| n.strokes.clone());
+    let radius = crate::right::common(doc, &ids, |n| n.corners.uniform()).flatten();
+    let fill = fills.as_ref().and_then(|list| list.first()).cloned();
+    let stroke = strokes.as_ref().and_then(|list| list.first()).cloned();
+    let pos = pos2(canvas.center().x - 203.0, canvas.max.y - 104.0);
+    egui::Area::new(egui::Id::new("selection_context_capsule")).fixed_pos(pos).order(egui::Order::Foreground).show(ui.ctx(), |ui| {
+        egui::Frame::NONE
+            .fill(t.panel)
+            .stroke(Stroke::new(1.0, t.border))
+            .corner_radius(CornerRadius::same(18))
+            .shadow(egui::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
+            .inner_margin(egui::Margin::symmetric(10, 5))
+            .show(ui, |ui| {
+                ui.set_width(386.0);
+                ui.set_height(32.0);
+                ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+                ui.horizontal(|ui| {
+                    let fill_resp = ui.add_sized(vec2(82.0, 28.0), egui::Button::new(tr("Fill")));
+                    if let Some(paint) = &fill {
+                        let sw = Rect::from_center_size(pos2(fill_resp.rect.min.x + 12.0, fill_resp.rect.center().y), vec2(12.0, 12.0));
+                        crate::widgets::paint_swatch(ui.painter(), sw, paint);
+                    }
+                    if fill_resp.clicked() {
+                        if fill.is_some() {
+                            app.ui.picker = Some(crate::colorpicker::PickerTarget::Paint { fills: true, index: 0, ids: ids.clone() });
+                        } else if app.run("fill.add", json!({"ids": ids})).is_some() {
+                            app.ui.picker = Some(crate::colorpicker::PickerTarget::Paint { fills: true, index: 0, ids: ids.clone() });
+                        }
+                    }
+                    let stroke_resp = ui.add_sized(vec2(88.0, 28.0), egui::Button::new(tr("Stroke")));
+                    if let Some(paint) = &stroke {
+                        let sw = Rect::from_center_size(pos2(stroke_resp.rect.min.x + 15.0, stroke_resp.rect.center().y), vec2(12.0, 12.0));
+                        crate::widgets::paint_swatch(ui.painter(), sw, paint);
+                    }
+                    if stroke_resp.clicked() {
+                        if stroke.is_some() {
+                            app.ui.picker = Some(crate::colorpicker::PickerTarget::Paint { fills: false, index: 0, ids: ids.clone() });
+                        } else if app.run("stroke.add", json!({"ids": ids})).is_some() {
+                            app.ui.picker = Some(crate::colorpicker::PickerTarget::Paint { fills: false, index: 0, ids: ids.clone() });
+                        }
+                    }
+                    let edit = crate::widgets::number_field(
+                        ui,
+                        egui::Id::new("selection_capsule_radius"),
+                        crate::widgets::Lead::Icon(Icon::CornerRadius, tr("Corner radius")),
+                        radius,
+                        "",
+                        132.0,
+                        1.0,
+                    );
+                    app.field(&ids, "cornerRadius", edit, |v| json!(v.max(0.0)));
+                });
+            });
+    });
 }
 
 /// The main toolbar pill's width for the active file: the Actions palette matches it so the two
@@ -196,7 +329,7 @@ fn main_toolbar(app: &mut FigApp, ui: &mut Ui, canvas: Rect, t: &Tokens, board: 
 
 /// A toolbar button's size.
 const TOOL_CELL: f32 = 32.0;
-const MODE_SWITCHER_WIDTH: f32 = 232.0;
+const MODE_SWITCHER_WIDTH: f32 = 280.0;
 
 /// Tool group `g` at `at` (its left edge, the pill's middle): the shown tool's button, its flyout
 /// caret and, while open, its flyout above the pill (whose top is `top`). Where the next starts.
@@ -294,14 +427,19 @@ fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens, 
     x
 }
 
-/// Three labeled workspace modes: Design, Motion, and Developer Mode.
+/// Four labeled workspace modes: Design, Draw, Motion, and Developer Mode.
 fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
-    let modes = [tr("Design"), tr("Motion"), tr("Developer Mode")];
-    let widths = [68.0, 64.0, 96.0];
-    let active = match app.ui.right_tab {
-        crate::RightTab::Motion => 1,
-        crate::RightTab::Inspect => 2,
-        _ => 0,
+    let modes = [tr("Design"), tr("Draw"), tr("Motion"), tr("Developer Mode")];
+    let widths = [58.0, 52.0, 58.0, 96.0];
+    let drawing = matches!(app.session.tool.tool, ToolId::Pen | ToolId::Pencil | ToolId::Marker | ToolId::Highlighter | ToolId::Eraser);
+    let active = if app.ui.right_tab == crate::RightTab::Motion {
+        2
+    } else if app.ui.right_tab == crate::RightTab::Inspect {
+        3
+    } else if drawing {
+        1
+    } else {
+        0
     };
     let seg = Rect::from_min_size(pos2(x, cy - 18.0), vec2(MODE_SWITCHER_WIDTH, 36.0));
     ui.painter().rect_filled(seg, CornerRadius::same(18), t.field);
@@ -312,14 +450,20 @@ fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
         let selected = i == active;
         a11y::toggle(&resp, label, selected);
         if selected {
-            ui.painter().rect_filled(r, CornerRadius::same(14), t.panel);
-            ui.painter().rect_stroke(r, CornerRadius::same(14), Stroke::new(1.0, t.border), StrokeKind::Inside);
-            let indicator = Rect::from_center_size(pos2(r.center().x, r.max.y - 3.0), vec2(8.0, 2.0));
-            ui.painter().rect_filled(indicator, CornerRadius::same(1), t.accent);
+            ui.painter().rect_filled(r, CornerRadius::same(12), t.panel);
+            ui.painter().rect_stroke(r, CornerRadius::same(12), Stroke::new(1.0, t.border), StrokeKind::Inside);
         } else if resp.hovered() || resp.has_focus() {
-            ui.painter().rect_filled(r, CornerRadius::same(14), t.hover);
+            ui.painter().rect_filled(r, CornerRadius::same(12), t.hover);
         }
-        ui.painter().text(r.center(), Align2::CENTER_CENTER, label, regular(10.5), if selected { t.text } else { t.text_secondary });
+        let color = if selected { t.text } else { t.text_secondary };
+        let text = ui.painter().layout_no_wrap(label.to_string(), regular(10.5), color);
+        let text_center = r.center() - vec2(if selected { 2.5 } else { 0.0 }, 0.0);
+        ui.painter().galley(text_center - text.size() / 2.0, text.clone(), color);
+        if selected {
+            // A small active dot reads clearly at a glance without adding another underline.
+            let dot_x = text_center.x + text.size().x / 2.0 + 5.0;
+            ui.painter().circle_filled(pos2(dot_x, r.center().y), 2.0, t.accent);
+        }
         if resp.clicked() {
             pick_mode(app, i);
         }
@@ -327,7 +471,8 @@ fn mode_switcher(app: &mut FigApp, ui: &mut Ui, x: f32, cy: f32, t: &Tokens) {
     }
 }
 
-/// Mode `i` of the switcher chosen; keep the existing tool and document untouched.
+/// Mode `i` of the switcher chosen. Draw is a focused pencil workflow; other modes keep
+/// the current document and selection intact.
 fn pick_mode(app: &mut FigApp, i: usize) {
     match i {
         0 => {
@@ -335,8 +480,20 @@ fn pick_mode(app: &mut FigApp, i: usize) {
                 app.run("motion.timeline", json!({"on": false}));
             }
             app.ui.right_tab = crate::RightTab::Design;
+            if matches!(app.session.tool.tool, ToolId::Pencil | ToolId::Marker | ToolId::Highlighter | ToolId::Eraser) {
+                choose(app, ToolId::Move);
+            }
         }
         1 => {
+            if app.ui.right_tab == crate::RightTab::Motion {
+                app.run("motion.timeline", json!({"on": false}));
+                app.ui.right_tab = crate::RightTab::Design;
+            } else if app.ui.right_tab == crate::RightTab::Inspect {
+                app.ui.right_tab = crate::RightTab::Design;
+            }
+            choose(app, ToolId::Pencil);
+        }
+        2 => {
             if app.ui.right_tab == crate::RightTab::Motion {
                 app.ui.right_tab = crate::RightTab::Design;
                 app.run("motion.timeline", json!({"on": false}));
@@ -345,7 +502,7 @@ fn pick_mode(app: &mut FigApp, i: usize) {
                 app.run("motion.timeline", json!({"on": true}));
             }
         }
-        2 => {
+        3 => {
             if app.ui.right_tab == crate::RightTab::Inspect {
                 app.ui.right_tab = crate::RightTab::Design;
             } else {
@@ -740,6 +897,6 @@ mod tests {
         let pill = pill_rect(canvas, 560.0);
         assert_eq!(pill.height(), 44.0);
         assert_eq!(pill.max.y, canvas.max.y - 12.0);
-        assert_eq!(MODE_SWITCHER_WIDTH, 232.0);
+        assert_eq!(MODE_SWITCHER_WIDTH, 280.0);
     }
 }

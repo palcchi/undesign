@@ -257,7 +257,7 @@ use std::sync::Arc;
 use std::task::{Context as TaskContext, Poll, Wake, Waker};
 
 use serde_json::{Value, json};
-use undesign_doc::{AnimatedProperty, NodeId};
+use undesign_doc::NodeId;
 use undesign_engine::Session;
 
 pub use control::{ControlReply, ControlRequest};
@@ -454,6 +454,15 @@ pub enum LeftTab {
     Assets,
 }
 
+/// Which content section is shown in the editor's left workspace panel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum LeftSection {
+    Pages,
+    #[default]
+    Layers,
+    Assets,
+}
+
 /// The window's title bar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum TitleBar {
@@ -536,8 +545,6 @@ pub struct UiState {
     /// Motion Studio timeline selection and playhead state.
     pub motion_composition: Option<u64>,
     pub motion_frame: u32,
-    pub motion_property: AnimatedProperty,
-    pub motion_value: f64,
     /// Playback runs (the Motion panel advances the playhead and asks for repaints).
     pub motion_playing: bool,
     /// Fractional frames banked while playing (frame-accurate advance at any fps).
@@ -550,13 +557,20 @@ pub struct UiState {
     pub motion_ppf: Option<f32>,
     /// Selected keyframe (track, frame) for delete and drag.
     pub motion_selected: Option<(u64, u32)>,
+    /// Active track for keyframe insertion and the Motion inspector.
+    pub motion_active_track: Option<u64>,
+    /// A keyframe-value edit held open while the field is being dragged.
+    pub motion_keyframe_interaction: Option<(u64, u32)>,
     /// Keyframe drag in progress (track, from-frame).
     pub motion_drag: Option<(u64, u32)>,
     /// The Motion timeline docked along the bottom (`motion.timeline`).
     pub motion_timeline: bool,
+    /// Whether the Motion dock is collapsed to its compact header.
+    pub motion_timeline_collapsed: bool,
     /// The tab of the previous frame, to see the right panel change mode.
     pub last_right_tab: RightTab,
     pub left_tab: LeftTab,
+    pub left_section: LeftSection,
     pub pages_open: bool,
     /// Pages panel search: open, and the case-insensitive name filter.
     pub page_search: bool,
@@ -747,18 +761,20 @@ impl Default for UiState {
             agent: agent_panel::AgentUi::default(),
             motion_composition: None,
             motion_frame: 0,
-            motion_property: AnimatedProperty::PositionX,
-            motion_value: 0.0,
             motion_playing: false,
             motion_play_acc: 0.0,
             motion_play_last: 0.0,
             motion_closed: BTreeSet::new(),
             motion_ppf: None,
             motion_selected: None,
+            motion_active_track: None,
+            motion_keyframe_interaction: None,
             motion_drag: None,
             motion_timeline: false,
+            motion_timeline_collapsed: false,
             last_right_tab: RightTab::Design,
             left_tab: LeftTab::File,
+            left_section: LeftSection::Layers,
             pages_open: true,
             page_search: false,
             page_filter: String::new(),
@@ -981,8 +997,7 @@ impl FigApp {
     /// the answer arrives (the network wakes the window then); errors show as with [`run`](Self::run).
     /// [`Session::waiting_for`] tells the panels to show that it's on its way.
     pub fn run_background(&mut self, ctx: &egui::Context, id: &str, params: Value, done: Done) {
-        self.waiting.retain(|(c, _)| c != id);
-        let r = self.session.start_background(id, params);
+        self.waiting.retain(|(c, _)| c != id);        let r = self.session.start_background(id, params);
         self.handle_ui_requests();
         match r {
             Ok(Some(v)) => done(self, ctx, v),
@@ -1099,7 +1114,10 @@ impl FigApp {
                 "panel.shortcuts" => self.ui.shortcuts_panel = !self.ui.shortcuts_panel,
                 "palette.actions" => menus::toggle_palette(&mut self.ui),
                 "panel.design" if self.session.doc().is_ok_and(undesign_engine::board::is_board) => self.ui.board_panel = !self.ui.board_panel,
-                "panel.design" => self.ui.right_tab = RightTab::Design,
+                "panel.design" => {
+                    motion_panel::cancel_keyframe_interaction(self);
+                    self.ui.right_tab = RightTab::Design;
+                }
                 "board.editText" => {
                     if let Some(id) = r.data.get("id").and_then(undesign_engine::params::id_of)
                         && let Err(e) = undesign_engine::board::edit_text(&mut self.session, id)
@@ -1107,14 +1125,19 @@ impl FigApp {
                         self.toast(e.to_string());
                     }
                 }
-                "panel.prototype" => self.ui.right_tab = RightTab::Prototype,
+                "panel.prototype" => {
+                    motion_panel::cancel_keyframe_interaction(self);
+                    self.ui.right_tab = RightTab::Prototype;
+                }
                 "panel.motionTimeline" => {
                     self.ui.motion_timeline = r.data.get("on").and_then(Value::as_bool).unwrap_or(!self.ui.motion_timeline);
                 }
                 "panel.designPrototype" => {
+                    motion_panel::cancel_keyframe_interaction(self);
                     self.ui.right_tab = if self.ui.right_tab == RightTab::Prototype { RightTab::Design } else { RightTab::Prototype };
                 }
                 "panel.devMode" => {
+                    motion_panel::cancel_keyframe_interaction(self);
                     self.ui.right_tab = if self.ui.right_tab == RightTab::Inspect { RightTab::Design } else { RightTab::Inspect };
                 }
                 "panel.leftSidebar" => self.ui.left_collapsed = !self.ui.left_collapsed,
@@ -1129,9 +1152,14 @@ impl FigApp {
                     self.services.save_prefs(&self.session.prefs);
                 }
                 "focus.region" => self.ui.nav.step(r.data.get("step").and_then(Value::as_i64).unwrap_or(1).clamp(-4, 4) as i32),
-                "panel.layers" => self.ui.left_tab = LeftTab::File,
+                "panel.layers" => {
+                    self.ui.left_tab = LeftTab::File;
+                    self.ui.left_section = LeftSection::Layers;
+                    self.ui.left_collapsed = false;
+                }
                 "panel.assets" => {
                     self.ui.left_tab = LeftTab::Assets;
+                    self.ui.left_section = LeftSection::Assets;
                     self.ui.left_collapsed = false;
                     self.ui.versions = Default::default();
                 }
@@ -1141,6 +1169,7 @@ impl FigApp {
                 }
                 "panel.libraries" => {
                     self.ui.left_tab = LeftTab::Assets;
+                    self.ui.left_section = LeftSection::Assets;
                     self.ui.left_collapsed = false;
                     self.ui.libraries = true;
                 }
@@ -1741,27 +1770,26 @@ impl FigApp {
             egui::Frame::NONE
                 .fill(t.panel)
                 .stroke(egui::Stroke::new(1.0, t.border))
-                .corner_radius(egui::CornerRadius::same(12))
+                .corner_radius(egui::CornerRadius::same(14))
                 .outer_margin(egui::Margin::same(8))
                 .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
         };
         // The docked Motion timeline spans the full width below the side panels, so it claims
         // its strip before they do.
         if !hidden && self.ui.motion_timeline {
-            egui::Panel::bottom("motion_timeline").resizable(true).default_size(232.0).frame(card()).show(ui, |ui| {
-                motion_panel::dock(self, ui);
-            });
-        }
-        if !hidden {
-            egui::Panel::left("left_rail")
-                .exact_size(56.0)
-                .resizable(false)
-                .frame(egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border)))
-                .show(ui, |ui| {
-                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Navigation, i18n::tr("Sidebar"));
-                    layers::rail(self, ui)
+            if self.ui.motion_timeline_collapsed {
+                egui::Panel::bottom("motion_timeline").exact_size(48.0).resizable(false).frame(card()).show(ui, |ui| {
+                    motion_panel::dock(self, ui);
                 });
+            } else {
+                egui::Panel::bottom("motion_timeline").resizable(true).default_size(232.0).min_size(160.0).frame(card()).show(ui, |ui| {
+                    motion_panel::dock(self, ui);
+                });
+            }
         }
+        // The editor uses a single Pages / Layers / Assets panel. The compact app rail
+        // belongs to Home only; duplicating it here wastes canvas width and diverges from
+        // the editor reference layout.
         // The panels are as wide as asked, less in a window too small for them and the canvas.
         let left_open = !hidden && !self.ui.left_collapsed;
         let (left_w, right_w) = fit_panels(ui.available_width(), left_open.then_some(self.ui.left_width), right_open.then_some(self.ui.right_width));
@@ -1962,13 +1990,13 @@ impl FigApp {
             "importReport": self.ui.import_report.as_ref().map(import_report::Report::inspect),
         });
         state["homeSearch"] = json!(self.ui.home_view.file_query);
+        state["motionTimeline"] = json!({"open": self.ui.motion_timeline, "collapsed": self.ui.motion_timeline_collapsed});
         // Set apart from the literal above, which is at the macro recursion limit.
         state["uiScale"] = json!({"choice": self.session.prefs.ui_scale, "zoom": self.ui.ui_scale.zoom, "drawn": self.ui.ui_scale.drawn, "limited": self.ui.ui_scale.limited});
         state["pendingOpens"] = json!(self.ui.pending_opens.len());
         state["missingFonts"] = json!(self.ui.missing_fonts.as_ref().map(missing_fonts::Shown::inspect));
         state["presentTabs"] = tabs::present_tabs_inspect(self);
-        state
-    }
+        state    }
 }
 
 /// The file types File ▸ Open and a drop on the home screen open.
