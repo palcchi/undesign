@@ -79,6 +79,7 @@ blockers.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-04 | minor | The Agent connects to an Anthropic Messages adapter as well as an OpenAI-compatible endpoint: fixed official endpoint, user-entered model ID and session-only key, nothing preselected; thinking blocks are not replayed, refusals and truncated tool calls fail without a proposal, tool names are sent with `__` for dots. AI readiness unchanged (no live provider check in CI). |
 | 2026-11-02 | minor | Added Design and Motion skill contracts plus a typed backend catalog for compact page context, bounded tools, proposals, approval and undoable batches. No provider setup or model transport is connected, so no AI request can be sent; no shared/default provider is used. AI readiness unchanged. |
 | 2026-11-01 | minor | Motion Studio M14.3 playback slice: play/pause with frame-accurate advance and looping at the composition's fps, and a render-only canvas preview while the Motion tab is active (sampled values apply like manual edits; no undo entries, no dirty document). Selection outlines and hit-testing stay on base values. |
 | 2026-11-01 | minor | Motion Studio M14: composition/track/keyframe commands are undoable and registered in the engine; the first Motion tab supports composition creation, property tracks, frame scrubbing and keyframe entry. Engine command tests pass in an Ubuntu 22.04 test container because the host is GLIBC 2.34 while the installed Rust toolchains require GLIBC 2.35. Playback, graph editor, effects and export remain. |

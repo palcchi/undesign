@@ -268,3 +268,21 @@ upstream revision so future syncs stay auditable.
   zoom combo), because the fourth tab overlapped the combo and keyboard focus skipped
   it; the missing `Agent` catalog key (English, Spanish); a shadowed test helper and a
   missing re-export in the agent crate; an egui-0.36 `TextEdit` frame call.
+
+## 2026-11-04: Integration and UI audit pass (change #18)
+
+- Merged the open branches into `main`: `work/ui-ux-implementation-2026-11-04` (Motion dock
+  collapse, inspector track list, ruler gridlines and label steps, Home action buttons,
+  `DESIGN.md`; main's newer editor shell, left panel and tab bar kept where the two
+  conflicted), `interaction-audit-fixes-2026-11-04` (canvas pointer tests),
+  `triangle/code-connect-publish` (`undesign-cli code-connect publish`), the dependabot
+  actions bump, and the code part of `work/motion-007-icon-refresh`. The brand-asset draft
+  (`brand-assets/`, PR #4) and the checkpoint PR #3 are not merged.
+- Agent: an Anthropic Messages adapter beside the OpenAI-compatible one
+  (`crates/ui-egui/src/agent_provider.rs`, `apps/undesign/src/agent_provider.rs`,
+  `crates/ui-egui/src/agent_ui.rs`); provider tool names use `__` for dots.
+- UI fixes from an on-screen check: one-row Motion timeline toolbar, padded Motion track list
+  and Agent panel, a Developer Mode toggle beside the tools, rail labels, centred text-field
+  editors, the Home folder list position, keyboard entry into the Interface size menu, an em
+  dash removed from a UI label, translated Motion transport tips (English, Indonesian).
+- Tests updated for the shipped layout (one left "Design" tab, the Developer Mode toggle).
