@@ -35,6 +35,7 @@ pub mod frame_stats;
 pub mod guides;
 pub mod handles;
 pub mod home;
+pub mod home_examples;
 pub mod home_recents;
 pub mod i18n;
 pub mod icons;
@@ -127,6 +128,8 @@ mod gap_handle_tests;
 mod gradient_shorthand_tests;
 #[cfg(test)]
 mod guide_release_tests;
+#[cfg(test)]
+mod home_examples_tests;
 #[cfg(test)]
 mod home_recents_tests;
 #[cfg(test)]

@@ -50,6 +50,8 @@ pub struct Home {
     pub recents: crate::home_recents::Recents,
     /// A Home quick action can request focus in the existing join-code field.
     pub join_code_focus: bool,
+    /// The built-in examples' pictures.
+    pub examples: crate::home_examples::Pictures,
 }
 
 const RAIL: f32 = 64.0;
@@ -390,9 +392,11 @@ fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
         ui.add_space(28.0);
         getting_started(app, ui, t);
     }
-    // The recent files (with their pictures) lead; the files already open in tabs follow.
+    // Your own files first: the recent files (with their pictures), the files already open in
+    // tabs; then the built-in examples (on a first run, right under "No recent files yet").
     crate::home_recents::section(app, ui, t, "");
     open_files(app, ui, t, "");
+    crate::home_examples::section(app, ui, t);
 }
 
 /// The Open files list: the documents whose name or path has `query` (lower case; all for ""), a

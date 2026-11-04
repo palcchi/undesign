@@ -305,3 +305,14 @@ upstream revision so future syncs stay auditable.
   `showcase/scripts/install-wasm.mjs`; built without `agent-relay`, as before.
 - The installer's WASM cap goes from 24 MiB to 28 MiB (the bundle is 25.5 MB: the data section
   grew 1.57 MB, the code section shrank); its tests follow.
+
+## 2026-11-04: Built-in examples and README refresh (change #21)
+
+- `examples/undesign-intro.undesign`: new synthetic example built through the control channel
+  (the app icon's U geometry, Inter text, a Motion composition "Intro", 1280 × 720, 30 fps, 3 s).
+- `crates/ui-egui/src/home_examples.rs`: the files in `examples/` are embedded with
+  `include_bytes!` and listed under Home ▸ Examples; a card opens a new unsaved copy through
+  `file.open {data, name}`. Tests: every example opens; a card opens its example.
+- `README.md`: new screenshots `docs/images/ui-*.png` and `made-undesign-intro.png` (rows in
+  `ATTRIBUTION.md`), an Examples table, Motion and Agent feature cells, the browser link; the
+  local-branch preview section removed.

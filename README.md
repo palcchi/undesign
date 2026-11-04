@@ -20,14 +20,19 @@
 <br>
 
 <p align="center">
-  <img src="docs/images/shot-1-hero.png" alt="Undesign in its dark theme editing the Ridgeline hiking app: three phone screens (Home in light mode, a trail detail page and Home in dark mode) on the canvas, the Featured trail card instance selected, the layers panel showing the screen's auto layout tree, and the Design panel showing the instance's Fill and Hug auto layout sizing, its Theme variable mode and a fill bound to the surface colour variable" width="100%">
-  <br><sub><b>Ridgeline</b>: auto layout screens built from components, with Light and Dark modes from one set of colour variables · <code>examples/ridgeline-app.undesign</code></sub>
+  <img src="docs/images/ui-editor.png" alt="Undesign in its dark theme with the Ridgeline app example: three phone screens on the canvas (Home in light mode with a Ready for dev badge, a trail detail page and Home in dark mode), the Featured trail card instance selected, the file name and layers on the left, and on the right the Share and zoom controls above the Design panel with the instance's properties, position, auto layout and appearance" width="100%">
+  <br><sub><b>The editor</b>: file and layers on the left, document actions and properties on the right, tools at the bottom of the canvas · <code>examples/ridgeline-app.undesign</code></sub>
+</p>
+
+<p align="center">
+  <b>Try it in your browser:</b> <a href="https://palcchi.github.io/undesign/">palcchi.github.io/undesign</a>. Home ▸ Examples opens every sample file below, Motion included.
 </p>
 
 <br>
 
 <p align="center">
   <a href="#a-look-around">A look around</a> ·
+  <a href="#examples">Examples</a> ·
   <a href="#made-in-undesign">Made in Undesign</a> ·
   <a href="#features">Features</a> ·
   <a href="#scriptable-to-the-core">Automation</a> ·
@@ -65,35 +70,46 @@
 <table>
 <tr>
 <td width="50%" valign="top">
-  <img src="docs/images/shot-2-components.png" alt="The Ridgeline UI design system open with the Assets panel on the left showing live thumbnails of the Button, Difficulty, Search field, Toggle and icon components; a Button component set of nine variants laid out in a three-by-three grid auto layout is selected, and the Design panel lists its Style (Primary, Tonal, Outline) and State (Default, Hover, Disabled) variant properties" width="100%">
-  <p align="center"><sub><b>Components and variants</b>: component sets, variant properties and the Assets panel · <code>examples/ridgeline-design-system.undesign</code></sub></p>
+  <img src="docs/images/ui-motion.png" alt="The Undesign intro example in the Motion workspace: the canvas shows the U mark, the Undesign wordmark and the tagline part-way through their entrance with the first feature chip fading in, the Motion panel on the right lists sixteen property tracks, and the docked timeline below has the transport, the current time at frame 38, a ruler in seconds, the playhead and keyframe diamonds on the mark's rotation, scale and opacity lanes" width="100%">
+  <p align="center"><sub><b>Motion</b>: compositions, property tracks and keyframes on a docked timeline, previewed on the canvas · <code>examples/undesign-intro.undesign</code></sub></p>
 </td>
 <td width="50%" valign="top">
-  <img src="docs/images/shot-3-prototype.png" alt="Four onboarding phone screens in the Prototype tab, joined by blue connection curves from the Get started, Continue, Allow location and Not now buttons to the next screens; the Get started button is selected and the Prototype panel shows its On click, Navigate to 2 Interests interaction" width="100%">
-  <p align="center"><sub><b>Prototyping</b>: connections, transitions, back actions and a flow · <code>examples/ridgeline-onboarding.undesign</code></sub></p>
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/images/shot-4-devmode.png" alt="Dev Mode on the Ridgeline home screen: the frame carries a Ready for dev badge, a Development annotation callout points at the featured trail card, a trail row instance is selected and the Inspect panel shows generated React code with a TrailRow props interface and the instance's title and details values" width="100%">
-  <p align="center"><sub><b>Dev Mode</b>: ready-for-dev status, annotations and React code where component properties become props · <code>examples/ridgeline-app.undesign</code></sub></p>
-</td>
-<td width="50%" valign="top">
-  <img src="docs/images/shot-5-vector.png" alt="Vector edit mode on a wave path with a gradient, tapered variable-width stroke: its anchor points, Bezier handles and the transform box of the selected points are visible, with the vector edit toolbar at the bottom; above it are a boolean-built mountain mark and an angular-gradient knot of excluded rings" width="100%">
-  <p align="center"><sub><b>Vector networks</b>: points and handles, variable-width strokes, booleans that stay editable · <code>examples/glass-and-vectors.undesign</code></sub></p>
+  <img src="docs/images/ui-home.png" alt="The Home screen: New design, New board, Import file and Join team buttons, a join-with-a-code field, the Getting started tips, and an Examples section with picture cards for Undesign intro, Daybreak motion study, Ridgeline app, Ridgeline onboarding, Ridgeline design system, Ridgeline Studio dashboard and Glass and vectors" width="100%">
+  <p align="center"><sub><b>Home</b>: new files, joining a shared file, and the built-in examples (each opens as a new copy)</sub></p>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-  <img src="docs/images/shot-6-dashboard-light.png" alt="The light UI theme with a web analytics dashboard for a fictional trail operator: a dark sidebar, KPI cards with sparklines, a grouped bar chart, a donut chart, a table of top trails and an area chart, with the frame's 12-column layout grid showing as tinted columns and its fill linked to a paint style" width="100%">
-  <p align="center"><sub><b>Layout grids and styles, light theme</b>: a 12-column grid, paint, text, effect and grid styles, charts drawn from shapes · <code>examples/ridgeline-studio-dashboard.undesign</code></sub></p>
+  <img src="docs/images/ui-prototype.png" alt="Four onboarding phone screens in the Prototype tab joined by connection curves; the Continue button on the second screen is selected and the Prototype panel shows its On click, Navigate to 3 Location interaction and its scroll behaviour" width="100%">
+  <p align="center"><sub><b>Prototyping</b>: connections, transitions and a flow · <code>examples/ridgeline-onboarding.undesign</code></sub></p>
 </td>
 <td width="50%" valign="top">
-  <img src="docs/images/shot-7-collab.png" alt="A live session seen from one participant's window: avatars of three people in the top right, a Priya Nair is spotlighting banner with a Follow button, Priya's green cursor and selection outline on the dark home screen's trail card, and Jonas Ortiz's purple cursor and selection on the Start hike button with his cursor chat bubble asking whether the button should stay pinned while scrolling" width="100%">
-  <p align="center"><sub><b>Live sessions</b>: three apps on one shared file, with cursors, selections, cursor chat and spotlight</sub></p>
+  <img src="docs/images/ui-devmode.png" alt="Developer Mode on the Ridgeline home screen: a Ready for dev badge, a Development annotation callout on the trail card, red measurement lines from a selected trail row to its frame, and the Inspect panel listing the row's layout, auto layout, fills and effects" width="100%">
+  <p align="center"><sub><b>Developer Mode</b>: annotations, measurements and the Inspect panel, a toggle beside the tools · <code>examples/ridgeline-app.undesign</code></sub></p>
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+  <img src="docs/images/ui-agent.png" alt="The Agent tab beside the onboarding screens: Design and Motion skills, a Provider switch set to Anthropic with the fixed Messages endpoint, empty Model ID and API key fields, notes that the key stays in memory for the session and that no request is sent until Send, and a Connect button" width="100%">
+  <p align="center"><sub><b>Agent</b>: bring your own provider (OpenAI-compatible or Anthropic); every change is a proposal you approve, applied as one undo step</sub></p>
 </td>
 </tr>
 </table>
+
+## Examples
+
+Every file in [`examples/`](examples) is also built into the app: **Home ▸ Examples** opens a new copy
+of it, on the desktop and in the browser, and the original stays as it is.
+
+| Example | What it shows |
+|---|---|
+| [Undesign intro](examples/undesign-intro.undesign) | **Motion**: the Undesign mark, wordmark and four feature chips animate in over 3 s (16 tracks, eased keyframes) |
+| [Daybreak motion study](examples/daybreak-motion-study.undesign) | **Motion**: a weather screen's glass panels, sun and forecast on a 4 s timeline |
+| [Ridgeline app](examples/ridgeline-app.undesign) | Auto layout screens built from components, light and dark from one set of colour variables, Dev Mode annotations |
+| [Ridgeline onboarding](examples/ridgeline-onboarding.undesign) | A prototype: connections, transitions, back actions and a flow |
+| [Ridgeline design system](examples/ridgeline-design-system.undesign) | Component sets, variant properties and the Assets panel |
+| [Ridgeline Studio dashboard](examples/ridgeline-studio-dashboard.undesign) | A 12-column layout grid, paint, text, effect and grid styles, charts made of shapes |
+| [Glass and vectors](examples/glass-and-vectors.undesign) | Glass and background blur, editable booleans, variable-width strokes |
 
 ## Made in Undesign
 
@@ -101,7 +117,10 @@ Every design below was built entirely through Undesign's command API, the same o
 and exported at 2x by Undesign's own renderer. The source files are in
 [`examples/`](examples).
 
-The [Daybreak Motion Study](examples/daybreak-motion-study.undesign) is a **Design + Motion** sample.
+<p align="center">
+  <img src="docs/images/made-undesign-intro.png" alt="The Undesign intro frame: the green U mark beside the white Undesign wordmark on a near-black background, the line Design, prototype and animate interfaces. Open source, written in Rust., and four outlined chips reading Auto layout, Components, Motion timeline and Dev Mode" width="100%">
+  <br><sub><b>Undesign intro</b>: the last frame of its 3 s entrance, rendered by Undesign · <code>examples/undesign-intro.undesign</code></sub>
+</p>
 
 <table>
 <tr>
@@ -142,24 +161,6 @@ The [Daybreak Motion Study](examples/daybreak-motion-study.undesign) is a **Desi
 </tr>
 </table>
 
-## Local redesign branch preview — not production
-
-> These are review-only captures from a local run of the unintegrated
-> `figma-editor-2026-11-04` branch. They are **not production screenshots** and do not represent the shipped application.
-
-<table>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/images/local-redesign-preview-1440x900.png" alt="Local, non-production redesign branch preview with a selected rectangle at a 1440 by 900 viewport" width="100%">
-  <p align="center"><sub><b>1440 × 900</b> · local redesign branch preview</sub></p>
-</td>
-<td width="50%" valign="top">
-  <img src="docs/images/local-redesign-preview-800x500.png" alt="Local, non-production redesign branch preview with the Dimensions fields visible at an 800 by 500 viewport" width="100%">
-  <p align="center"><sub><b>800 × 500</b> · local redesign branch preview</sub></p>
-</td>
-</tr>
-</table>
-
 ## Features
 
 <table>
@@ -191,6 +192,16 @@ The [Daybreak Motion Study](examples/daybreak-motion-study.undesign) is a **Desi
     <td width="50%" valign="top">
       <h3>Prototype and hand off</h3>
       Connections, triggers, actions and Smart Animate-style transitions, variables with conditionals (if / else if / else built in the interaction editor, expressions like <code>count + 1</code>), flows, a presentation view with device frames, hotspot hints and an Inspect panel, and a live preview pane. Alt to measure distances and padding on the canvas, Inspect mode with measurements, annotations in colour-coded categories, a ready-for-dev list with a focus view and Compare changes (before / after with property-level diffs since a frame was marked ready), and code (CSS, HTML, React, Leptos, SwiftUI, Compose) where components take their properties as parameters, comment threads pinned to frames (replies, @mentions, reactions, read state) and named version history. Export any layer at any scale to PNG, JPG, WebP, SVG or PDF.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Motion</h3>
+      Compositions with their own size, frame rate and length; property tracks for position, scale, rotation, opacity and size, with keyframes that hold, move linearly or ease; a timeline docked under the canvas with a shared ruler and playhead, zoom, keyframe dragging with snapping and Delete; playback that previews on the canvas without changing the design. An early slice: no graph editor or video export yet.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Agent, with your own provider</h3>
+      An optional assistant tab that talks only to the provider you connect: an OpenAI-compatible endpoint or the Anthropic Messages API, with your key held in memory for the session. It reads the current page, proposes Design or Motion changes through the same commands as the menus, and nothing changes until you approve; the whole proposal is one undo step. No shared or default provider, and no request before you press Send.
     </td>
   </tr>
 </table>
@@ -255,7 +266,7 @@ New contributors: start with [`AGENTS.md`](AGENTS.md), then [`docs/`](docs/).
 Installers for macOS (universal, signed and notarized), Windows (x64, x86 and arm64), Linux (AppImage, `.deb`, `.rpm`, Flatpak and tarball), FreeBSD and the web are attached to each [GitHub release](https://github.com/palcchi/undesign/releases). Maintainers: [`docs/releasing.md`](docs/releasing.md) explains how releases are built, signed and published.
 
 > [!IMPORTANT]
-> **Status:** Undesign is in **alpha**: about 49% of the way to replacing proprietary tools for real work, by our own estimate. Nearly all tracked interface design actions in the menu checklist are wired ([`docs/parity-checklist.md`](docs/parity-checklist.md)) and the core editor works end to end, but Undesign opens `.fig` files only best effort, has only a first preview of multiplayer (live sessions hosted from the app — the self-hosted server was removed 2026-10-30 — with per-person undo and share links to edit or to view; no accounts, teams or cloud yet), runs its own WebAssembly plugins, and hasn't been checked against real design documents. The honest, area-by-area picture is in the [roadmap](ROADMAP.md) and [`docs/target-app-parity.md`](docs/target-app-parity.md). Expect rough edges and please file issues.
+> **Status:** Undesign is in **alpha**: about 49% of the way to replacing proprietary tools for real work, by our own estimate. Nearly all tracked interface design actions in the menu checklist are wired ([`docs/parity-checklist.md`](docs/parity-checklist.md)) and the core editor works end to end, but Undesign opens `.fig` files only best effort, has only a first preview of multiplayer (live sessions hosted from the app (the self-hosted server was removed 2026-10-30) with per-person undo and share links to edit or to view; no accounts, teams or cloud yet), runs its own WebAssembly plugins, and hasn't been checked against real design documents. The honest, area-by-area picture is in the [roadmap](ROADMAP.md) and [`docs/target-app-parity.md`](docs/target-app-parity.md). Expect rough edges and please file issues.
 
 ## Privacy and online sharing
 

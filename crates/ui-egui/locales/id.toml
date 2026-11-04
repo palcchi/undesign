@@ -8,6 +8,15 @@ name = "Bahasa Indonesia"
 status = "draft — needs native review"
 
 [ui]
+"Examples" = "Contoh"
+"Built into the app. Each opens as a new copy; the original stays as it is." = "Sudah ada di dalam aplikasi. Setiap contoh dibuka sebagai salinan baru; aslinya tetap seperti semula."
+"Motion: the mark, the wordmark and four feature chips animate in over 3 s" = "Motion: logo, wordmark, dan empat chip fitur muncul beranimasi selama 3 detik"
+"Motion: a weather screen's glass panels, sun and forecast on a 4 s timeline" = "Motion: panel kaca, matahari, dan prakiraan di layar cuaca pada timeline 4 detik"
+"Auto layout screens built from components, light and dark from one set of variables" = "Layar auto layout dari komponen, terang dan gelap dari satu set variabel"
+"A prototype: connections, transitions, back actions and a flow" = "Prototipe: koneksi, transisi, aksi kembali, dan sebuah flow"
+"Component sets, variant properties and the Assets panel" = "Set komponen, properti varian, dan panel Assets"
+"A 12-column layout grid, paint, text and effect styles, charts made of shapes" = "Grid tata letak 12 kolom, style warna, teks, dan efek, grafik dari bentuk"
+"Background blur, editable booleans and variable-width strokes" = "Blur latar, boolean yang tetap bisa diedit, dan stroke dengan lebar variabel"
 "No recent files yet. Files you open or save show up here." = "Belum ada file terbaru. File yang Anda buka atau simpan akan muncul di sini."
 "Developer Mode" = "Mode Developer"
 

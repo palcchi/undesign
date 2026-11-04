@@ -606,12 +606,16 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, t: &Tokens, query: &str) -> usize 
         }
     }
     let with_created = files.iter().any(|f| f.stat.is_some_and(|s| s.created.is_some()));
-    let mut action = toolbar(ui, t, view, sort, with_created);
-    ui.add_space(16.0);
     if files.is_empty() {
+        // No sort or view controls for an empty list: just what will appear here.
+        ui.add_space(28.0);
+        ui.label(egui::RichText::new(tr("Recent files")).font(semibold(12.0)).color(t.text_secondary));
+        ui.add_space(8.0);
         ui.label(egui::RichText::new(tr("No recent files yet. Files you open or save show up here.")).font(regular(12.0)).color(t.text_secondary));
         return 0;
     }
+    let mut action = toolbar(ui, t, view, sort, with_created);
+    ui.add_space(16.0);
     let chosen = match view {
         View::Grid => grid(ui, t, state, &files, now, time, reduce_motion),
         View::List => list(ui, t, state, &files, now, sort, with_created),

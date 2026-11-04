@@ -256,10 +256,16 @@ fn rects_of(s: &[Shape], c: egui::Color32) -> usize {
     s.iter().filter(|s| matches!(s, Shape::Rect(r) if r.fill == c)).count()
 }
 
-/// Preview images in the main content area, excluding the branded sidebar icon.
-fn images(s: &[Shape]) -> usize {
+/// The recent files' pictures in the main content area: not the branded sidebar icon and not the
+/// built-in examples' pictures.
+fn images(u: &Ui, s: &[Shape]) -> usize {
+    let examples = u.app.ui.home_view.examples.texture_ids();
     s.iter()
-        .filter(|s| matches!(s, Shape::Mesh(m) if m.texture_id != egui::TextureId::default() && m.vertices.iter().any(|v| v.pos.x > 240.0)))
+        .filter(|s| {
+            matches!(s, Shape::Mesh(m) if m.texture_id != egui::TextureId::default()
+                && !examples.contains(&m.texture_id)
+                && m.vertices.iter().any(|v| v.pos.x > 240.0))
+        })
         .count()
 }
 
@@ -278,7 +284,7 @@ fn cards_show_pictures_on_their_page_colour_with_name_and_time() {
     assert_eq!(file(&r, "empty")["picture"], "page", "nothing on it: its page colour alone");
     assert_eq!(file(&r, "icon")["picture"], "placeholder");
     assert_eq!(file(&r, "gone")["exists"], false);
-    assert_eq!(images(&s), 2, "two pictures drawn");
+    assert_eq!(images(&u, &s), 2, "two pictures drawn");
     // Each picture sits on its file's page colour (not one fixed colour).
     let page = |v: f32| crate::theme::c32(undesign_color::Color { r: v, g: v, b: v, a: 1.0 });
     assert!(rects_of(&s, page(0.1)) >= 1 && rects_of(&s, page(0.9)) >= 1 && rects_of(&s, page(0.2)) >= 1);
@@ -472,7 +478,7 @@ fn the_sort_menu_and_the_view_buttons_are_kept_in_the_preferences() {
     assert_eq!(View::of(&u.app.session.prefs), View::List);
     assert_eq!(log.lock().unwrap().saved.last().and_then(|p| p.home_views.get("recents").cloned()).as_deref(), Some("list"));
     let s = settle(&mut u);
-    assert_eq!(images(&s), 0, "no pictures in the list");
+    assert_eq!(images(&u, &s), 0, "no pictures in the list");
     for want in ["Name", "Last modified", "3 hours ago", "2 days ago", "File not found", "pic"] {
         assert!(has_text(&s, want), "{want}: {:?}", texts(&s));
     }
