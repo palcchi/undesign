@@ -150,8 +150,8 @@ fn expanding_collapsing_and_revealing() {
 #[test]
 fn sweeping_across_eyes_and_padlocks_sets_several_layers() {
     let (mut u, [a, b, c, d]) = four();
-    // The eye and padlock are at the row's right end (the left panel spans 56…296).
-    let (eye, padlock) = (272.0, 250.0);
+    // The eye and padlock are at the row's right end (the docked left panel spans 0…240).
+    let (eye, padlock) = (216.0, 194.0);
     let (rd, rb) = (u.row_at(d), u.row_at(b));
     let steps = u.app.session.undo_depth().0;
     let from = Pos2::new(eye, rd.y);

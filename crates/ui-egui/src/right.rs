@@ -79,26 +79,47 @@ impl FigApp {
     }
 }
 
-pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
+/// The top of the left panel (the editor has no separate header bar): the main menu, the file's
+/// name (renamed in place) with its file-and-pages menu, and the save status under it.
+pub fn file_header(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    a11y::region(&mut app.ui.nav, ui, a11y::Region::Header, egui::accesskit::Role::Toolbar, tr("Top bar"));
-    let (top, _) = ui.allocate_exact_size(vec2(ui.available_width(), 48.0), Sense::hover());
+    let (top, _) = ui.allocate_exact_size(vec2(ui.available_width(), FILE_HEADER_H), Sense::hover());
     ui.painter().line_segment([top.left_bottom(), top.right_bottom()], Stroke::new(1.0, t.border));
 
-    let share_label = ui.painter().layout_no_wrap(tr("Share").to_string(), semibold(11.5), t.accent_on);
-    let share_w = (share_label.size().x + 24.0).max(56.0);
-    let help = Rect::from_min_size(pos2(top.max.x - 10.0 - 28.0, top.center().y - 14.0), vec2(28.0, 28.0));
-    let zoom = Rect::from_min_size(pos2(help.min.x - 6.0 - 62.0, top.center().y - 14.0), vec2(62.0, 28.0));
-    let play = Rect::from_min_size(pos2(zoom.min.x - 6.0 - 42.0, top.center().y - 14.0), vec2(42.0, 28.0));
-    let share = Rect::from_min_size(pos2(play.min.x - 8.0 - share_w, top.center().y - 16.0), vec2(share_w, 32.0));
+    let menu = Rect::from_min_size(pos2(top.min.x + 8.0, top.min.y + 10.0), vec2(28.0, 28.0));
+    let mresp = ui.interact(menu, ui.id().with("panel_main_menu"), Sense::click()).tip(tr("Main menu"));
+    a11y::menu_button(&mresp, tr("Main menu"), app.ui.main_menu);
+    if mresp.hovered() || mresp.has_focus() || app.ui.main_menu {
+        ui.painter().rect_filled(menu, CornerRadius::same(5), t.hover);
+    }
+    icons::paint(ui.painter(), Rect::from_center_size(menu.center(), vec2(16.0, 16.0)), Icon::Logo, t.icon);
+    if mresp.clicked() {
+        app.ui.main_menu = !app.ui.main_menu;
+    }
+    if app.ui.main_menu {
+        a11y::popup(&mut app.ui.nav, mresp.id, crate::menus::main_menu_id());
+    }
 
-    let file_left = top.min.x + 72.0;
-    let people_width = (share.min.x - file_left - 72.0).clamp(80.0, 112.0);
-    let people = Rect::from_min_size(pos2(share.min.x - 8.0 - people_width, top.min.y), vec2(people_width, top.height()));
-    let file_right = people.min.x - 8.0;
-    let slot_width = (file_right - file_left).clamp(64.0, 220.0);
     let (file_name, is_design, dirty, in_review) =
         app.session.ds().map(|ds| (ds.doc.name.clone(), ds.doc.kind.is_design(), ds.is_dirty(), ds.branch_of.is_some())).unwrap_or_default();
+    let name_left = menu.max.x + 4.0;
+    let room = (top.max.x - 8.0 - 22.0 - name_left).max(40.0);
+    // The chevron follows the name, as wide as the name needs.
+    let wanted = ui.painter().layout_no_wrap(file_name.clone(), semibold(12.0), t.text).size().x + 14.0;
+    let name_rect = Rect::from_min_size(pos2(name_left, top.min.y + 5.0), vec2(wanted.clamp(40.0, room), 24.0));
+    let start = std::mem::take(&mut app.ui.rename_file);
+    if let (Some(new), _) = widgets::rename_field(ui, Id::new("filename"), &file_name, name_rect, semibold(12.0), start) {
+        app.run("file.rename", json!({"name": new}));
+    }
+    let file_menu = Rect::from_min_size(pos2(name_rect.max.x, name_rect.center().y - 10.0), vec2(20.0, 20.0));
+    let fresp = ui.interact(file_menu, ui.id().with("file_page_menu"), Sense::click()).tip(tr("File and pages"));
+    a11y::menu_button(&fresp, tr("File and pages"), a11y::menu_open(&fresp));
+    if fresp.hovered() || fresp.has_focus() {
+        ui.painter().rect_filled(file_menu, CornerRadius::same(5), t.hover);
+    }
+    app_glyphs::paint(ui.painter(), Rect::from_center_size(file_menu.center(), vec2(10.0, 10.0)), Glyph::ChevronDown, t.icon_secondary);
+    file_page_menu(app, &fresp, is_design);
+
     let status_label = if in_review {
         tr("In review")
     } else if dirty {
@@ -106,58 +127,79 @@ pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
     } else {
         tr("All changes saved")
     };
-    let status_galley = ui.painter().layout_no_wrap(status_label.to_string(), regular(9.0), t.text_secondary);
-    let status_width = status_galley.size().x + 12.0;
-    let show_status = slot_width >= status_width + 74.0;
-    let name_width = if show_status { (slot_width - status_width - 22.0).max(40.0) } else { (slot_width - 22.0).max(40.0) };
-    let name_rect = Rect::from_min_size(pos2(file_left, top.center().y - 14.0), vec2(name_width, 28.0));
-    let start = std::mem::take(&mut app.ui.rename_file);
-    if let (Some(new), _) = widgets::rename_field(ui, Id::new("filename"), &file_name, name_rect, semibold(11.5), start) {
-        app.run("file.rename", json!({"name": new}));
-    }
-    let file_menu = Rect::from_min_size(pos2(name_rect.max.x + 2.0, top.center().y - 12.0), vec2(20.0, 24.0));
-    let fresp = ui.interact(file_menu, ui.id().with("file_page_menu"), Sense::click());
-    a11y::menu_button(&fresp, tr("File and pages"), a11y::menu_open(&fresp));
-    if fresp.hovered() || fresp.has_focus() {
-        ui.painter().rect_filled(file_menu, CornerRadius::same(5), t.hover);
-    }
-    app_glyphs::paint(ui.painter(), Rect::from_center_size(file_menu.center(), vec2(12.0, 12.0)), Glyph::ChevronDown, t.icon_secondary);
-    file_page_menu(app, &fresp, is_design);
-    if show_status {
-        let status_rect = Rect::from_min_size(pos2(file_menu.max.x + 4.0, top.center().y - 8.0), vec2(status_width, 16.0));
-        let status_resp = ui.interact(status_rect, ui.id().with("save_status"), Sense::hover()).tip(status_label);
-        a11y::status(
-            &status_resp,
-            status_label,
-            if in_review {
-                "In review"
-            } else if dirty {
-                "Unsaved changes"
-            } else {
-                "All changes saved"
-            },
-        );
-        let dot = Rect::from_center_size(pos2(status_rect.min.x + 4.0, status_rect.center().y), vec2(5.0, 5.0));
-        let dot_color = if in_review {
-            t.warning
+    let status_rect = Rect::from_min_size(pos2(name_left + 6.0, top.min.y + 30.0), vec2((top.max.x - 8.0 - name_left - 6.0).max(0.0), 14.0));
+    let status_resp = ui.interact(status_rect, ui.id().with("save_status"), Sense::hover());
+    a11y::status(
+        &status_resp,
+        status_label,
+        if in_review {
+            "In review"
         } else if dirty {
-            t.accent
+            "Unsaved changes"
         } else {
-            t.success
-        };
-        ui.painter().circle_filled(dot.center(), 2.5, dot_color);
-        ui.painter().galley(pos2(status_rect.min.x + 10.0, status_rect.center().y - status_galley.size().y / 2.0), status_galley, t.text_secondary);
-    }
+            "All changes saved"
+        },
+    );
+    let dot_color = if in_review {
+        t.warning
+    } else if dirty {
+        t.accent
+    } else {
+        t.success
+    };
+    ui.painter().circle_filled(pos2(status_rect.min.x + 3.0, status_rect.center().y), 2.5, dot_color);
+    let shown = widgets::elide_font(ui, status_label, status_rect.width() - 10.0, regular(10.5));
+    ui.painter().text(pos2(status_rect.min.x + 10.0, status_rect.center().y), Align2::LEFT_CENTER, shown, regular(10.5), t.text_secondary);
+}
+
+/// The height of [`file_header`].
+pub const FILE_HEADER_H: f32 = 52.0;
+
+/// The top of the right panel: who is here, the comment history, Present (with Preview), Share and
+/// the zoom menu. It is the editor's "Top bar" for screen readers and F6.
+pub fn actions_header(app: &mut FigApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let (top, _) = ui.allocate_exact_size(vec2(ui.available_width(), ACTIONS_HEADER_H), Sense::hover());
+    // A child that doesn't move the panel's cursor (the row only paints and interacts).
+    let mut row = ui.new_child(egui::UiBuilder::new().max_rect(top).id_salt("actions_header"));
+    a11y::region(&mut app.ui.nav, &row, a11y::Region::Header, egui::accesskit::Role::Toolbar, tr("Top bar"));
+    actions_row(app, &mut row, top, &t);
+    ui.painter().line_segment([top.left_bottom(), top.right_bottom()], Stroke::new(1.0, t.border));
+}
+
+/// The height of [`actions_header`].
+pub const ACTIONS_HEADER_H: f32 = 44.0;
+
+fn actions_row(app: &mut FigApp, ui: &mut Ui, top: Rect, t: &Tokens) {
+    let cy = top.center().y;
+    let share_label = ui.painter().layout_no_wrap(tr("Share").to_string(), semibold(11.0), t.accent_on);
+    let share_w = (share_label.size().x + 20.0).max(52.0);
+    let zoom = Rect::from_min_size(pos2(top.max.x - 8.0 - 54.0, cy - 12.0), vec2(54.0, 24.0));
+    let share = Rect::from_min_size(pos2(zoom.min.x - 6.0 - share_w, cy - 12.0), vec2(share_w, 24.0));
+    let play = Rect::from_min_size(pos2(share.min.x - 4.0 - 36.0, cy - 12.0), vec2(36.0, 24.0));
+    let chat = Rect::from_min_size(pos2(play.min.x - 2.0 - 24.0, cy - 12.0), vec2(24.0, 24.0));
+    let people = Rect::from_min_max(pos2(top.min.x + 8.0, top.min.y), pos2((chat.min.x - 4.0).max(top.min.x + 8.0), top.max.y));
 
     crate::live::people_bar(app, ui, people);
-    let sresp = ui.interact(share, ui.id().with("share"), Sense::click()).tip(tr("Share: live session, export"));
-    a11y::button(&sresp, tr("Share"));
-    ui.painter().rect_filled(share, CornerRadius::same(6), if sresp.hovered() { t.accent_hover } else { t.accent });
-    ui.painter().galley(share.center() - share_label.size() / 2.0, share_label, t.accent_on);
-    crate::live::share_popover(app, &sresp);
+
+    let cresp = ui.interact(chat, ui.id().with("header_chat"), Sense::click()).tip(tr("Chat"));
+    a11y::toggle(&cresp, tr("Chat"), app.ui.chat_open);
+    if app.ui.chat_open {
+        ui.painter().rect_filled(chat, CornerRadius::same(5), t.selected_row);
+    } else if cresp.hovered() || cresp.has_focus() {
+        ui.painter().rect_filled(chat, CornerRadius::same(5), t.hover);
+    }
+    icons::paint(ui.painter(), chat.shrink(5.0), Icon::Comment, if app.ui.chat_open { t.accent_text } else { t.icon });
+    if cresp.clicked() {
+        app.ui.chat_open = !app.ui.chat_open;
+        if app.ui.chat_open {
+            app.ui.right_tab = RightTab::Design;
+            app.ui.compact_panel = crate::CompactPanel::Design;
+        }
+    }
 
     let (tri_r, chev_r) =
-        (Rect::from_min_max(play.min, pos2(play.max.x - 16.0, play.max.y)), Rect::from_min_max(pos2(play.max.x - 16.0, play.min.y), play.max));
+        (Rect::from_min_max(play.min, pos2(play.max.x - 14.0, play.max.y)), Rect::from_min_max(pos2(play.max.x - 14.0, play.min.y), play.max));
     let present_keys = crate::toolbar::pretty_shortcut(crate::shortcuts::shortcut("proto.present").unwrap_or(""));
     let presp = ui.interact(tri_r, ui.id().with("play"), Sense::click()).tip(format!("{}  {present_keys}", tr("Present")));
     a11y::button(&presp, tr("Present"));
@@ -166,8 +208,8 @@ pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
     if presp.hovered() || mresp.hovered() || presp.has_focus() || mresp.has_focus() {
         ui.painter().rect_filled(play, CornerRadius::same(5), t.hover);
     }
-    app_glyphs::paint(ui.painter(), Rect::from_center_size(play.center() - vec2(7.0, 0.0), vec2(16.0, 16.0)), Glyph::Play, t.icon);
-    app_glyphs::paint(ui.painter(), Rect::from_center_size(play.center() + vec2(12.0, 0.0), vec2(10.0, 10.0)), Glyph::ChevronDown, t.icon_secondary);
+    app_glyphs::paint(ui.painter(), Rect::from_center_size(play.center() - vec2(6.0, 0.0), vec2(14.0, 14.0)), Glyph::Play, t.icon);
+    app_glyphs::paint(ui.painter(), Rect::from_center_size(play.center() + vec2(10.0, 0.0), vec2(9.0, 9.0)), Glyph::ChevronDown, t.icon_secondary);
     if presp.clicked() {
         app.run("proto.present", json!({}));
     }
@@ -183,12 +225,23 @@ pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
         }
     });
 
+    let sresp = ui.interact(share, ui.id().with("share"), Sense::click()).tip(tr("Share: live session, export"));
+    a11y::button(&sresp, tr("Share"));
+    ui.painter().rect_filled(share, CornerRadius::same(5), if sresp.hovered() { t.accent_hover } else { t.accent });
+    ui.painter().galley(share.center() - share_label.size() / 2.0, share_label, t.accent_on);
+    crate::live::share_popover(app, &sresp);
+
     zoom_menu(app, ui, zoom);
-    let hresp = ui.interact(help, ui.id().with("top_help"), Sense::click()).tip(tr("Help and resources"));
+}
+
+/// The help button in the canvas's bottom-right corner (out of the way of the tools pill).
+pub fn help_button(app: &mut FigApp, ui: &mut Ui, canvas: Rect) {
+    let t = Tokens::get(ui.ctx());
+    let help = Rect::from_center_size(pos2(canvas.max.x - 26.0, canvas.max.y - 26.0), vec2(28.0, 28.0));
+    let hresp = ui.interact(help, ui.id().with("canvas_help"), Sense::click()).tip(tr("Help and resources"));
     a11y::menu_button(&hresp, tr("Help and resources"), a11y::menu_open(&hresp));
-    if hresp.hovered() || hresp.has_focus() {
-        ui.painter().rect_filled(help, CornerRadius::same(5), t.hover);
-    }
+    ui.painter().circle_filled(help.center(), 14.0, if hresp.hovered() || hresp.has_focus() { t.hover } else { t.panel });
+    ui.painter().circle_stroke(help.center(), 14.0, Stroke::new(1.0, t.border));
     icons::paint(ui.painter(), help.shrink(7.0), Icon::Help, t.icon);
     menu_popup(&hresp).show(|ui| {
         for (label, cmd) in [

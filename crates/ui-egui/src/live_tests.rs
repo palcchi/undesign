@@ -98,6 +98,28 @@ impl Harness {
         last
     }
 
+    /// The middle of the button a screen reader names `label` (for icon-only buttons).
+    pub(crate) fn button_center(&mut self, label: &str) -> Pos2 {
+        self.ctx.enable_accesskit();
+        let mut nodes = Vec::new();
+        for _ in 0..2 {
+            self.time += 1.0 / 60.0;
+            let input =
+                RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))), time: Some(self.time), ..Default::default() };
+            let app = &mut self.app;
+            let mut out = self.ctx.run_ui(input, |ui| app.ui(ui));
+            out.textures_delta.clear();
+            nodes = out.platform_output.accesskit_update.map(|u| u.nodes).unwrap_or_default();
+        }
+        let b = nodes
+            .iter()
+            .map(|(_, n)| n)
+            .find(|n| n.role() == egui::accesskit::Role::Button && n.label() == Some(label))
+            .and_then(|n| n.bounds())
+            .unwrap_or_else(|| panic!("no button {label:?}"));
+        Pos2::new(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32)
+    }
+
     pub(crate) fn click(&mut self, p: Pos2) {
         for pressed in [true, false] {
             self.frame(vec![

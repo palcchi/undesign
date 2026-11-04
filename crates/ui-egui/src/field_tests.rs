@@ -562,7 +562,7 @@ fn the_glass_light_intensity_field_has_a_label() {
 }
 
 /// A glass settings field's width in the Design panel at its default width.
-const GLASS_FIELD_W: f32 = 98.5;
+const GLASS_FIELD_W: f32 = 106.5;
 
 /// The light intensity label this fix adds fits whole beside its value in every language (#256).
 /// Other glass labels may end in "…" in some languages (es "Profundidad"); a longer

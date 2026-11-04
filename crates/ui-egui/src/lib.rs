@@ -1903,15 +1903,10 @@ impl FigApp {
         let hidden = self.session.ds().map(|d| d.view.ui_hidden).unwrap_or(false);
         let right_open = self.right_panel_shown(hidden);
         let compact = ui.available_width() < 680.0;
-        if !hidden && !compact {
-            egui::Panel::top("editor_header")
-                .exact_size(48.0)
-                .resizable(false)
-                .frame(egui::Frame::NONE.fill(t.panel))
-                .show(ui, |ui| right::editor_header(self, ui));
-        }
-        // The panels float like cards (their resize edges sit on the visible edge).
-        let gap = 8.0;
+        // Narrow windows float their panels like cards; the full editor docks them edge to edge, with
+        // the file's name on top of the left panel and the document actions on top of the right one.
+        let gap = if compact { 8.0 } else { 0.0 };
+        let docked = || egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border));
         let card = || {
             egui::Frame::NONE
                 .fill(t.panel)
@@ -1947,17 +1942,7 @@ impl FigApp {
             // The docked Motion timeline spans the full width below the side panels, so it claims
             // its strip before they do.
             if !hidden && self.ui.motion_timeline {
-                motion_dock_panel(self, ui, "motion_timeline", 280.0, 160.0, card());
-            }
-            if !hidden {
-                egui::Panel::left("left_rail")
-                    .exact_size(56.0)
-                    .resizable(false)
-                    .frame(egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border)))
-                    .show(ui, |ui| {
-                        a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Navigation, i18n::tr("Sidebar"));
-                        layers::rail(self, ui)
-                    });
+                motion_dock_panel(self, ui, "motion_timeline", 280.0, 160.0, docked());
             }
             // The panels are as wide as asked, less in a window too small for them and the canvas.
             let left_open = !hidden && !self.ui.left_collapsed;
@@ -1965,19 +1950,20 @@ impl FigApp {
                 fit_panels(ui.available_width(), left_open.then_some(self.ui.left_width), right_open.then_some(self.ui.right_width));
             if left_open {
                 edges.push(("left", ui.available_rect_before_wrap().min.x + left_w - gap, left_w, 1.0));
-                egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card()).show(ui, |ui| {
+                egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(docked()).show(ui, |ui| {
                     let label = match self.ui.left_tab {
                         _ if self.ui.versions.open => i18n::tr("Version history"),
                         LeftTab::File | LeftTab::Layers | LeftTab::Pages => i18n::tr("Design"),
                         LeftTab::Assets => i18n::tr("Assets"),
                     };
                     a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
+                    right::file_header(self, ui);
                     layers::left_panel(self, ui)
                 });
             }
             if right_open {
                 edges.push(("right", ui.available_rect_before_wrap().max.x - right_w + gap, right_w, -1.0));
-                egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card()).show(ui, |ui| {
+                egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(docked()).show(ui, |ui| {
                     let label = if self.ui.chat_open {
                         i18n::tr("Chat")
                     } else {
@@ -1990,6 +1976,7 @@ impl FigApp {
                         }
                     };
                     a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
+                    right::actions_header(self, ui);
                     right::right_panel(self, ui)
                 });
             }
@@ -2007,6 +1994,10 @@ impl FigApp {
                     a11y::container(ui, egui::accesskit::Role::Toolbar, i18n::tr("Tools"));
                     toolbar::show(self, ui);
                 });
+                if !compact {
+                    let canvas = ui.max_rect();
+                    right::help_button(self, ui, canvas);
+                }
             }
         });
         // The panels' edges, over the canvas and the panels (drawn after them: they take the press).

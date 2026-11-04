@@ -132,8 +132,8 @@ fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
     assert!(nodes.iter().all(|n| n.role() != Role::Tab || n.label() != Some("Inspect workspace")), "Dev Mode remains a separate toolbar mode");
     assert_eq!(find(&nodes, Role::Button, "Developer Mode").toggled(), Some(Toggled::False), "the toolbar toggle reaches Developer Mode");
-    find(&nodes, Role::Button, "Agent");
-    find(&nodes, Role::Button, "Chat");
+    // The Agent is a workspace tab; Chat is a toggle in the right panel's header.
+    assert_eq!(find(&nodes, Role::Button, "Chat").toggled(), Some(Toggled::False));
     find(&nodes, Role::Button, "Comment");
     assert!(nodes.iter().all(|n| n.label() != Some("Dev Mode")), "Inspect replaces the obsolete Dev Mode control");
     find(&nodes, Role::Button, "Assets");
@@ -177,8 +177,8 @@ fn tablet_width_uses_desktop_sidebar_tabs_and_the_shared_header() {
     assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
     assert!(nodes.iter().all(|n| n.role() != Role::Tab || n.label() != Some("Inspect workspace")), "Dev Mode remains a separate toolbar mode");
     assert_eq!(find(&nodes, Role::Button, "Developer Mode").toggled(), Some(Toggled::False), "the toolbar toggle reaches Developer Mode");
-    find(&nodes, Role::Button, "Agent");
-    find(&nodes, Role::Button, "Chat");
+    // The Agent is a workspace tab; Chat is a toggle in the right panel's header.
+    assert_eq!(find(&nodes, Role::Button, "Chat").toggled(), Some(Toggled::False));
     find(&nodes, Role::Button, "Comment");
     assert!(nodes.iter().all(|n| n.label() != Some("Dev Mode")));
     find(&nodes, Role::Button, "Assets");
@@ -192,10 +192,12 @@ fn tablet_width_uses_desktop_sidebar_tabs_and_the_shared_header() {
 }
 
 #[test]
-fn global_rail_and_toolbar_actions_open_their_destinations() {
+fn header_and_toolbar_actions_open_their_destinations() {
     let mut agent = Ui::new(Session::new());
     agent.frame(vec![]);
-    let at = button_center(&mut agent, "Agent");
+    let nodes = tree(&mut agent);
+    let b = find(&nodes, Role::Tab, "Agent workspace").bounds().expect("tab bounds");
+    let at = Pos2::new(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32);
     click(&mut agent, at);
     assert_eq!(agent.app.ui.right_tab, crate::RightTab::Agent);
     assert_eq!(agent.app.ui.compact_panel, crate::CompactPanel::Agent);

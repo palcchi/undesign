@@ -141,8 +141,9 @@ fn dev_mode_layers_panel_selects_and_expands_but_edits_nothing() {
     assert!(u.app.ui.rename.is_none(), "no rename");
     assert!(u.app.ui.toast.as_ref().is_some_and(|(m, _)| m.contains("Shift+D")));
     rest(&mut u);
-    // The eye and padlock spots don't hide or lock (the row is selected instead).
-    let (eye, padlock) = (272.0, 250.0);
+    // The eye and padlock spots don't hide or lock (the row is selected instead); the docked left
+    // panel spans 0…240.
+    let (eye, padlock) = (216.0, 194.0);
     for x in [eye, padlock] {
         u.frame(vec![Event::PointerMoved(Pos2::new(x, rb.y))]);
         click(&mut u, Pos2::new(x, rb.y));

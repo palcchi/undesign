@@ -11,8 +11,9 @@ use crate::icons::{self, Icon};
 use crate::theme::{Tokens, regular, semibold};
 
 pub const ROW_H: f32 = 32.0;
-pub const FIELD_H: f32 = 32.0;
-pub const LABELLED_FIELD_H: f32 = 36.0;
+/// Controls in the panels are 24 px tall in 32 px rows: the dense layout of a design tool.
+pub const FIELD_H: f32 = 24.0;
+pub const LABELLED_FIELD_H: f32 = 24.0;
 pub const PAD: f32 = 16.0;
 
 /// What a numeric field's label shows: text ("X") or an icon with the field's name (for screen
@@ -789,7 +790,7 @@ fn segments(
     let t = Tokens::get(ui.ctx());
     let w = cell * names.len() as f32;
     let (rect, _) = ui.allocate_exact_size(vec2(w, FIELD_H), Sense::hover());
-    ui.painter().rect_filled(rect, CornerRadius::same(12), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(6), t.field);
     let mut out = None;
     for (i, name) in names.iter().enumerate() {
         let r = Rect::from_min_size(pos2(rect.min.x + i as f32 * cell, rect.min.y), vec2(cell, FIELD_H));
@@ -799,10 +800,10 @@ fn segments(
         }
         a11y::toggle(&resp, name, active == Some(i));
         if active == Some(i) {
-            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(10), t.panel);
-            ui.painter().rect_stroke(r.shrink(2.0), CornerRadius::same(10), Stroke::new(1.0, t.border), StrokeKind::Inside);
+            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(4), t.panel);
+            ui.painter().rect_stroke(r.shrink(2.0), CornerRadius::same(4), Stroke::new(1.0, t.border), StrokeKind::Inside);
         } else if resp.hovered() {
-            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(10), t.hover);
+            ui.painter().rect_filled(r.shrink(2.0), CornerRadius::same(4), t.hover);
         }
         paint(ui, r, i, active == Some(i), &t);
         if resp.clicked() {
@@ -1052,9 +1053,9 @@ pub fn button(ui: &mut Ui, label: &str, primary: bool, enabled: bool) -> Respons
         (true, false, false) => (Color32::TRANSPARENT, t.text),
         (true, false, true) => (t.hover, t.text),
     };
-    ui.painter().rect_filled(rect, CornerRadius::same(12), fill);
+    ui.painter().rect_filled(rect, CornerRadius::same(5), fill);
     if !primary {
-        ui.painter().rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0, t.border_strong), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, t.border_strong), StrokeKind::Inside);
     }
     ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, regular(11.0), text);
     resp

@@ -34,9 +34,9 @@ fn ui() -> (Ui, Kept) {
     (u, kept)
 }
 
-/// The visible edges of the floating panel cards, set back from the canvas by their 8 px margin.
+/// The visible edges of the side panels: docked against the canvas (no card margin).
 fn edges(u: &Ui) -> (f32, f32) {
-    const CARD_MARGIN: f32 = 8.0;
+    const CARD_MARGIN: f32 = 0.0;
     let hidden = u.app.session.ds().is_ok_and(|d| d.view.ui_hidden);
     let left_margin = if hidden || u.app.ui.left_collapsed { 0.0 } else { CARD_MARGIN };
     let right_margin = if hidden { 0.0 } else { CARD_MARGIN };
@@ -181,14 +181,14 @@ fn the_widths_come_back_with_the_preferences() {
     let mut u = Ui::new(s);
     u.frame(vec![]);
     assert_eq!(widths(&u), (360.0, 300.0));
-    assert_eq!(u.app.canvas.rect.width(), 1440.0 - 56.0 - 360.0 - 300.0, "the canvas between them (the icon rail is 56 wide)");
+    assert_eq!(u.app.canvas.rect.width(), 1440.0 - 360.0 - 300.0, "the canvas between them (no icon rail in the full editor)");
     // Widths from a damaged file are brought within the limits when drawn.
     let mut s = Session::new();
     s.prefs.panel_widths = (-5.0, f32::NAN);
     let mut u = Ui::new(s);
     u.frame(vec![]);
     let (left, right) = edges(&u);
-    assert_eq!((left, 1440.0 - right), (56.0 + *LEFT_PANEL.start() - 8.0, PANEL_DEFAULT - 8.0));
+    assert_eq!((left, 1440.0 - right), (*LEFT_PANEL.start(), PANEL_DEFAULT));
 }
 
 #[test]
@@ -209,7 +209,7 @@ fn minimize_ui_hides_the_panels_and_keeps_their_widths() {
     // The left sidebar alone: its edge goes with it, the right panel stays.
     u.app.run("view.leftSidebar", json!({}));
     u.frame(vec![]);
-    assert_eq!(edges(&u), (56.0, shown.1));
+    assert_eq!(edges(&u), (0.0, shown.1));
 }
 
 #[test]

@@ -52,9 +52,9 @@ pub struct Tokens {
 }
 
 /// Shared corner-radius tokens from the UI spec, in points.
-pub const PANEL_RADIUS: u8 = 20;
-pub const INPUT_RADIUS: u8 = 12;
-pub const NUMERIC_RADIUS: u8 = 8;
+pub const PANEL_RADIUS: u8 = 12;
+pub const INPUT_RADIUS: u8 = 5;
+pub const NUMERIC_RADIUS: u8 = 5;
 
 /// Light grayscale surface used for brand marks and canvas overlays on dark pages.
 pub const BRAND: Color32 = Color32::from_rgb(0xD8, 0xD8, 0xD8);
@@ -465,9 +465,9 @@ mod tests {
 
     #[test]
     fn ui_radius_tokens_match_the_reference_scale() {
-        assert_eq!(PANEL_RADIUS, 20);
-        assert_eq!(INPUT_RADIUS, 12);
-        assert_eq!(NUMERIC_RADIUS, 8);
+        assert_eq!(PANEL_RADIUS, 12);
+        assert_eq!(INPUT_RADIUS, 5);
+        assert_eq!(NUMERIC_RADIUS, 5);
         let light = visuals(Tokens::light());
         assert_eq!(light.window_corner_radius, egui::CornerRadius::same(PANEL_RADIUS));
         assert_eq!(light.menu_corner_radius, egui::CornerRadius::same(INPUT_RADIUS));
