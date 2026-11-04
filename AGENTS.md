@@ -26,11 +26,24 @@ upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 - Reference screenshots of the incumbent stay local under the gitignored `plan/figma/screenshots/`
   and are never committed, published or used as assets.
 
-### Assets: no third-party product iconography or images — ever (absolute rule from the project owner)
-- **Never add, copy, trace, redraw-from, embed or ship any icon, image, illustration, cursor, logo,
-  template, UI kit, preset library, font file or screenshot from Figma, Adobe, Avid, Autodesk or any
-  other product, or from any source whose licence doesn't allow it.** This includes "lookalike"
-  redraws of their icons. Breaking this rule is the worst thing you can do in this repo.
+### Assets: third-party product assets prohibited, except the owner's narrow Figma toolbar approval
+- **The sole product-icon exception is the project owner's explicit approval to copy only these
+  monochrome Figma editor toolbar glyphs: Move, Frame, Rectangle, Pen, Text, Comment, Actions/sparkle,
+  and Dev Mode/Code.** The permitted visual reference is the public toolbar image from Figma's
+  [Help Center article](https://help.figma.com/hc/en-us/articles/360041064174-Access-design-tools-from-the-toolbar),
+  identified in [`ATTRIBUTION.md`](ATTRIBUTION.md); use only the glyph paths, never the screenshot.
+  This is a narrow, user-authorized exception, not general permission to use Figma or other product
+  assets. Keep the glyph renderer monochrome.
+- **Do not claim these glyphs are CC BY 4.0.** Figma's Community guidance says free Community files
+  are CC BY 4.0, but the Figma UI3 kit listing has no license badge, and the cited Help Center
+  screenshot/article states no redistribution licence. Record this condition accurately in
+  [`ATTRIBUTION.md`](ATTRIBUTION.md); the source/licence status for these specific glyphs remains
+  unconfirmed.
+- Otherwise, never add, copy, trace, redraw-from, embed or ship any third-party icon, image,
+  illustration, cursor, logo, template, UI kit, preset library, font file or screenshot from Figma,
+  Adobe, Avid, Autodesk or another product, or from any source whose licence doesn't allow it. No
+  other product's iconography is permitted. Never inspect a logged-in app, proprietary app bundle or
+  private network traffic to obtain assets; the clean-room rules above still apply.
 - Every image, icon, font or other asset must be one of:
   - original work created for Undesign by a contributor (licensed MIT OR Apache-2.0);
   - OSI open source;
@@ -39,10 +52,10 @@ upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 - **Every asset file must have a row in [`ATTRIBUTION.md`](ATTRIBUTION.md)** (path, author, source,
   licence, notes). `cargo xtask assets` (part of `cargo xtask ci`) fails on any unlisted file under
   `assets/` or `docs/images/`.
-- The UI glyph set is drawn in code (`crates/ui-egui/src/icons.rs`) and adapted from FigCraft's
-  original icon artwork. Preserve the upstream FigCraft copyright and licence notices. The
-  Undesign `Logo` glyph is original. Do not add third-party icon packs or copy/trace icons from
-  Figma or another product; any new glyph must be designed from scratch.
+- The inherited UI glyph set is drawn in code (`crates/ui-egui/src/icons.rs`) and adapted from
+  FigCraft's original icon artwork. Preserve the upstream FigCraft copyright and licence notices.
+  The Undesign `Logo` glyph is original. Only the eight Figma editor toolbar glyphs named above may
+  use that user-authorized exception; all other new glyphs must be designed from scratch.
 - The app icon is a placeholder U mark drawn for Undesign (`assets/app-icon/README.md`);
   `cargo xtask icon` renders the PNGs and `.ico` from `assets/app-icon/undesign.svg`.
 - **Fonts live in [storytold/craft-fonts](https://github.com/storytold/craft-fonts), never in this

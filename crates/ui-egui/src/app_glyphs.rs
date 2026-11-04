@@ -1,8 +1,8 @@
-//! Original, code-drawn UI glyphs for the Undesign workspace shell and primary controls.
+//! Monochrome UI glyphs for the Undesign workspace shell and primary controls.
 //!
-//! These simple geometric marks follow a shared 24-unit grid, round-ended strokes and a consistent
-//! optical weight. They are drawn here from scratch; no product icon artwork or raster glyphs are
-//! embedded in this module.
+//! The inherited geometric marks follow a shared 24-unit grid, round-ended strokes and a consistent
+//! optical weight. The common toolbar marks use monochrome Figma editor glyph paths by explicit
+//! project-owner approval; `paint` still takes one color for the complete glyph.
 
 use egui::{Color32, CornerRadius, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, pos2};
 
@@ -29,6 +29,7 @@ pub enum Glyph {
     TextOnPath,
     Comment,
     Components,
+    Puzzle,
     Actions,
     Motion,
     Design,
@@ -91,6 +92,7 @@ impl Glyph {
         Glyph::TextOnPath,
         Glyph::Comment,
         Glyph::Components,
+        Glyph::Puzzle,
         Glyph::Actions,
         Glyph::Motion,
         Glyph::Design,
@@ -131,7 +133,7 @@ impl Glyph {
     ];
 }
 
-/// Map familiar control roles to this module's independently drawn glyphs.
+/// Map familiar control roles to the common monochrome glyphs in this module.
 /// Unmapped specialist icons can continue using the app's broader feature icon renderer.
 pub fn from_icon(icon: crate::icons::Icon) -> Option<Glyph> {
     use crate::icons::Icon as I;
@@ -200,7 +202,7 @@ pub fn from_icon(icon: crate::icons::Icon) -> Option<Glyph> {
     })
 }
 
-/// Draw an original glyph centred in `rect` using a uniform round-ended stroke.
+/// Draw a glyph centred in `rect` using a uniform monochrome round-ended stroke.
 pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
     let side = rect.width().min(rect.height());
     if side <= 0.0 {
@@ -250,7 +252,7 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
 
     use Glyph::*;
     match glyph {
-        Select => filled_poly(&[(5.0, 3.0), (5.0, 19.0), (9.2, 15.2), (12.7, 21.0), (15.5, 19.4), (12.0, 13.8), (19.0, 13.2)]),
+        Select => path(&[(5.0, 3.0), (19.0, 10.0), (13.2, 11.8), (17.0, 19.0), (14.5, 20.3), (10.7, 13.0), (5.0, 18.0), (5.0, 3.0)], true),
         Hand => path(
             &[
                 (7.0, 20.0),
@@ -280,10 +282,10 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
             path(&[(20.0, 16.0), (20.0, 20.0), (16.0, 20.0)], false);
         }
         Frame => {
-            for (x, y, sx, sy) in [(4.0, 9.0, 1.0, -1.0), (20.0, 9.0, -1.0, -1.0), (4.0, 15.0, 1.0, 1.0), (20.0, 15.0, -1.0, 1.0)] {
-                line((x, y), (x + sx * 5.0, y));
-                line((x, y), (x, y + sy * 5.0));
-            }
+            line((7.0, 3.0), (7.0, 21.0));
+            line((17.0, 3.0), (17.0, 21.0));
+            line((3.0, 7.0), (21.0, 7.0));
+            line((3.0, 17.0), (21.0, 17.0));
         }
         Section => {
             path(&[(5.0, 7.0), (5.0, 18.0), (19.0, 18.0), (19.0, 7.0), (13.0, 7.0), (11.0, 5.0), (6.0, 5.0), (5.0, 7.0)], true);
@@ -299,7 +301,7 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
             path(&[(19.0, 19.0), (15.0, 19.0)], false);
             path(&[(19.0, 19.0), (19.0, 15.0)], false);
         }
-        Rectangle => outline_rect((5.0, 5.0), (19.0, 19.0), 2.0),
+        Rectangle => outline_rect((5.0, 5.0), (19.0, 19.0), 1.5),
         Line => line((5.0, 19.0), (19.0, 5.0)),
         Arrow => {
             line((5.0, 19.0), (19.0, 5.0));
@@ -324,8 +326,8 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
             true,
         ),
         Pen => {
-            path(&[(12.0, 4.0), (18.0, 10.0), (10.0, 18.0), (6.0, 19.0), (7.0, 15.0), (12.0, 4.0)], true);
-            line((9.0, 13.0), (13.0, 17.0));
+            path(&[(5.0, 3.0), (14.5, 6.0), (19.5, 11.0), (12.0, 18.5), (8.0, 17.5), (5.0, 3.0)], true);
+            circle((13.0, 11.5), 1.7);
         }
         Pencil => {
             path(&[(6.0, 17.0), (16.0, 7.0), (19.0, 10.0), (9.0, 20.0), (6.0, 20.0), (6.0, 17.0)], true);
@@ -358,19 +360,49 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
             path(&[(4.0, 19.0), (8.0, 15.0), (12.0, 15.0), (16.0, 15.0), (20.0, 19.0)], false);
         }
         Comment => {
-            outline_rect((4.0, 5.0), (20.0, 17.0), 3.0);
-            path(&[(8.0, 17.0), (7.0, 20.0), (11.0, 17.0)], false);
-            line((8.0, 10.0), (16.0, 10.0));
-            line((8.0, 13.0), (13.0, 13.0));
+            circle((12.0, 11.0), 8.0);
+            path(&[(7.0, 17.0), (6.0, 20.0), (11.0, 18.0)], false);
         }
         Components | Assets => {
             for (x, y) in [(5.0, 5.0), (13.0, 5.0), (5.0, 13.0), (13.0, 13.0)] {
                 outline_rect((x, y), (x + 6.0, y + 6.0), 1.0);
             }
         }
+        Puzzle => path(
+            &[
+                (5.0, 5.0),
+                (9.0, 5.0),
+                (9.0, 3.5),
+                (11.0, 2.5),
+                (13.0, 3.5),
+                (13.0, 5.0),
+                (19.0, 5.0),
+                (19.0, 10.0),
+                (20.5, 10.0),
+                (21.5, 12.0),
+                (20.5, 14.0),
+                (19.0, 14.0),
+                (19.0, 19.0),
+                (14.0, 19.0),
+                (14.0, 17.5),
+                (12.0, 16.5),
+                (10.0, 17.5),
+                (10.0, 19.0),
+                (5.0, 19.0),
+                (5.0, 14.0),
+                (6.5, 14.0),
+                (7.5, 12.0),
+                (6.5, 10.0),
+                (5.0, 10.0),
+                (5.0, 5.0),
+            ],
+            true,
+        ),
         Actions => {
             path(&[(12.0, 3.0), (13.7, 9.5), (20.0, 12.0), (13.7, 13.7), (12.0, 20.0), (10.3, 13.7), (4.0, 12.0), (10.3, 9.5), (12.0, 3.0)], false);
-            dot((19.0, 5.0), 1.1);
+            circle((19.0, 5.0), 1.4);
+            line((18.0, 18.0), (22.0, 18.0));
+            line((20.0, 16.0), (20.0, 20.0));
         }
         Motion => {
             line((7.0, 4.0), (7.0, 20.0));
@@ -522,7 +554,7 @@ mod tests {
     use egui::vec2;
 
     #[test]
-    fn every_original_glyph_produces_a_shape() {
+    fn every_app_glyph_produces_a_shape() {
         let ctx = egui::Context::default();
         let mut failures = Vec::new();
         for &glyph in Glyph::ALL {
@@ -535,14 +567,23 @@ mod tests {
                 failures.push(format!("{glyph:?}"));
             }
         }
-        assert!(failures.is_empty(), "empty original glyphs: {failures:?}");
+        assert!(failures.is_empty(), "empty app glyphs: {failures:?}");
     }
 
     #[test]
-    fn mockup_primary_toolbar_roles_have_original_glyphs() {
+    fn approved_figma_toolbar_roles_map_to_the_expected_glyphs() {
         use crate::icons::Icon as I;
-        for icon in [I::Move, I::Frame, I::Rectangle, I::Pen, I::Text, I::Comment, I::Assets] {
-            assert!(from_icon(icon).is_some(), "missing clean-room glyph for {icon:?}");
+        for (icon, expected) in [
+            (I::Move, Glyph::Select),
+            (I::Frame, Glyph::Frame),
+            (I::Rectangle, Glyph::Rectangle),
+            (I::Pen, Glyph::Pen),
+            (I::Text, Glyph::Text),
+            (I::Comment, Glyph::Comment),
+            (I::Actions, Glyph::Actions),
+            (I::Code, Glyph::Code),
+        ] {
+            assert_eq!(from_icon(icon), Some(expected), "wrong glyph for {icon:?}");
         }
     }
 }

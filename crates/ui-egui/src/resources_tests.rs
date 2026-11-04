@@ -1,4 +1,4 @@
-//! The toolbar's Components button and Shift+I open the Assets panel (#710), from a collapsed
+//! The toolbar's Assets button and Shift+I open the Assets panel (#710), from a collapsed
 //! sidebar and from the version history too.
 
 use egui::accesskit::Role;
@@ -23,13 +23,13 @@ fn shift_i(u: &mut Ui) {
     u.frame(vec![]);
 }
 
-/// The middle of the toolbar's Components button, found in the AccessKit tree.
-fn components_button(u: &mut Ui) -> Pos2 {
+/// The middle of the toolbar's Assets button, found in the AccessKit tree.
+fn assets_button(u: &mut Ui) -> Pos2 {
     u.ctx.enable_accesskit();
     u.frame(vec![]);
     let out = u.frame_output(vec![]);
     let nodes = out.platform_output.accesskit_update.expect("an AccessKit update").nodes;
-    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == Role::Button && n.label() == Some("Components")).expect("Components");
+    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == Role::Button && n.label() == Some("Assets")).expect("Assets");
     let b = n.bounds().expect("bounds");
     pos2(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32)
 }
@@ -38,7 +38,7 @@ fn assets_shown(u: &Ui) -> bool {
     u.app.ui.left_tab == LeftTab::Assets && !u.app.ui.left_collapsed && !u.app.ui.versions.open
 }
 
-/// The three states the sidebar can be in when Components is asked for.
+/// The three states the sidebar can be in when Assets is asked for.
 fn starts() -> Vec<(&'static str, Ui)> {
     let shown = Ui::new(Session::new());
     let mut collapsed = Ui::new(Session::new());
@@ -49,9 +49,9 @@ fn starts() -> Vec<(&'static str, Ui)> {
 }
 
 #[test]
-fn the_components_button_opens_the_assets_panel() {
+fn the_assets_button_opens_the_assets_panel() {
     for (name, mut u) in starts() {
-        let at = components_button(&mut u);
+        let at = assets_button(&mut u);
         click(&mut u, at);
         assert!(assets_shown(&u), "{name}: the Assets panel is open");
     }

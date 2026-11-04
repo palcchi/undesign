@@ -35,13 +35,13 @@ fn board() -> Ui {
 
 /// The board toolbar pill on screen.
 fn pill(u: &Ui) -> Rect {
-    crate::toolbar::pill_rect(u.app.canvas.rect, crate::toolbar::bar_width(&u.app))
+    crate::toolbar::palette_pill_rect(&u.app)
 }
 
 /// The left edge of board toolbar group `i` (button 32 wide, a 10-wide caret after the groups with
-/// flyouts, 4 between): move, ink, sticky, shapes, connector, text, section, stamp, comment.
+/// flyouts, 4 between): move, ink, sticky, shapes, connector, text, section and stamp.
 fn group_x(u: &Ui, i: usize) -> f32 {
-    const WIDTHS: [f32; 9] = [46.0, 46.0, 46.0, 46.0, 36.0, 36.0, 36.0, 46.0, 36.0];
+    const WIDTHS: [f32; 8] = [46.0, 46.0, 46.0, 46.0, 36.0, 36.0, 36.0, 46.0];
     pill(u).min.x + 8.0 + WIDTHS.iter().take(i).sum::<f32>()
 }
 
@@ -211,14 +211,15 @@ fn the_next_sticky_from_the_keyboard_goes_on_typing() {
     assert_eq!(doc.node(owner).unwrap().transform.translation().x, 224.0);
 }
 
-/// The left panel's header names the file's kind under its name (Figma names the project
-/// there; Undesign has none), never the old "Drafts".
+/// The editor header shows the file name, not the old inline kind breadcrumb.
 #[test]
-fn the_left_header_names_the_files_kind() {
+fn the_editor_header_shows_the_file_name() {
     let mut u = Ui::new(Session::new());
+    let name = u.app.session.doc().unwrap().name.clone();
     let shapes = flat(&u.frame_output(vec![]).shapes);
-    assert!(has_text(&shapes, "Design") && !has_text(&shapes, "Drafts"), "a design file");
+    assert!(has_text(&shapes, &name), "design file name");
     let mut u = board();
+    let name = u.app.session.doc().unwrap().name.clone();
     let shapes = flat(&u.frame_output(vec![]).shapes);
-    assert!(has_text(&shapes, "Board") && !has_text(&shapes, "Drafts"), "a board file");
+    assert!(has_text(&shapes, &name), "board file name");
 }

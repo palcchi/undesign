@@ -143,24 +143,28 @@ fn dropping_layers_on_another_page_moves_them_there() {
     let p1 = u.app.session.page().unwrap();
     let p2 = id(u.app.session.execute("page.add", &json!({})).unwrap());
     u.app.session.execute("page.select", &json!({"id": p1})).unwrap();
+    u.app.ui.pages_open = false;
     u.frame(vec![]);
-    // Find Page 2's row in the Pages list: the click that switches to it.
-    let mut at = None;
-    for y in (90..400).step_by(4) {
-        let p = Pos2::new(150.0, y as f32);
-        u.button(p, true);
-        u.button(p, false);
-        if u.app.session.page().unwrap() == p2 {
-            // Rows are 32 high: aim at the middle, past the hit tolerance at its edge.
-            at = Some(p + vec2(0.0, 12.0));
-            u.app.session.execute("page.select", &json!({"id": p1})).unwrap();
-            u.frame(vec![]);
-            break;
-        }
-    }
-    let page_row = at.expect("page 2 row");
-    let r = u.row_at(rect);
-    u.drag_to(r, page_row);
+    // A drag over the Pages disclosure expands the section so its row can accept the layer drop.
+    let layer_row = u.row_at(rect);
+    u.ctx.enable_accesskit();
+    let nodes = u.frame_output(vec![]).platform_output.accesskit_update.unwrap().nodes;
+    let disclosure =
+        nodes.iter().map(|(_, node)| node).find(|node| node.role() == egui::accesskit::Role::Button && node.label() == Some("Pages")).unwrap();
+    let bounds = disclosure.bounds().unwrap();
+    let pages_header = Pos2::new(((bounds.x0 + bounds.x1) / 2.0) as f32, ((bounds.y0 + bounds.y1) / 2.0) as f32);
+    u.drag_to(layer_row, pages_header);
+    assert!(u.app.ui.pages_open, "hovering the disclosure during a layer drag expands Pages");
+    let page_name = u.app.session.doc().unwrap().node(p2).unwrap().name.clone();
+    let nodes = u.frame_output(vec![]).platform_output.accesskit_update.unwrap().nodes;
+    let row = nodes
+        .iter()
+        .map(|(_, node)| node)
+        .find(|node| node.role() == egui::accesskit::Role::ListBoxOption && node.label() == Some(page_name.as_str()))
+        .expect("Page 2 row");
+    let bounds = row.bounds().unwrap();
+    let page_row = Pos2::new(((bounds.x0 + bounds.x1) / 2.0) as f32, ((bounds.y0 + bounds.y1) / 2.0) as f32);
+    u.frame(vec![Event::PointerMoved(page_row)]);
     u.button(page_row, false);
     let doc = u.app.session.doc().unwrap();
     assert_eq!(doc.ancestors(rect).last().copied(), Some(p2), "moved to page 2");

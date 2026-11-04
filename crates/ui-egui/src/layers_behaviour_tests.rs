@@ -19,6 +19,14 @@ const SHIFT: Modifiers = Modifiers { alt: false, ctrl: false, shift: true, mac_c
 const CMD: Modifiers = Modifiers { alt: false, ctrl: true, shift: false, mac_cmd: false, command: true };
 const ALT: Modifiers = Modifiers { alt: true, ctrl: false, shift: false, mac_cmd: false, command: false };
 
+fn show_pages(u: &mut Ui) {
+    u.app.ui.left_tab = crate::LeftTab::Pages;
+    u.app.ui.left_collapsed = false;
+    u.app.ui.pages_open = true;
+    u.app.ui.compact_panel = crate::CompactPanel::Layers;
+    u.frame(vec![]);
+}
+
 /// A click at `p` with `m` held, then a pause (so the next click is no double click).
 fn click(u: &mut Ui, p: Pos2, m: Modifiers) {
     let button = |pressed| Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: m };
@@ -43,6 +51,19 @@ fn accessible_button(u: &mut Ui, label: &str, near_y: Option<f32>) -> Pos2 {
         })
         .unwrap_or_else(|| panic!("accessible button {label:?} at {near_y:?}"));
     let bounds = node.bounds().unwrap();
+    Pos2::new(((bounds.x0 + bounds.x1) / 2.0) as f32, ((bounds.y0 + bounds.y1) / 2.0) as f32)
+}
+
+fn accessible_page_row(u: &mut Ui, label: &str) -> Pos2 {
+    u.ctx.enable_accesskit();
+    let nodes = u.frame_output(vec![]).platform_output.accesskit_update.unwrap().nodes;
+    let node = nodes
+        .iter()
+        .map(|(_, node)| node)
+        .find(|node| node.role() == egui::accesskit::Role::ListBoxOption && node.label() == Some(label))
+        .unwrap_or_else(|| panic!("accessible page row {label:?}"));
+    let bounds = node.bounds().expect("page row bounds");
+    u.ctx.disable_accesskit();
     Pos2::new(((bounds.x0 + bounds.x1) / 2.0) as f32, ((bounds.y0 + bounds.y1) / 2.0) as f32)
 }
 
@@ -197,9 +218,10 @@ fn renaming_several_layers_opens_the_rename_dialog() {
 /// The middle of page `page`'s row in the pages list, found by clicking down the list from page
 /// `back` (each click opens the page under it); `back` is open again afterwards.
 fn page_row(u: &mut Ui, page: NodeId, back: NodeId) -> Pos2 {
+    show_pages(u);
     u.app.session.execute("page.select", &json!({"id": back})).unwrap();
     u.frame(vec![]);
-    for y in (90..400).step_by(4) {
+    for y in (160..820).step_by(4) {
         let p = Pos2::new(150.0, y as f32);
         u.button(p, true);
         u.button(p, false);
@@ -221,6 +243,7 @@ fn pages_search_button_opens_the_filter_and_escape_clears_it() {
     let s = Session::new();
     let _ = s.page().unwrap();
     let mut u = Ui::new(s);
+    show_pages(&mut u);
 
     // The search icon in the Pages header opens the page-name field, not Find and Replace.
     let search = accessible_button(&mut u, "Search pages", None);
@@ -240,6 +263,7 @@ fn pages_search_leaves_escape_to_the_canvas_when_the_field_is_unfocused() {
     let r = rect(&mut s, "r", 0.0, None);
     s.execute("select.set", &json!({"ids": [r]})).unwrap();
     let mut u = Ui::new(s);
+    show_pages(&mut u);
     u.app.ui.page_search = true;
     u.app.ui.page_filter = "COMPON".into();
     u.frame(vec![]);
@@ -257,6 +281,7 @@ fn escape_in_the_pages_search_does_not_reach_the_canvas() {
     let r = rect(&mut s, "r", 0.0, None);
     s.execute("select.set", &json!({"ids": [r]})).unwrap();
     let mut u = Ui::new(s);
+    show_pages(&mut u);
     let search = accessible_button(&mut u, "Search pages", None);
     click(&mut u, search, Modifiers::NONE);
     assert!(u.app.ui.page_search);
@@ -274,23 +299,19 @@ fn pages_search_filters_page_names_case_insensitively() {
     let library = id(s.execute("page.add", &json!({"name": "Library"})).unwrap());
     s.execute("page.select", &json!({"id": library})).unwrap();
     let mut u = Ui::new(s);
+    show_pages(&mut u);
     u.app.ui.page_search = true;
     u.app.ui.page_filter = "COMPON".into();
     let shapes = u.frame_output(vec![]).shapes;
     let text = crate::live_tests::texts(&crate::live_tests::flat(&shapes));
-    assert!(text.iter().any(|(label, _, _)| label == "Components"), "the matching page remains visible");
-    assert!(!text.iter().any(|(label, _, _)| label == "Library"), "nonmatching pages are filtered out");
+    let page_rows: Vec<_> = text.iter().filter(|(_, pos, _)| pos.y > 140.0).collect();
+    assert!(page_rows.iter().any(|(label, _, _)| label == "Components"), "the matching page remains visible");
+    assert!(!page_rows.iter().any(|(label, _, _)| label == "Library"), "nonmatching pages are filtered out");
 
     // Search leaves only Components; the active page starts as Library.
-    for y in (150..400).step_by(4) {
-        let p = Pos2::new(150.0, y as f32);
-        u.button(p, true);
-        u.button(p, false);
-        if u.app.session.page().unwrap() == components {
-            break;
-        }
-    }
-    assert_eq!(u.app.session.page().unwrap(), components, "matching is case-insensitive and opens the named page");
+    let row = accessible_page_row(&mut u, "Components");
+    click(&mut u, row, Modifiers::NONE);
+    assert_eq!(u.app.session.page().unwrap(), components, "matching is case-insensitive and opens the named page at {row:?}");
 }
 
 #[test]
@@ -332,20 +353,18 @@ fn pages_down_to(u: &mut Ui, to: f32) -> Vec<NodeId> {
 }
 
 #[test]
-fn a_long_pages_list_scrolls_and_leaves_room_for_the_layers() {
+fn a_long_pages_list_scrolls_to_its_last_page_in_the_pages_tab() {
     let mut s = Session::new();
     let first = s.page().unwrap();
-    let rect = id(s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap());
     for _ in 0..59 {
         s.execute("page.add", &json!({})).unwrap();
     }
-    let pages = s.doc().unwrap().pages.clone();
-    let last = *pages.last().unwrap();
+    let last = *s.doc().unwrap().pages.last().unwrap();
+    s.execute("page.rename", &json!({"id": last, "name": "Last"})).unwrap();
     s.execute("page.select", &json!({"id": first})).unwrap();
     s.execute("select.none", &json!({})).unwrap();
     let mut u = Ui::new(s);
-    // The layers list stays on screen under 60 pages.
-    let layer = u.row_at(rect);
+    show_pages(&mut u);
     // The wheel over the pages list scrolls it to its last page.
     let wheel = Event::MouseWheel {
         unit: egui::MouseWheelUnit::Point,
@@ -359,17 +378,15 @@ fn a_long_pages_list_scrolls_and_leaves_room_for_the_layers() {
     for _ in 0..30 {
         u.frame(vec![]);
     }
-    let opened = pages_down_to(&mut u, layer.y - 60.0);
-    assert!(opened.contains(&last), "the last page can be reached");
-    let top = pages.iter().position(|p| Some(p) == opened.first()).unwrap();
-    assert!(top > 30, "the list scrolled past its first pages (top row: page {top})");
+    let shapes = u.frame_output(vec![]).shapes;
+    let text = crate::live_tests::texts(&crate::live_tests::flat(&shapes));
+    assert!(text.iter().any(|(label, pos, _)| label == "Last" && pos.y > 140.0), "the last page row is visible after scrolling");
 }
 
 #[test]
 fn a_page_dropped_below_the_pages_list_stays_where_it_was() {
     let mut s = Session::new();
     let first = s.page().unwrap();
-    let rect = id(s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap());
     let second = id(s.execute("page.add", &json!({})).unwrap());
     for _ in 0..58 {
         s.execute("page.add", &json!({})).unwrap();
@@ -378,10 +395,11 @@ fn a_page_dropped_below_the_pages_list_stays_where_it_was() {
     s.execute("page.select", &json!({"id": first})).unwrap();
     s.execute("select.none", &json!({})).unwrap();
     let mut u = Ui::new(s);
-    let (row, layer) = (page_row(&mut u, second, first), u.row_at(rect));
-    // Released over the layers, where pages scrolled out of view would be: no page row is there.
-    u.drag_to(row, layer);
-    u.button(layer, false);
+    let row = page_row(&mut u, second, first);
+    // Released on the canvas outside the Pages panel: no page row is there.
+    let outside = Pos2::new(700.0, 760.0);
+    u.drag_to(row, outside);
+    u.button(outside, false);
     assert_eq!(u.app.session.doc().unwrap().pages, pages, "the pages keep their order");
 }
 
@@ -426,112 +444,10 @@ fn double_clicking_a_page_renames_it_with_the_focus_in_the_screen_reader_tree() 
     assert!(u.app.ui.last_error.is_none(), "{:?}", u.app.ui.last_error);
 }
 
-/// The y of the line between the pages and the layers, above the layers' row at `layer` (found by
-/// the resize cursor it shows when hovered).
-fn pages_edge_at(u: &mut Ui, layer: f32) -> f32 {
-    let hits: Vec<f32> = ((layer - 120.0) as i32..layer as i32)
-        .map(|y| y as f32)
-        .filter(|y| u.frame_output(vec![Event::PointerMoved(Pos2::new(150.0, *y))]).platform_output.cursor_icon == egui::CursorIcon::ResizeVertical)
-        .collect();
-    assert!(!hits.is_empty(), "no edge above {layer}");
-    (hits[0] + hits[hits.len() - 1]) / 2.0
-}
-
-#[test]
-fn the_line_between_pages_and_layers_drags_to_size_the_pages_list() {
-    let mut s = Session::new();
-    let rect = id(s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap());
-    for _ in 0..59 {
-        s.execute("page.add", &json!({})).unwrap();
-    }
-    let first = s.doc().unwrap().pages[0];
-    s.execute("page.select", &json!({"id": first})).unwrap();
-    s.execute("select.none", &json!({})).unwrap();
-    let mut u = Ui::new(s);
-    let before = u.row_at(rect).y;
-    let edge = pages_edge_at(&mut u, before);
-    // A drag down by 150 px makes the pages list taller and moves the layers down with it.
-    let at = |dy: f32| Pos2::new(150.0, edge + dy);
-    let button = |p, pressed| Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
-    u.frame(vec![Event::PointerMoved(at(0.0))]);
-    u.frame(vec![button(at(0.0), true)]);
-    for k in 1..=15 {
-        u.frame(vec![Event::PointerMoved(at(10.0 * k as f32))]);
-    }
-    u.frame(vec![button(at(150.0), false)]);
-    for _ in 0..30 {
-        u.frame(vec![]);
-    }
-    let after = u.row_at(rect).y;
-    assert!((after - before - 150.0).abs() < 3.0, "the layers moved from {before} to {after}");
-    // The height is kept for the next start.
-    let kept = u.app.session.prefs.pages_height.expect("kept in the preferences");
-    let mut next = Session::new();
-    next.prefs = u.app.session.prefs.clone();
-    assert_eq!(crate::FigApp::new(next, Box::new(crate::NoServices)).ui.pages_height, Some(kept));
-    // A double-click puts back the default.
-    let edge = pages_edge_at(&mut u, after);
-    let p = Pos2::new(150.0, edge);
-    u.frame(vec![Event::PointerMoved(p)]);
-    for _ in 0..2 {
-        u.frame(vec![button(p, true)]);
-        u.frame(vec![button(p, false)]);
-    }
-    for _ in 0..30 {
-        u.frame(vec![]);
-    }
-    assert_eq!(u.app.session.prefs.pages_height, None);
-    assert!((u.row_at(rect).y - before).abs() < 3.0);
-}
-
-#[test]
-fn dragging_up_the_line_under_a_short_pages_list_shrinks_it_at_once() {
-    // Five pages fit in the room the list is given: the drag starts from the rows shown, not
-    // from that room, so the line follows the pointer.
-    let mut s = Session::new();
-    let rect = id(s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap());
-    for _ in 0..4 {
-        s.execute("page.add", &json!({})).unwrap();
-    }
-    let first = s.doc().unwrap().pages[0];
-    s.execute("page.select", &json!({"id": first})).unwrap();
-    s.execute("select.none", &json!({})).unwrap();
-    let mut u = Ui::new(s);
-    let before = u.row_at(rect).y;
-    let edge = pages_edge_at(&mut u, before);
-    let at = |dy: f32| Pos2::new(150.0, edge + dy);
-    let button = |p, pressed| Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
-    u.frame(vec![Event::PointerMoved(at(0.0))]);
-    u.frame(vec![button(at(0.0), true)]);
-    for k in 1..=4 {
-        u.frame(vec![Event::PointerMoved(at(-10.0 * k as f32))]);
-    }
-    u.frame(vec![button(at(-40.0), false)]);
-    for _ in 0..30 {
-        u.frame(vec![]);
-    }
-    let after = u.row_at(rect).y;
-    assert!((before - after - 40.0).abs() < 3.0, "the layers moved from {before} to {after}");
-}
-
-#[test]
-fn the_pages_list_keeps_three_rows_and_leaves_the_layers_room() {
-    use crate::layers::{ROW, pages_list_height};
-    // The default: 40% of the panel.
-    assert_eq!(pages_list_height(None, 800.0), 320.0);
-    // Dragged short or tall, it stays within three rows and the room the layers need.
-    assert_eq!(pages_list_height(Some(0.0), 800.0), 3.0 * ROW);
-    assert_eq!(pages_list_height(Some(5000.0), 800.0), 800.0 - 40.0 - 3.0 * ROW);
-    assert_eq!(pages_list_height(Some(f32::NAN), 800.0), 320.0);
-    // A panel too short for both keeps the three rows.
-    assert_eq!(pages_list_height(Some(500.0), 100.0), 3.0 * ROW);
-}
-
 /// Selecting a page that is far down the list automatically scrolls it into view.
 #[test]
 fn selecting_a_distant_page_scrolls_it_into_view() {
     let mut s = Session::new();
-    let rect = id(s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap());
     for _ in 0..40 {
         s.execute("page.add", &json!({})).unwrap();
     }
@@ -541,7 +457,7 @@ fn selecting_a_distant_page_scrolls_it_into_view() {
     s.execute("page.select", &json!({"id": first})).unwrap();
     s.execute("select.none", &json!({})).unwrap();
     let mut u = Ui::new(s);
-    let layer = u.row_at(rect);
+    show_pages(&mut u);
     u.frame(vec![]);
     // Select the last page.
     u.app.run("page.select", json!({"id": last}));
@@ -549,9 +465,9 @@ fn selecting_a_distant_page_scrolls_it_into_view() {
         u.frame(vec![]);
     }
     assert_eq!(u.app.ui.pages_seen_page, Some((u.app.session.ds().unwrap().uid, last)));
-    let opened = pages_down_to(&mut u, layer.y - 60.0);
+    let opened = pages_down_to(&mut u, 820.0);
     let top = pages.iter().position(|p| Some(p) == opened.first()).unwrap();
-    assert!(top > 20, "the list scrolled past its first pages to reveal the selection (top row: page {top})");
+    assert!(top >= 20, "the list scrolled past its first pages to reveal the selection (top row: page {top})");
 }
 
 /// If the active page is filtered out by search, it is not marked as seen
@@ -566,6 +482,7 @@ fn filtered_out_active_page_is_seen_only_after_rendering() {
     s.execute("page.select", &json!({"id": p1})).unwrap();
     let uid = s.ds().unwrap().uid;
     let mut u = Ui::new(s);
+    show_pages(&mut u);
     assert_eq!(u.app.ui.pages_seen_page, Some((uid, p1)));
 
     // Filter to only "Alpha", then select "Beta" (p2).

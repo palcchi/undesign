@@ -1,4 +1,4 @@
-//! The right panel: Design, Prototype and Inspect tabs.
+//! The right panel: Design properties and context-selected workspace controls.
 
 use egui::{Align2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use serde_json::{Value, json};
@@ -79,33 +79,58 @@ impl FigApp {
     }
 }
 
-pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
+pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    let w = ui.available_width();
-    // Top bar: people (you and the others in a live session), present, share.
-    let (top, _) = ui.allocate_exact_size(vec2(w, 48.0), Sense::hover());
-    // As wide as its label needs (longer in some languages).
-    let label = ui.painter().layout_no_wrap(tr("Share").to_string(), semibold(11.5), t.accent_on);
-    let sw = (label.size().x + 24.0).max(56.0);
-    let share = Rect::from_min_size(pos2(top.max.x - 14.0 - sw, top.center().y - 16.0), vec2(sw, 32.0));
+    a11y::region(&mut app.ui.nav, ui, a11y::Region::Header, egui::accesskit::Role::Toolbar, tr("Top bar"));
+    let (top, _) = ui.allocate_exact_size(vec2(ui.available_width(), 48.0), Sense::hover());
+    ui.painter().line_segment([top.left_bottom(), top.right_bottom()], Stroke::new(1.0, t.border));
+
+    let share_label = ui.painter().layout_no_wrap(tr("Share").to_string(), semibold(11.5), t.accent_on);
+    let share_w = (share_label.size().x + 24.0).max(56.0);
+    let help = Rect::from_min_size(pos2(top.max.x - 10.0 - 28.0, top.center().y - 14.0), vec2(28.0, 28.0));
+    let zoom = Rect::from_min_size(pos2(help.min.x - 6.0 - 62.0, top.center().y - 14.0), vec2(62.0, 28.0));
+    let play = Rect::from_min_size(pos2(zoom.min.x - 6.0 - 42.0, top.center().y - 14.0), vec2(42.0, 28.0));
+    let share = Rect::from_min_size(pos2(play.min.x - 8.0 - share_w, top.center().y - 16.0), vec2(share_w, 32.0));
+
+    let file_left = top.min.x + 72.0;
+    let people_width = (share.min.x - file_left - 72.0).clamp(80.0, 112.0);
+    let people = Rect::from_min_size(pos2(share.min.x - 8.0 - people_width, top.min.y), vec2(people_width, top.height()));
+    let file_right = people.min.x - 8.0;
+    let slot_width = (file_right - file_left).clamp(64.0, 220.0);
+    let name_rect = Rect::from_min_size(pos2(file_left, top.center().y - 14.0), vec2((slot_width - 22.0).max(40.0), 28.0));
+    let (file_name, is_design) = app.session.doc().map(|doc| (doc.name.clone(), doc.kind.is_design())).unwrap_or_default();
+    let start = std::mem::take(&mut app.ui.rename_file);
+    if let (Some(new), _) = widgets::rename_field(ui, Id::new("filename"), &file_name, name_rect, semibold(11.5), start) {
+        app.run("file.rename", json!({"name": new}));
+    }
+    let file_menu = Rect::from_min_size(pos2(name_rect.max.x + 2.0, top.center().y - 12.0), vec2(20.0, 24.0));
+    let fresp = ui.interact(file_menu, ui.id().with("file_page_menu"), Sense::click());
+    a11y::menu_button(&fresp, tr("File and pages"), a11y::menu_open(&fresp));
+    if fresp.hovered() || fresp.has_focus() {
+        ui.painter().rect_filled(file_menu, CornerRadius::same(5), t.hover);
+    }
+    app_glyphs::paint(ui.painter(), Rect::from_center_size(file_menu.center(), vec2(12.0, 12.0)), Glyph::ChevronDown, t.icon_secondary);
+    file_page_menu(app, &fresp, is_design);
+
+    crate::live::people_bar(app, ui, people);
     let sresp = ui.interact(share, ui.id().with("share"), Sense::click()).tip(tr("Share: live session, export"));
+    a11y::button(&sresp, tr("Share"));
     ui.painter().rect_filled(share, CornerRadius::same(6), if sresp.hovered() { t.accent_hover } else { t.accent });
-    ui.painter().galley(share.center() - label.size() / 2.0, label, t.accent_on);
+    ui.painter().galley(share.center() - share_label.size() / 2.0, share_label, t.accent_on);
     crate::live::share_popover(app, &sresp);
-    // Play presents; its chevron opens the play menu (present, or preview in a pane).
-    let play = Rect::from_min_size(pos2(share.min.x - 50.0, top.center().y - 14.0), vec2(42.0, 28.0));
+
     let (tri_r, chev_r) =
         (Rect::from_min_max(play.min, pos2(play.max.x - 16.0, play.max.y)), Rect::from_min_max(pos2(play.max.x - 16.0, play.min.y), play.max));
     let present_keys = crate::toolbar::pretty_shortcut(crate::shortcuts::shortcut("proto.present").unwrap_or(""));
     let presp = ui.interact(tri_r, ui.id().with("play"), Sense::click()).tip(format!("{}  {present_keys}", tr("Present")));
+    a11y::button(&presp, tr("Present"));
     let mresp = ui.interact(chev_r, ui.id().with("play_menu"), Sense::click()).tip(tr("Present or preview"));
-    if presp.hovered() || mresp.hovered() {
+    a11y::menu_button(&mresp, tr("Present or preview"), a11y::menu_open(&mresp));
+    if presp.hovered() || mresp.hovered() || presp.has_focus() || mresp.has_focus() {
         ui.painter().rect_filled(play, CornerRadius::same(5), t.hover);
     }
-    let tri = Rect::from_center_size(play.center() - vec2(7.0, 0.0), vec2(16.0, 16.0));
-    app_glyphs::paint(ui.painter(), tri, Glyph::Play, t.icon);
+    app_glyphs::paint(ui.painter(), Rect::from_center_size(play.center() - vec2(7.0, 0.0), vec2(16.0, 16.0)), Glyph::Play, t.icon);
     app_glyphs::paint(ui.painter(), Rect::from_center_size(play.center() + vec2(12.0, 0.0), vec2(10.0, 10.0)), Glyph::ChevronDown, t.icon_secondary);
-    crate::live::people_bar(app, ui, Rect::from_min_max(pos2(top.min.x + 12.0, top.min.y), pos2(play.min.x - 6.0, top.max.y)));
     if presp.clicked() {
         app.run("proto.present", json!({}));
     }
@@ -120,59 +145,83 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
             ui.close();
         }
     });
-    // Reference layout: a 36px icon-and-label tab row, then a separate 32px zoom row. This also
-    // keeps the controls' hit regions distinct for keyboard focus and screen readers.
-    let (tabs, _) = ui.allocate_exact_size(vec2(w, 68.0), Sense::hover());
-    ui.painter().line_segment([tabs.left_top(), tabs.right_top()], Stroke::new(1.0, t.border));
-    let mut x = tabs.min.x + 6.0;
-    for (tab, icon, label) in [
-        (RightTab::Design, Glyph::Design, tr("Design")),
-        (RightTab::Prototype, Glyph::Prototype, tr("Prototype")),
-        (RightTab::Motion, Glyph::Motion, tr("Motion")),
-        (RightTab::Agent, Glyph::Agent, tr("Agent")),
-    ] {
-        let galley = ui.painter().layout_no_wrap(label.into(), semibold(9.5), t.text);
-        let r = Rect::from_min_size(pos2(x, tabs.min.y + 6.0), vec2(galley.size().x + 20.0, 24.0));
-        let resp = ui.interact(r, ui.id().with(("rtab", label)), Sense::click());
-        let active = app.ui.right_tab == tab;
-        a11y::tab(&resp, label, active);
-        if active {
-            ui.painter().rect_filled(r, CornerRadius::same(6), t.selected_row);
-            let indicator = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(10.0, 2.0));
-            ui.painter().rect_filled(indicator, CornerRadius::same(1), t.accent);
-        } else if resp.hovered() || resp.has_focus() {
-            ui.painter().rect_filled(r, CornerRadius::same(6), t.hover);
-        }
-        app_glyphs::paint(
-            ui.painter(),
-            Rect::from_center_size(pos2(r.min.x + 8.0, r.center().y), vec2(12.0, 12.0)),
-            icon,
-            if active { t.accent_text } else { t.icon_secondary },
-        );
-        ui.painter().galley(pos2(r.min.x + 16.0, r.center().y - galley.size().y / 2.0), galley, if active { t.text } else { t.text_secondary });
-        if resp.clicked() {
-            if tab == RightTab::Prototype && app.ui.right_tab != tab {
-                crate::proto_panel::open_editor(ui.ctx(), None);
+
+    zoom_menu(app, ui, zoom);
+    let hresp = ui.interact(help, ui.id().with("top_help"), Sense::click()).tip(tr("Help and resources"));
+    a11y::menu_button(&hresp, tr("Help and resources"), a11y::menu_open(&hresp));
+    if hresp.hovered() || hresp.has_focus() {
+        ui.painter().rect_filled(help, CornerRadius::same(5), t.hover);
+    }
+    icons::paint(ui.painter(), help.shrink(7.0), Icon::Help, t.icon);
+    menu_popup(&hresp).show(|ui| {
+        for (label, cmd) in [
+            (tr("Getting started"), "help.gettingStarted"),
+            (tr("Keyboard shortcuts"), "help.shortcuts"),
+            (tr("Help page"), "help.page"),
+            (tr("About Undesign"), "help.about"),
+        ] {
+            if menu_item(ui, label, crate::shortcuts::shortcut(cmd).unwrap_or("")) {
+                app.run(cmd, json!({}));
+                ui.close();
             }
-            app.ui.right_tab = tab;
         }
-        x = r.max.x + 1.0;
-    }
-    // Zoom menu.
+    });
+}
+
+fn file_page_menu(app: &mut FigApp, anchor: &egui::Response, is_design: bool) {
+    let pages = app
+        .session
+        .ds()
+        .map(|ds| {
+            ds.doc
+                .pages
+                .iter()
+                .filter(|id| !ds.doc.is_divider(**id))
+                .filter_map(|id| ds.doc.node(*id).map(|page| (*id, page.name.clone(), *id == ds.page)))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    menu_popup(anchor).width(220.0).show(|ui| {
+        if menu_item(ui, tr("Rename file"), "") {
+            crate::menus::invoke(app, "file.rename");
+            ui.close();
+        }
+        if !is_design {
+            return;
+        }
+        ui.separator();
+        for (id, name, selected) in &pages {
+            if menu_check(ui, *selected, name, "") && !selected {
+                app.ui.left_tab = crate::LeftTab::Layers;
+                app.ui.left_collapsed = false;
+                app.ui.pages_open = true;
+                app.run("page.select", json!({"id": id.0}));
+                ui.close();
+            }
+        }
+        ui.separator();
+        if menu_item(ui, tr("Add page"), "") {
+            crate::menus::invoke(app, "page.add");
+            app.ui.left_tab = crate::LeftTab::Layers;
+            app.ui.left_collapsed = false;
+            app.ui.pages_open = true;
+            ui.close();
+        }
+    });
+}
+
+fn zoom_menu(app: &mut FigApp, ui: &mut Ui, rect: Rect) {
+    let t = Tokens::get(ui.ctx());
     let zoom = app.session.ds().map(|d| d.view.zoom).unwrap_or(1.0);
-    let zr = Rect::from_min_size(pos2(tabs.max.x - 64.0, tabs.min.y + 38.0), vec2(56.0, 28.0));
-    let zresp = ui.interact(zr, ui.id().with("zoommenu"), Sense::click());
-    // The value is only spelled out while a screen reader reads the tree.
-    let value = if a11y::active(&zresp.ctx) { format!("{}%", (zoom * 100.0).round()) } else { String::new() };
-    a11y::combo(&zresp, tr("Zoom"), &value, a11y::menu_open(&zresp));
-    if zresp.hovered() {
-        ui.painter().rect_filled(zr, CornerRadius::same(5), t.hover);
+    let zresp = ui.interact(rect, ui.id().with("top_zoom"), Sense::click());
+    a11y::combo(&zresp, tr("Zoom"), &format!("{}%", (zoom * 100.0).round()), a11y::menu_open(&zresp));
+    if zresp.hovered() || zresp.has_focus() {
+        ui.painter().rect_filled(rect, CornerRadius::same(5), t.hover);
     }
-    // Use the same neutral selected-text token as other active controls.
-    ui.painter().text(pos2(zr.min.x + 6.0, zr.center().y), Align2::LEFT_CENTER, format!("{}%", (zoom * 100.0).round()), regular(11.0), t.accent_text);
+    ui.painter().text(pos2(rect.min.x + 7.0, rect.center().y), Align2::LEFT_CENTER, format!("{}%", (zoom * 100.0).round()), regular(11.0), t.text);
     app_glyphs::paint(
         ui.painter(),
-        Rect::from_center_size(pos2(zr.max.x - 9.0, zr.center().y), vec2(10.0, 10.0)),
+        Rect::from_center_size(pos2(rect.max.x - 9.0, rect.center().y), vec2(10.0, 10.0)),
         Glyph::ChevronDown,
         t.icon_secondary,
     );
@@ -200,40 +249,276 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
                 ui.close();
             }
         }
-        let toggles: [(&str, &str, bool); 5] = [
+        for (label, cmd, on) in [
             (tr("Pixel grid"), "view.pixelGrid", v.pixel_grid),
             (tr("Snap to pixel grid"), "view.snapPixel", v.snap_pixel),
             (tr("Layout grids"), "view.layoutGrids", v.layout_grids),
             (tr("Rulers"), "view.rulers", v.rulers),
             (tr("Outlines"), "view.outlines", v.outlines),
-        ];
-        for (label, cmd, on) in toggles {
+        ] {
             if menu_check(ui, on, label, crate::shortcuts::shortcut(cmd).unwrap_or("")) {
                 app.run(cmd, json!({}));
                 ui.close();
             }
         }
     });
+}
+
+pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let w = ui.available_width();
+    if app.ui.chat_open && app.ui.right_tab != RightTab::Design {
+        app.ui.chat_open = false;
+    }
+    let chat_view = app.ui.chat_open;
+    let header_h = if chat_view { 36.0 } else { 64.0 };
+    let (tabs, _) = ui.allocate_exact_size(vec2(w, header_h), Sense::hover());
+    ui.painter().line_segment([tabs.left_top(), tabs.right_top()], Stroke::new(1.0, t.border));
+    if chat_view {
+        let title = tr("Chat");
+        let galley = ui.painter().layout_no_wrap(title.into(), semibold(12.0), t.text);
+        app_glyphs::paint(ui.painter(), Rect::from_center_size(pos2(tabs.min.x + 18.0, tabs.center().y), vec2(14.0, 14.0)), Glyph::Comment, t.icon);
+        ui.painter().galley(pos2(tabs.min.x + 32.0, tabs.center().y - galley.size().y / 2.0), galley, t.text);
+        let close = Rect::from_center_size(pos2(tabs.max.x - 20.0, tabs.center().y), vec2(26.0, 26.0));
+        let response = ui.interact(close, ui.id().with("close_chat_history"), Sense::click()).tip(tr("Return to Design"));
+        a11y::button(&response, tr("Return to Design"));
+        if response.hovered() || response.has_focus() {
+            ui.painter().rect_filled(close, CornerRadius::same(5), t.hover);
+        }
+        icons::paint(ui.painter(), close.shrink(7.0), Icon::Close, t.icon);
+        if response.clicked() {
+            app.ui.chat_open = false;
+        }
+    } else {
+        workspace_header(app, ui, tabs);
+    }
     ui.painter().line_segment([tabs.left_bottom(), tabs.right_bottom()], Stroke::new(1.0, t.border));
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
-        if app.session.tool.tool == undesign_engine::ToolId::Comment {
-            crate::comments::panel(app, ui);
-            ui.add_space(80.0);
-            return;
-        }
-        match app.ui.right_tab {
-            // The Frame tool shows the frame presets.
-            RightTab::Design if app.session.tool.tool == undesign_engine::ToolId::Frame => crate::frame_presets::panel(app, ui),
-            RightTab::Design => design(app, ui),
-            RightTab::Prototype => crate::proto_panel::prototype(app, ui),
-            RightTab::Motion => crate::motion_panel::panel(app, ui),
-            RightTab::Agent => crate::agent_ui::panel(app, ui),
-            RightTab::Inspect => inspect(app, ui),
-        }
+        let opacity = panel_transition(app, ui);
+        ui.set_opacity(opacity);
+        ui.add_space((1.0 - opacity) * 8.0);
+        panel_body(app, ui);
         ui.add_space(80.0);
         a11y::scroll_focus(&mut app.ui.nav, ui);
     });
+}
+
+/// Three primary workspaces sit above their independent inspector controls. Prototype remains a
+/// Design-side tab; Agent stays reachable from the same panel without becoming a workspace mode.
+fn workspace_header(app: &mut FigApp, ui: &mut Ui, tabs: Rect) {
+    let t = Tokens::get(ui.ctx());
+    let state_accent = crate::motion_panel::motion_state_accent(&t);
+    let active_workspace = match app.ui.right_tab {
+        RightTab::Design | RightTab::Prototype => Some(RightTab::Design),
+        RightTab::Motion => Some(RightTab::Motion),
+        RightTab::Inspect => Some(RightTab::Inspect),
+        RightTab::Agent => None,
+    };
+    let modes = [
+        (RightTab::Design, tr("Design"), tr("Design workspace")),
+        (RightTab::Motion, tr("Motion"), tr("Motion workspace")),
+        (RightTab::Inspect, tr("Inspect"), tr("Inspect workspace")),
+    ];
+    let inset = 6.0;
+    let gap = 3.0;
+    let mode_w = ((tabs.width() - inset * 2.0 - gap * 2.0) / 3.0).max(52.0);
+    for (i, (mode, label, accessible_label)) in modes.into_iter().enumerate() {
+        let x = tabs.min.x + inset + i as f32 * (mode_w + gap);
+        let r = Rect::from_min_size(pos2(x, tabs.min.y + 4.0), vec2(mode_w, 28.0));
+        let active = active_workspace == Some(mode);
+        let resp = ui.interact(r, ui.id().with(("workspace-tab", label)), Sense::click());
+        a11y::tab(&resp, accessible_label, active);
+        if active {
+            ui.painter().rect_filled(r, CornerRadius::same(6), t.selected_row);
+            let indicator = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(12.0, 2.0));
+            ui.painter().rect_filled(indicator, CornerRadius::same(1), state_accent);
+        } else if resp.hovered() || resp.has_focus() {
+            ui.painter().rect_filled(r, CornerRadius::same(6), t.hover);
+        }
+        let galley = ui.painter().layout_no_wrap(
+            label.into(),
+            if active { semibold(11.0) } else { regular(11.0) },
+            if active { state_accent } else { t.text_secondary },
+        );
+        ui.painter().galley(
+            pos2(r.center().x - galley.size().x / 2.0, r.center().y - galley.size().y / 2.0),
+            galley,
+            if active { state_accent } else { t.text_secondary },
+        );
+        if resp.has_focus() {
+            ui.painter().rect_stroke(r, CornerRadius::same(6), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
+        }
+        if resp.clicked() {
+            app.ui.chat_open = false;
+            if mode != RightTab::Motion {
+                crate::motion_panel::cancel_keyframe_interaction(app);
+            }
+            match mode {
+                RightTab::Design => {
+                    app.ui.motion_timeline = false;
+                    app.ui.right_tab = RightTab::Design;
+                    app.ui.compact_panel = crate::CompactPanel::Design;
+                }
+                RightTab::Motion => {
+                    app.ui.right_tab = RightTab::Motion;
+                    app.ui.compact_panel = crate::CompactPanel::Motion;
+                    app.ui.motion_timeline = true;
+                }
+                RightTab::Inspect => {
+                    app.ui.motion_timeline = false;
+                    app.ui.right_tab = RightTab::Inspect;
+                    app.ui.compact_panel = crate::CompactPanel::Inspect;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let sub_y = tabs.min.y + 36.0;
+    let sub_h = 22.0;
+    match app.ui.right_tab {
+        RightTab::Design | RightTab::Prototype => {
+            let mut x = tabs.min.x + inset;
+            for (tab, label) in [(RightTab::Design, tr("Design")), (RightTab::Prototype, tr("Prototype"))] {
+                let galley = ui.painter().layout_no_wrap(label.into(), regular(10.0), t.text_secondary);
+                let r = Rect::from_min_size(pos2(x, sub_y), vec2(galley.size().x + 16.0, sub_h));
+                let active = app.ui.right_tab == tab;
+                let resp = ui.interact(r, ui.id().with(("inspector-tab", label)), Sense::click());
+                a11y::tab(&resp, label, active);
+                if active {
+                    ui.painter().rect_filled(r, CornerRadius::same(5), t.selected_row);
+                } else if resp.hovered() || resp.has_focus() {
+                    ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
+                }
+                ui.painter().galley(
+                    pos2(r.min.x + 8.0, r.center().y - galley.size().y / 2.0),
+                    galley,
+                    if active { state_accent } else { t.text_secondary },
+                );
+                if resp.has_focus() {
+                    ui.painter().rect_stroke(r, CornerRadius::same(5), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
+                }
+                if resp.clicked() {
+                    if tab == RightTab::Prototype && app.ui.right_tab != tab {
+                        crate::proto_panel::open_editor(ui.ctx(), None);
+                    }
+                    crate::motion_panel::cancel_keyframe_interaction(app);
+                    app.ui.chat_open = false;
+                    app.ui.motion_timeline = false;
+                    app.ui.right_tab = tab;
+                    app.ui.compact_panel = if tab == RightTab::Design { crate::CompactPanel::Design } else { crate::CompactPanel::Prototype };
+                }
+                x = r.max.x + 3.0;
+            }
+        }
+        RightTab::Motion => {
+            let label = tr("Timeline");
+            let r = Rect::from_min_size(pos2(tabs.min.x + inset, sub_y), vec2(78.0, sub_h));
+            let resp = ui.interact(r, ui.id().with("motion-timeline-toggle"), Sense::click());
+            a11y::toggle(&resp, label, app.ui.motion_timeline);
+            if app.ui.motion_timeline {
+                ui.painter().rect_filled(r, CornerRadius::same(5), t.selected_row);
+            } else if resp.hovered() || resp.has_focus() {
+                ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
+            }
+            if resp.has_focus() {
+                ui.painter().rect_stroke(r, CornerRadius::same(5), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
+            }
+            ui.painter().text(
+                r.center(),
+                Align2::CENTER_CENTER,
+                label,
+                regular(10.0),
+                if app.ui.motion_timeline { state_accent } else { t.text_secondary },
+            );
+            if resp.clicked() {
+                app.ui.motion_timeline = !app.ui.motion_timeline;
+            }
+        }
+        RightTab::Inspect => {}
+        RightTab::Agent => {}
+    }
+
+    let agent_label = tr("Agent");
+    let agent_active = app.ui.right_tab == RightTab::Agent;
+    let agent_galley = ui.painter().layout_no_wrap(agent_label.into(), regular(10.0), if agent_active { state_accent } else { t.text_secondary });
+    let agent_r = Rect::from_min_size(pos2(tabs.max.x - agent_galley.size().x - 28.0, sub_y), vec2(agent_galley.size().x + 22.0, sub_h));
+    let agent_resp = ui.interact(agent_r, ui.id().with("right-agent-tab"), Sense::click());
+    a11y::button(&agent_resp, agent_label);
+    if agent_active {
+        ui.painter().rect_filled(agent_r, CornerRadius::same(5), t.selected_row);
+    } else if agent_resp.hovered() || agent_resp.has_focus() {
+        ui.painter().rect_filled(agent_r, CornerRadius::same(5), t.hover);
+    }
+    if agent_resp.has_focus() {
+        ui.painter().rect_stroke(agent_r, CornerRadius::same(5), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
+    }
+    ui.painter().galley(
+        pos2(agent_r.min.x + 11.0, agent_r.center().y - agent_galley.size().y / 2.0),
+        agent_galley,
+        if agent_active { state_accent } else { t.text_secondary },
+    );
+    if agent_resp.clicked() {
+        crate::motion_panel::cancel_keyframe_interaction(app);
+        app.ui.chat_open = false;
+        app.ui.motion_timeline = false;
+        app.ui.right_tab = RightTab::Agent;
+        app.ui.compact_panel = crate::CompactPanel::Agent;
+    }
+}
+
+/// The narrow inspector uses its own full-width tab strip, so it needs only the active panel body.
+pub fn compact_panel(app: &mut FigApp, ui: &mut Ui) {
+    if app.ui.chat_open && app.ui.right_tab != RightTab::Design {
+        app.ui.chat_open = false;
+    }
+    egui::ScrollArea::vertical().id_salt("compact-right-content").auto_shrink([false, false]).show(ui, |ui| {
+        ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+        let opacity = panel_transition(app, ui);
+        ui.set_opacity(opacity);
+        ui.add_space((1.0 - opacity) * 8.0);
+        panel_body(app, ui);
+        ui.add_space(24.0);
+        a11y::scroll_focus(&mut app.ui.nav, ui);
+    });
+}
+
+/// Fade and lift the current panel body when its workspace changes; the same scroll region remains
+/// mounted, so the right pane never flashes empty or jumps to a different surface.
+fn panel_transition(app: &FigApp, ui: &Ui) -> f32 {
+    let target = if app.ui.chat_open {
+        5.0
+    } else {
+        match app.ui.right_tab {
+            RightTab::Design => 0.0,
+            RightTab::Prototype => 1.0,
+            RightTab::Inspect => 2.0,
+            RightTab::Motion => 3.0,
+            RightTab::Agent => 4.0,
+        }
+    };
+    let current = ui.ctx().animate_value_with_time(Id::new("right-panel-transition"), target, 0.18);
+    (1.0 - (target - current).abs().min(1.0)).clamp(0.0, 1.0)
+}
+
+fn panel_body(app: &mut FigApp, ui: &mut Ui) {
+    if app.ui.chat_open && app.ui.right_tab == RightTab::Design {
+        crate::comments::chat_panel(app, ui);
+        return;
+    }
+    if app.session.tool.tool == undesign_engine::ToolId::Comment {
+        crate::comments::panel(app, ui);
+        return;
+    }
+    match app.ui.right_tab {
+        RightTab::Design if app.session.tool.tool == undesign_engine::ToolId::Frame => crate::frame_presets::panel(app, ui),
+        RightTab::Design => design(app, ui),
+        RightTab::Prototype => crate::proto_panel::prototype(app, ui),
+        RightTab::Motion => crate::motion_panel::panel(app, ui),
+        RightTab::Agent => crate::agent_ui::panel(app, ui),
+        RightTab::Inspect => inspect(app, ui),
+    }
 }
 
 /// The smallest width a popup menu is measured in (see [`menu_popup`]).
@@ -429,7 +714,7 @@ fn page_section(app: &mut FigApp, ui: &mut Ui, doc: &Document) {
     let mut new_hex = None;
     row(ui, 32.0, |ui| {
         let p = Paint::solid(bg);
-        if widgets::swatch(ui, &p, 16.0).clicked() {
+        if widgets::swatch(ui, &p, 20.0).clicked() {
             open_picker = true;
         }
         if let Some(h) = widgets::text_field(ui, Id::new("pagebg"), &bg.to_hex(), 96.0, "") {
@@ -473,9 +758,11 @@ fn page_section(app: &mut FigApp, ui: &mut Ui, doc: &Document) {
         }
     });
     widgets::separator(ui);
-    widgets::section_header(ui, tr("Local styles"), &[], undesign_engine::library::local_styles(doc).next().is_none());
-    crate::style_picker::local_styles(app, ui, doc);
-    widgets::separator(ui);
+    if undesign_engine::library::local_styles(doc).next().is_some() {
+        widgets::section_header(ui, tr("Local styles"), &[], false);
+        crate::style_picker::local_styles(app, ui, doc);
+        widgets::separator(ui);
+    }
     crate::export_panel::page_section(app, ui, doc, page);
 }
 
@@ -1737,7 +2024,8 @@ fn fx_field(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, prop: &str,
 }
 
 fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &Effect) {
-    let half = (ui.available_width() - PAD * 2.0 - 8.0) / 2.0;
+    // The floating panel card already contributes its outer gutter; reserve one inner PAD plus the column gap.
+    let half = (ui.available_width() - PAD - 8.0) / 2.0;
     let set = |app: &mut FigApp, e2: Effect, scrub: Option<bool>| {
         let p = json!({"ids": ids, "index": i, "effect": e2});
         match scrub {
@@ -2265,6 +2553,8 @@ fn inspect_assets(app: &mut FigApp, ui: &mut Ui, assets: &[undesign_engine::devi
 /// the selected layer, or the list of what's ready for dev.
 fn inspect(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
+    widgets::note(ui, tr("Read-only"), t.text_secondary);
+    ui.add_space(4.0);
     let Ok(ds) = app.session.ds() else { return };
     let doc = ds.doc.clone();
     let sel = ds.selection.clone();

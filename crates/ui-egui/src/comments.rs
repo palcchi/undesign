@@ -1007,6 +1007,142 @@ pub fn keys(app: &mut FigApp, ctx: &egui::Context) {
     }
 }
 
+/// Comment threads as a shared conversation history, opened from the Chat rail action.
+pub fn chat_panel(app: &mut FigApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let Ok(doc) = app.session.ds().map(|ds| ds.doc.clone()) else {
+        ui.add_space(16.0);
+        ui.label(egui::RichText::new(tr("Chat is available in design files.")).font(regular(12.0)).color(t.text_secondary));
+        return;
+    };
+    let me = me(app);
+    ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        ui.label(egui::RichText::new(tr("Comment history")).font(semibold(12.0)).color(t.text));
+    });
+    ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        let w = ui.available_width() - 16.0;
+        if let Some(search) = crate::widgets::text_field(ui, Id::new("chat_comment_search"), &app.ui.comments.search, w, tr("Search comments")) {
+            app.ui.comments.search = search;
+        }
+    });
+    ui.add_space(8.0);
+
+    let search = app.ui.comments.search.clone();
+    let query = Query { page: None, frame: None, filter: Filter::All, sort: Sort::Date, text: &search };
+    let mut threads = cc::query(&doc, &query, &me);
+    threads.reverse();
+    if threads.is_empty() {
+        let has_comments = doc.comments.iter().any(|c| doc.pages.contains(&c.page));
+        let (title, detail) = if has_comments {
+            (tr("No matching comments"), tr("Try another search."))
+        } else {
+            (tr("No comments yet"), tr("Use Comment in the toolbar to start a conversation on the canvas."))
+        };
+        ui.add_space(24.0);
+        ui.vertical_centered(|ui| {
+            ui.label(egui::RichText::new(title).font(semibold(12.0)).color(t.text_secondary));
+            ui.add_space(4.0);
+            ui.label(egui::RichText::new(detail).font(regular(11.0)).color(t.text_tertiary));
+        });
+        return;
+    }
+
+    let mut go = None;
+    egui::ScrollArea::vertical().id_salt("chat_comment_history").stick_to_bottom(true).auto_shrink([false, false]).show(ui, |ui| {
+        for c in threads {
+            ui.add_space(8.0);
+            let page_name = doc.node(c.page).map(|n| n.name.clone()).unwrap_or_default();
+            let frame_id = cc::frame_of(&doc, c);
+            let frame_name = frame_id.and_then(|id| doc.node(id)).map(|n| n.name.clone());
+            let anchor_name = c.anchor.and_then(|id| doc.node(id)).map(|n| n.name.clone());
+            let location = match (anchor_name, frame_name, frame_id) {
+                (Some(anchor), Some(frame), Some(frame_id)) if c.anchor != Some(frame_id) => format!("{page_name} · {frame} / {anchor}"),
+                (Some(anchor), _, _) => format!("{page_name} · {anchor}"),
+                (None, Some(frame), _) => format!("{page_name} · {frame}"),
+                _ => page_name,
+            };
+            let short_location =
+                if location.chars().count() > 34 { format!("{}…", location.chars().take(33).collect::<String>()) } else { location.clone() };
+            ui.horizontal(|ui| {
+                ui.add_space(14.0);
+                let target = ui
+                    .add(
+                        egui::Button::new(egui::RichText::new(short_location).font(semibold(10.5)).color(t.text_secondary))
+                            .fill(t.field)
+                            .stroke(Stroke::new(1.0, t.border))
+                            .corner_radius(CornerRadius::same(6)),
+                    )
+                    .on_hover_text(location.clone())
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                crate::a11y::button(&target, &location);
+                if target.clicked() {
+                    go = Some(c.id);
+                }
+                if c.resolved {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new(tr("Resolved")).font(regular(10.5)).color(t.text_tertiary));
+                }
+                if c.is_unread(&me) {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new(tr("Unread")).font(semibold(10.5)).color(t.accent_text));
+                }
+            });
+            for (index, message) in c.messages().enumerate() {
+                let width = ui.available_width();
+                let bubble_w = (width - 48.0).clamp(120.0, 360.0).min(width);
+                let text_w = (bubble_w - 24.0).max(72.0);
+                let body = ui.painter().layout(message.text.clone(), regular(12.0), t.text, text_w);
+                let lines = body.rows.len().max(1) as f32;
+                let bubble_h = 42.0 + 16.0 * lines;
+                let (row, _) = ui.allocate_exact_size(vec2(width, bubble_h + 4.0), Sense::hover());
+                let response =
+                    ui.interact(row, Id::new(("chat_comment_message", c.id, index)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+                let label = format!("{}: {}", message.author, message.text);
+                crate::a11y::button(&response, &label);
+                let own = message.author == me;
+                let bubble_left = if own { row.max.x - bubble_w - 34.0 } else { row.min.x + 34.0 };
+                let bubble = Rect::from_min_size(pos2(bubble_left, row.min.y + 1.0), vec2(bubble_w, bubble_h));
+                let fill = if response.hovered() {
+                    t.hover
+                } else if own {
+                    t.selected_row
+                } else {
+                    t.field
+                };
+                ui.painter().rect_filled(bubble, CornerRadius::same(10), fill);
+                let avatar_at = if own { pos2(row.max.x - 16.0, bubble.min.y + 18.0) } else { pos2(row.min.x + 16.0, bubble.min.y + 18.0) };
+                avatar(ui.painter(), avatar_at, 12.0, &message.author);
+                ui.painter().text(pos2(bubble.min.x + 12.0, bubble.min.y + 13.0), Align2::LEFT_CENTER, &message.author, semibold(11.0), t.text);
+                ui.painter().text(
+                    pos2(bubble.max.x - 12.0, bubble.min.y + 13.0),
+                    Align2::RIGHT_CENTER,
+                    ago(message.created),
+                    regular(10.0),
+                    t.text_tertiary,
+                );
+                let text_rect = Rect::from_min_size(pos2(bubble.min.x + 12.0, bubble.min.y + 28.0), vec2(text_w, 16.0 * lines));
+                ui.painter().with_clip_rect(text_rect).galley(text_rect.min, body, t.text);
+                if response.clicked() {
+                    go = Some(c.id);
+                }
+            }
+            ui.add_space(6.0);
+        }
+    });
+    if let Some(id) = go {
+        app.run("comment.open", json!({"id": id, "view": "center"}));
+    }
+    if let Some(id) = app.ui.comments.open.filter(|id| doc.comment(*id).is_some()) {
+        let bounds = app.canvas.rect;
+        let ctx = ui.ctx().clone();
+        thread(app, &ctx, id, bounds.center(), bounds);
+    }
+}
+
 /// The Comments panel (right side, Comment tool).
 pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());

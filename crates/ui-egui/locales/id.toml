@@ -63,6 +63,7 @@ status = "draft — needs native review"
 "Add new page" = "Tambah halaman baru"
 "Add or update collections from a variables JSON" = "Tambah atau perbarui koleksi dari JSON variabel"
 "Add properties to make instances configurable" = "Tambahkan properti agar instance dapat dikonfigurasi"
+"Add property" = "Tambah properti"
 "Add reaction" = "Tambah reaksi"
 "Add starting point" = "Tambah titik awal"
 "Add stroke" = "Tambah stroke"
@@ -279,6 +280,7 @@ status = "draft — needs native review"
 "Column span" = "Rentang kolom"
 "Columns" = "Kolom"
 "Columns {count}" = "Kolom {count}"
+"Chat" = "Chat"
 "Comment" = "Komentar"
 "Comments" = "Komentar"
 "Commits" = "Commit"
@@ -829,6 +831,7 @@ status = "draft — needs native review"
 "Moved to {name}" = "Dipindahkan ke {name}"
 "Multi" = "Multi"
 "Multiply" = "Multiply"
+"Mute track" = "Bisukan track"
 "Muted" = "Dibisukan"
 "Name" = "Nama"
 "Name (A–Z)" = "Nama (A–Z)"
@@ -1473,6 +1476,7 @@ status = "draft — needs native review"
 "Union" = "Gabungkan"
 "Unions" = "Gabungan"
 "Unknown — treated as sRGB" = "Tidak diketahui — dianggap sRGB"
+"Unmute track" = "Bunyikan track"
 "Unread" = "Belum dibaca"
 "Unresolve" = "Buka kembali"
 "Unsaved changes" = "Perubahan belum disimpan"
@@ -1747,6 +1751,7 @@ status = "draft — needs native review"
 "{n} hours ago" = { other = "{n} jam lalu" }
 "{n} instances" = { other = "{n} instance" }
 "{n} layers" = { other = "{n} layer" }
+"{n} layers locked" = { other = "{n} layer terkunci" }
 "{n} layers as one file" = { other = "{n} layer sebagai satu file" }
 "{n} layers selected" = { other = "{n} layer dipilih" }
 "{n} layers · {parts}" = { other = "{n} layer · {parts}" }
@@ -1763,6 +1768,7 @@ status = "draft — needs native review"
 "{n} rows" = { other = "{n} baris" }
 "{n} styles" = { other = "{n} gaya" }
 "{n} text layers" = { other = "{n} layer teks" }
+"{n} tracks" = { other = "{n} track" }
 "{n} variables" = { other = "{n} variabel" }
 "{n} weeks ago" = { other = "{n} minggu lalu" }
 "{n} years ago" = { other = "{n} tahun lalu" }
@@ -1790,6 +1796,41 @@ status = "draft — needs native review"
 "⌘ click" = "⌘ klik"
 "⌘ scroll" = "⌘ gulir"
 "⌥ drag" = "⌥ seret"
+"Add page" = "Tambah halaman"
+"Chat is available in design files." = "Chat tersedia di file desain."
+"Comment history" = "Riwayat komentar"
+"File and pages" = "File dan halaman"
+"Rename file" = "Ganti nama file"
+"Return to Design" = "Kembali ke Desain"
+"Top bar" = "Bilah atas"
+"Try another search." = "Coba pencarian lain."
+"Use Comment in the toolbar to start a conversation on the canvas." = "Gunakan Komentar di toolbar untuk memulai percakapan di kanvas."
+
+# Motion workspace and keyframe inspector
+"Add keyframe" = "Tambah keyframe"
+"Agent" = "Agen"
+"Collapse layer" = "Ciutkan layer"
+"Delete keyframe" = "Hapus keyframe"
+"Design workspace" = "Ruang kerja Desain"
+"Drag to move; Delete removes" = "Seret untuk memindahkan; Delete menghapus"
+"Ease In" = "Masuk perlahan"
+"Ease In & Out" = "Masuk dan keluar perlahan"
+"Ease Out" = "Keluar perlahan"
+"Expand layer" = "Perluas layer"
+"Hold/Step" = "Tahan/Langkah"
+"Inspect workspace" = "Ruang kerja Inspeksi"
+"Interpolation" = "Interpolasi"
+"Keyframe" = "Keyframe"
+"Motion" = "Motion"
+"Motion workspace" = "Ruang kerja Motion"
+"Read-only" = "Hanya baca"
+"Remove animation for this property" = "Hapus animasi untuk properti ini"
+"Select a keyframe in the timeline to edit its value" = "Pilih keyframe di timeline untuk mengedit nilainya"
+"Select a track or keyframe in the timeline" = "Pilih track atau keyframe di timeline"
+"Select {name}" = "Pilih {name}"
+"Select {property} track" = "Pilih track {property}"
+"Timeline" = "Timeline"
+"{property} keyframe at frame {frame}" = "Keyframe {property} pada frame {frame}"
 
 [commands]
 "align.bottom" = "Ratakan bawah"

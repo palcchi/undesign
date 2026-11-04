@@ -257,7 +257,7 @@ use std::sync::Arc;
 use std::task::{Context as TaskContext, Poll, Wake, Waker};
 
 use serde_json::{Value, json};
-use undesign_doc::{AnimatedProperty, NodeId};
+use undesign_doc::NodeId;
 use undesign_engine::Session;
 
 pub use control::{ControlReply, ControlRequest};
@@ -448,9 +448,23 @@ pub enum RightTab {
     Agent,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum CompactPanel {
+    Layers,
+    Assets,
+    #[default]
+    Design,
+    Prototype,
+    Inspect,
+    Motion,
+    Agent,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum LeftTab {
     File,
+    Pages,
+    Layers,
     Assets,
 }
 
@@ -524,6 +538,105 @@ pub fn fit_panels(avail: f32, left: Option<f32>, right: Option<f32>) -> (f32, f3
     (left.map_or(0.0, |l| fit(l, &LEFT_PANEL, avail - right - CANVAS_MIN)), right)
 }
 
+fn compact_inspector(app: &mut FigApp, ui: &mut egui::Ui) {
+    let tabs = [
+        (CompactPanel::Layers, i18n::tr("Layers")),
+        (CompactPanel::Assets, i18n::tr("Assets")),
+        (CompactPanel::Design, i18n::tr("Design")),
+        (CompactPanel::Motion, i18n::tr("Motion")),
+        (CompactPanel::Inspect, i18n::tr("Inspect")),
+        (CompactPanel::Prototype, i18n::tr("Prototype")),
+        (CompactPanel::Agent, i18n::tr("Agent")),
+    ];
+    egui::ScrollArea::horizontal().id_salt("compact-panel-tabs").show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            for (panel, label) in tabs {
+                let active = app.ui.compact_panel == panel;
+                let response = ui.add_sized(egui::vec2(76.0, 44.0), egui::Button::selectable(active, label));
+                a11y::tab(&response, label, active);
+                if !response.clicked() {
+                    continue;
+                }
+                app.ui.compact_panel = panel;
+                match panel {
+                    CompactPanel::Layers => {
+                        app.ui.left_tab = LeftTab::File;
+                        app.ui.left_collapsed = false;
+                        app.ui.versions = Default::default();
+                    }
+                    CompactPanel::Assets => {
+                        app.ui.left_tab = LeftTab::Assets;
+                        app.ui.left_collapsed = false;
+                        app.ui.versions = Default::default();
+                    }
+                    CompactPanel::Design => {
+                        crate::motion_panel::cancel_keyframe_interaction(app);
+                        app.ui.motion_timeline = false;
+                        app.ui.right_tab = RightTab::Design;
+                    }
+                    CompactPanel::Prototype => {
+                        crate::motion_panel::cancel_keyframe_interaction(app);
+                        app.ui.motion_timeline = false;
+                        if app.ui.right_tab != RightTab::Prototype {
+                            crate::proto_panel::open_editor(ui.ctx(), None);
+                        }
+                        app.ui.right_tab = RightTab::Prototype;
+                    }
+                    CompactPanel::Inspect => {
+                        crate::motion_panel::cancel_keyframe_interaction(app);
+                        app.ui.motion_timeline = false;
+                        app.ui.right_tab = RightTab::Inspect;
+                    }
+                    CompactPanel::Motion => {
+                        app.ui.right_tab = RightTab::Motion;
+                        app.ui.motion_timeline = true;
+                    }
+                    CompactPanel::Agent => {
+                        crate::motion_panel::cancel_keyframe_interaction(app);
+                        app.ui.motion_timeline = false;
+                        app.ui.right_tab = RightTab::Agent;
+                    }
+                }
+            }
+        });
+    });
+    ui.separator();
+    if app.ui.compact_panel == CompactPanel::Motion {
+        ui.horizontal(|ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let label = i18n::tr("Timeline");
+                if widgets::button(ui, label, app.ui.motion_timeline, true).clicked() {
+                    app.ui.motion_timeline = !app.ui.motion_timeline;
+                }
+            });
+        });
+    }
+    match app.ui.compact_panel {
+        CompactPanel::Layers | CompactPanel::Assets => {
+            let label = match app.ui.compact_panel {
+                CompactPanel::Layers => i18n::tr("Layers"),
+                CompactPanel::Assets => i18n::tr("Assets"),
+                _ => i18n::tr("Layers"),
+            };
+            a11y::region(&mut app.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
+            layers::compact_left_panel(app, ui);
+        }
+        CompactPanel::Design | CompactPanel::Prototype | CompactPanel::Inspect | CompactPanel::Motion | CompactPanel::Agent => {
+            let label = match app.ui.compact_panel {
+                CompactPanel::Design => i18n::tr("Design"),
+                CompactPanel::Prototype => i18n::tr("Prototype"),
+                CompactPanel::Inspect => i18n::tr("Inspect"),
+                CompactPanel::Motion => i18n::tr("Motion"),
+                CompactPanel::Agent => i18n::tr("Agent"),
+                CompactPanel::Layers | CompactPanel::Assets => i18n::tr("Layers"),
+            };
+            a11y::region(&mut app.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
+            right::compact_panel(app, ui);
+        }
+    }
+}
+
 /// UI-only state (serialisable for `ui.inspect`).
 pub struct UiState {
     /// The widths asked for the side panels (a drag of their edge; [`fit_panels`] gives what a
@@ -531,13 +644,15 @@ pub struct UiState {
     pub left_width: f32,
     pub right_width: f32,
     pub right_tab: RightTab,
+    /// The Chat destination presents anchored comment threads as one conversation history.
+    pub chat_open: bool,
+    /// The panel shown below the canvas in a narrow browser window.
+    pub compact_panel: CompactPanel,
     /// Prompt-to-command Agent panel state.
     pub agent: agent_panel::AgentUi,
     /// Motion Studio timeline selection and playhead state.
     pub motion_composition: Option<u64>,
     pub motion_frame: u32,
-    pub motion_property: AnimatedProperty,
-    pub motion_value: f64,
     /// Playback runs (the Motion panel advances the playhead and asks for repaints).
     pub motion_playing: bool,
     /// Fractional frames banked while playing (frame-accurate advance at any fps).
@@ -550,6 +665,10 @@ pub struct UiState {
     pub motion_ppf: Option<f32>,
     /// Selected keyframe (track, frame) for delete and drag.
     pub motion_selected: Option<(u64, u32)>,
+    /// Active track for keyframe insertion and the Motion inspector.
+    pub motion_active_track: Option<u64>,
+    /// Keyframe value scrub currently grouped into one undoable interaction.
+    pub motion_keyframe_interaction: Option<(u64, u32)>,
     /// Keyframe drag in progress (track, from-frame).
     pub motion_drag: Option<(u64, u32)>,
     /// The Motion timeline docked along the bottom (`motion.timeline`).
@@ -744,21 +863,23 @@ impl Default for UiState {
             left_width: PANEL_DEFAULT,
             right_width: PANEL_DEFAULT,
             right_tab: RightTab::Design,
+            chat_open: false,
+            compact_panel: CompactPanel::Design,
             agent: agent_panel::AgentUi::default(),
             motion_composition: None,
             motion_frame: 0,
-            motion_property: AnimatedProperty::PositionX,
-            motion_value: 0.0,
             motion_playing: false,
             motion_play_acc: 0.0,
             motion_play_last: 0.0,
             motion_closed: BTreeSet::new(),
             motion_ppf: None,
             motion_selected: None,
+            motion_active_track: None,
+            motion_keyframe_interaction: None,
             motion_drag: None,
             motion_timeline: false,
             last_right_tab: RightTab::Design,
-            left_tab: LeftTab::File,
+            left_tab: LeftTab::Layers,
             pages_open: true,
             page_search: false,
             page_filter: String::new(),
@@ -1098,8 +1219,14 @@ impl FigApp {
                 "dialog.missingFonts" => missing_fonts::request(self),
                 "panel.shortcuts" => self.ui.shortcuts_panel = !self.ui.shortcuts_panel,
                 "palette.actions" => menus::toggle_palette(&mut self.ui),
-                "panel.design" if self.session.doc().is_ok_and(undesign_engine::board::is_board) => self.ui.board_panel = !self.ui.board_panel,
-                "panel.design" => self.ui.right_tab = RightTab::Design,
+                "panel.design" if self.session.doc().is_ok_and(undesign_engine::board::is_board) => {
+                    self.ui.chat_open = false;
+                    self.ui.board_panel = !self.ui.board_panel;
+                }
+                "panel.design" => {
+                    self.ui.chat_open = false;
+                    self.ui.right_tab = RightTab::Design;
+                }
                 "board.editText" => {
                     if let Some(id) = r.data.get("id").and_then(undesign_engine::params::id_of)
                         && let Err(e) = undesign_engine::board::edit_text(&mut self.session, id)
@@ -1107,14 +1234,19 @@ impl FigApp {
                         self.toast(e.to_string());
                     }
                 }
-                "panel.prototype" => self.ui.right_tab = RightTab::Prototype,
+                "panel.prototype" => {
+                    self.ui.chat_open = false;
+                    self.ui.right_tab = RightTab::Prototype;
+                }
                 "panel.motionTimeline" => {
                     self.ui.motion_timeline = r.data.get("on").and_then(Value::as_bool).unwrap_or(!self.ui.motion_timeline);
                 }
                 "panel.designPrototype" => {
+                    self.ui.chat_open = false;
                     self.ui.right_tab = if self.ui.right_tab == RightTab::Prototype { RightTab::Design } else { RightTab::Prototype };
                 }
                 "panel.devMode" => {
+                    self.ui.chat_open = false;
                     self.ui.right_tab = if self.ui.right_tab == RightTab::Inspect { RightTab::Design } else { RightTab::Inspect };
                 }
                 "panel.leftSidebar" => self.ui.left_collapsed = !self.ui.left_collapsed,
@@ -1129,9 +1261,15 @@ impl FigApp {
                     self.services.save_prefs(&self.session.prefs);
                 }
                 "focus.region" => self.ui.nav.step(r.data.get("step").and_then(Value::as_i64).unwrap_or(1).clamp(-4, 4) as i32),
-                "panel.layers" => self.ui.left_tab = LeftTab::File,
+                "panel.layers" => {
+                    self.ui.left_tab = LeftTab::Layers;
+                    self.ui.compact_panel = CompactPanel::Layers;
+                    self.ui.left_collapsed = false;
+                    self.ui.versions = Default::default();
+                }
                 "panel.assets" => {
                     self.ui.left_tab = LeftTab::Assets;
+                    self.ui.compact_panel = CompactPanel::Assets;
                     self.ui.left_collapsed = false;
                     self.ui.versions = Default::default();
                 }
@@ -1203,6 +1341,14 @@ impl FigApp {
                 "comment.open" => {
                     if let Some(id) = r.data.get("id").and_then(Value::as_u64) {
                         self.ui.comments.show(id);
+                        let target = self.session.doc().ok().and_then(|doc| {
+                            let comment = doc.comment(id)?;
+                            comment
+                                .anchor
+                                .filter(|target| doc.page_of(*target) == Some(comment.page))
+                                .or_else(|| undesign_engine::cmd::comment::frame_of(doc, comment))
+                        });
+                        self.run("select.set", json!({"ids": target.into_iter().collect::<Vec<_>>()}));
                     }
                 }
                 "comment.new" => {
@@ -1735,6 +1881,14 @@ impl FigApp {
         }
         let hidden = self.session.ds().map(|d| d.view.ui_hidden).unwrap_or(false);
         let right_open = self.right_panel_shown(hidden);
+        let compact = ui.available_width() < 680.0;
+        if !hidden && !compact {
+            egui::Panel::top("editor_header")
+                .exact_size(48.0)
+                .resizable(false)
+                .frame(egui::Frame::NONE.fill(t.panel))
+                .show(ui, |ui| right::editor_header(self, ui));
+        }
         // The panels float like cards (their resize edges sit on the visible edge).
         let gap = 8.0;
         let card = || {
@@ -1745,58 +1899,91 @@ impl FigApp {
                 .outer_margin(egui::Margin::same(8))
                 .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
         };
-        // The docked Motion timeline spans the full width below the side panels, so it claims
-        // its strip before they do.
-        if !hidden && self.ui.motion_timeline {
-            egui::Panel::bottom("motion_timeline").resizable(true).default_size(232.0).frame(card()).show(ui, |ui| {
-                motion_panel::dock(self, ui);
-            });
-        }
-        if !hidden {
-            egui::Panel::left("left_rail")
-                .exact_size(56.0)
-                .resizable(false)
-                .frame(egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border)))
-                .show(ui, |ui| {
-                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Navigation, i18n::tr("Sidebar"));
-                    layers::rail(self, ui)
-                });
-        }
-        // The panels are as wide as asked, less in a window too small for them and the canvas.
-        let left_open = !hidden && !self.ui.left_collapsed;
-        let (left_w, right_w) = fit_panels(ui.available_width(), left_open.then_some(self.ui.left_width), right_open.then_some(self.ui.right_width));
         let rows = ui.available_rect_before_wrap().y_range();
         let mut edges: Vec<(&str, f32, f32, f32)> = Vec::new();
-        if left_open {
-            edges.push(("left", ui.available_rect_before_wrap().min.x + left_w - gap, left_w, 1.0));
-            egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card()).show(ui, |ui| {
-                let label = match self.ui.left_tab {
-                    _ if self.ui.versions.open => i18n::tr("Version history"),
-                    LeftTab::File => i18n::tr("Layers"),
-                    LeftTab::Assets => i18n::tr("Assets"),
-                };
-                a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
-                layers::left_panel(self, ui)
-            });
-        }
-        if right_open {
-            edges.push(("right", ui.available_rect_before_wrap().max.x - right_w + gap, right_w, -1.0));
-            egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card()).show(ui, |ui| {
-                let label = match self.ui.right_tab {
-                    RightTab::Design => i18n::tr("Design"),
-                    RightTab::Prototype => i18n::tr("Prototype"),
-                    RightTab::Inspect => i18n::tr("Dev Mode"),
-                    RightTab::Motion => i18n::tr("Motion"),
-                    RightTab::Agent => i18n::tr("Agent"),
-                };
-                a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
-                right::right_panel(self, ui)
-            });
+        if compact {
+            if !hidden {
+                if self.ui.motion_timeline && self.ui.right_tab == RightTab::Motion {
+                    egui::Panel::bottom("motion_timeline_compact").resizable(true).default_size(176.0).min_size(96.0).frame(card()).show(ui, |ui| {
+                        motion_panel::dock(self, ui);
+                    });
+                }
+                let inspector_height = (ui.available_height() * 0.30).clamp(124.0, 224.0);
+                egui::Panel::bottom("compact_inspector").resizable(true).default_size(inspector_height).min_size(112.0).frame(card()).show(
+                    ui,
+                    |ui| {
+                        compact_inspector(self, ui);
+                    },
+                );
+                egui::Panel::left("left_rail")
+                    .exact_size(56.0)
+                    .resizable(false)
+                    .frame(egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border)))
+                    .show(ui, |ui| {
+                        a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Navigation, i18n::tr("Sidebar"));
+                        layers::rail(self, ui)
+                    });
+            }
+        } else {
+            // The docked Motion timeline spans the full width below the side panels, so it claims
+            // its strip before they do.
+            if !hidden && self.ui.motion_timeline {
+                egui::Panel::bottom("motion_timeline").resizable(true).default_size(232.0).frame(card()).show(ui, |ui| {
+                    motion_panel::dock(self, ui);
+                });
+            }
+            if !hidden {
+                egui::Panel::left("left_rail")
+                    .exact_size(56.0)
+                    .resizable(false)
+                    .frame(egui::Frame::NONE.fill(t.panel).stroke(egui::Stroke::new(1.0, t.border)))
+                    .show(ui, |ui| {
+                        a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Navigation, i18n::tr("Sidebar"));
+                        layers::rail(self, ui)
+                    });
+            }
+            // The panels are as wide as asked, less in a window too small for them and the canvas.
+            let left_open = !hidden && !self.ui.left_collapsed;
+            let (left_w, right_w) =
+                fit_panels(ui.available_width(), left_open.then_some(self.ui.left_width), right_open.then_some(self.ui.right_width));
+            if left_open {
+                edges.push(("left", ui.available_rect_before_wrap().min.x + left_w - gap, left_w, 1.0));
+                egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card()).show(ui, |ui| {
+                    let label = match self.ui.left_tab {
+                        _ if self.ui.versions.open => i18n::tr("Version history"),
+                        LeftTab::File | LeftTab::Layers | LeftTab::Pages => i18n::tr("Design"),
+                        LeftTab::Assets => i18n::tr("Assets"),
+                    };
+                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
+                    layers::left_panel(self, ui)
+                });
+            }
+            if right_open {
+                edges.push(("right", ui.available_rect_before_wrap().max.x - right_w + gap, right_w, -1.0));
+                egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card()).show(ui, |ui| {
+                    let label = if self.ui.chat_open {
+                        i18n::tr("Chat")
+                    } else {
+                        match self.ui.right_tab {
+                            RightTab::Design => i18n::tr("Design"),
+                            RightTab::Prototype => i18n::tr("Prototype"),
+                            RightTab::Inspect => i18n::tr("Dev Mode"),
+                            RightTab::Motion => i18n::tr("Motion"),
+                            RightTab::Agent => i18n::tr("Agent"),
+                        }
+                    };
+                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
+                    right::right_panel(self, ui)
+                });
+            }
         }
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |ui| {
+            // Explicitly paint the neutral canvas surface even when no document content is present.
+            ui.painter().rect_filled(ui.max_rect(), egui::CornerRadius::ZERO, t.canvas);
             let worker = self.worker.take();
             let mut worker = worker.unwrap_or_else(|| render_worker::Worker::new(ctx.clone()));
             canvas::show(self, ui, &mut worker);
+            canvas::empty_state(self, ui);
             self.worker = Some(worker);
             if !hidden {
                 ui.scope_builder(egui::UiBuilder::new().id_salt("toolbar"), |ui| {
@@ -1806,11 +1993,13 @@ impl FigApp {
             }
         });
         // The panels' edges, over the canvas and the panels (drawn after them: they take the press).
-        for (name, x, shown, grows) in edges {
-            if let Some(w) = Self::panel_edge(ui, name, x, rows, shown, grows) {
-                let (l, r) = if name == "left" { (w, self.ui.right_width) } else { (self.ui.left_width, w) };
-                self.set_panel_widths(l, r);
-                self.panels_unsaved = true;
+        if !compact {
+            for (name, x, shown, grows) in edges {
+                if let Some(w) = Self::panel_edge(ui, name, x, rows, shown, grows) {
+                    let (l, r) = if name == "left" { (w, self.ui.right_width) } else { (self.ui.left_width, w) };
+                    self.set_panel_widths(l, r);
+                    self.panels_unsaved = true;
+                }
             }
         }
         // Kept once the drag is over (not on every pointer move).
@@ -1836,7 +2025,11 @@ impl FigApp {
         self.toast_ui(&ctx);
         // A rename started after the layers panel drew (Cmd/Ctrl+R, a double-click) opens its field
         // next frame.
-        if self.ui.rename.is_some_and(|r| r.start) && !hidden && !self.ui.left_collapsed && self.ui.left_tab == LeftTab::File {
+        if self.ui.rename.is_some_and(|r| r.start)
+            && !hidden
+            && !self.ui.left_collapsed
+            && matches!(self.ui.left_tab, LeftTab::File | LeftTab::Layers)
+        {
             ctx.request_repaint();
         }
         a11y::end(self, &ctx);

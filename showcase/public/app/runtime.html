@@ -2,24 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Undesign</title>
 
-<script type="module" src="/app/trunk-bootstrap-BgaJ-5mnb0A9qV_FYbEj5nEjdDquAAb7_iLIKmhwfKG6I7bKWPBRQtK5Z7YnvfdQ.js" integrity="sha384-BgaJ+5mnb0A9qV/FYbEj5nEjdDquAAb7/iLIKmhwfKG6I7bKWPBRQtK5Z7YnvfdQ" crossorigin="anonymous"></script>
+<script type="module" src="/app/trunk-bootstrap-x6LbPCkRyvluCTQEU2sEbys9yLpCBUAVr-Ss3nmUXYj7va-RAkfCKeP7zG0ANzIj.js" integrity="sha384-x6LbPCkRyvluCTQEU2sEbys9yLpCBUAVr+Ss3nmUXYj7va+RAkfCKeP7zG0ANzIj" crossorigin="anonymous"></script>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #f5f5f5; }
     #undesign_canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .skip-link { position: absolute; z-index: 2; top: 8px; left: 8px; padding: 10px 14px; transform: translateY(-160%); border: 1px solid #737373; border-radius: 8px; background: #ffffff; color: #181818; font: 14px system-ui, sans-serif; }
+    .skip-link:focus { transform: translateY(0); }
     #undesign_loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
       color: #6b6b6b; font: 14px system-ui, sans-serif; pointer-events: none; }
     @media (prefers-color-scheme: dark) {
       html, body { background: #2c2c2c; }
       #undesign_loading { color: #b8b8b8; }
+      .skip-link { border-color: #737373; background: #1d1d1d; color: #f2f2f2; }
     }
   </style>
-<link rel="modulepreload" href="./undesign-web-1b88d857c5225d1.js" crossorigin="anonymous" integrity="sha384-QZ1NNO17LKi3vk/HRGA+1Z4kkz3WUaCu/QrcMZZ2S96elo500gI4EzC83EO42lS2"><link rel="preload" href="./undesign-web-f24e125d8cd5aaa3_bg.wasm" crossorigin="anonymous" integrity="sha384-5CB0lPkEU8NdddJbjhxVtUiHWRjDSy64fjRJSM11eNt6ka+RH5Pah9mKCJDQ9Gix" as="fetch" type="application/wasm">  <meta name="undesign-runtime" content="true">
+<link rel="modulepreload" href="./undesign-web-66fd50dd09cfe65.js" crossorigin="anonymous" integrity="sha384-IpJSmtDCN8TW9PA0tEr/Z3u2NV4Zgz0+DwT8fcs167EAjFOcEQc9B8IZuruc2yTJ"><link rel="preload" href="./undesign-web-c5976d84b6aea67c_bg.wasm" crossorigin="anonymous" integrity="sha384-4S1iHODvN69q6gz55328hVbSDBXX9nYSxt5w1c23Du/XqCpiO1Wfy+Wd7ydLVgnv" as="fetch" type="application/wasm">  <meta name="undesign-runtime" content="true">
 </head>
 <body>
-  <canvas id="undesign_canvas"></canvas>
-  <div id="undesign_loading">Loading Undesign&hellip;</div>
+  <header class="visually-hidden"><h1 id="undesign_title">Undesign Web editor</h1></header>
+  <nav aria-label="Editor navigation"><a class="skip-link" href="#undesign_main">Skip to editor</a></nav>
+  <main id="undesign_main" tabindex="-1" aria-labelledby="undesign_title">
+    <canvas id="undesign_canvas" role="img" aria-label="Undesign design canvas"></canvas>
+    <div id="undesign_loading" role="status" aria-live="polite" aria-atomic="true">Loading Undesign&hellip;</div>
+  </main>
+  <footer class="visually-hidden"><p id="undesign_runtime_status" role="status" aria-live="polite">Starting editor.</p></footer>
 </body>
 </html>

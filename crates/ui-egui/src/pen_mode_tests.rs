@@ -1,6 +1,6 @@
 //! Leaving Design with a pen path open (#307): the path ends as Escape ends it, the tool goes back
 //! to Move, and the canvas of Prototype or Inspect takes no more pen points. Driven by the panel
-//! keys and by the toolbar's mode switcher.
+//! the keys and by the right-side workspace tabs.
 
 use egui::accesskit::Role;
 use egui::{Event, Key, Modifiers, Pos2, pos2};
@@ -29,18 +29,19 @@ fn layers(u: &Ui) -> usize {
     doc.node(u.app.session.page().unwrap()).unwrap().children.len()
 }
 
-/// The middle of the toolbar's mode button named `label`, found in the AccessKit tree.
+/// The middle of the right-side workspace tab named `label`, found in the AccessKit tree.
 fn mode_button(u: &mut Ui, label: &str) -> Pos2 {
     u.ctx.enable_accesskit();
     u.frame(vec![]);
     let out = u.frame_output(vec![]);
     let nodes = out.platform_output.accesskit_update.expect("an AccessKit update").nodes;
-    let (wanted, role) = match label {
-        "Prototype" => (label, Role::Tab),
-        "Inspect" => ("Developer Mode", Role::Button),
-        _ => (label, Role::Button),
+    let wanted = match label {
+        "Design" => "Design workspace",
+        "Motion" => "Motion workspace",
+        "Inspect" => "Inspect workspace",
+        _ => label,
     };
-    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == role && n.label() == Some(wanted)).expect(wanted);
+    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == Role::Tab && n.label() == Some(wanted)).expect(wanted);
     let b = n.bounds().expect("bounds");
     pos2(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32)
 }
@@ -85,11 +86,15 @@ fn the_mode_switcher_ends_the_pen_path_too() {
         press(&mut esc, Key::Escape, Modifiers::NONE);
         layers(&esc)
     };
-    for (label, tab) in [("Prototype", RightTab::Prototype), ("Inspect", RightTab::Inspect)] {
+    for (label, tab) in [("Inspect", RightTab::Inspect), ("Motion", RightTab::Motion)] {
         let mut u = drawing();
         let at = mode_button(&mut u, label);
         click(&mut u, at);
         assert_eq!(u.app.ui.right_tab, tab, "{label}");
+        if tab == RightTab::Motion {
+            assert_eq!(u.app.ui.compact_panel, crate::CompactPanel::Motion, "Motion opens its panel body");
+            assert!(u.app.ui.motion_timeline, "Motion preserves the existing timeline behavior");
+        }
         assert!(u.app.session.tool.pen.is_none(), "{label}: the path is finished");
         assert_eq!(u.app.session.tool.tool, ToolId::Move, "{label}: back to Move");
         assert_eq!(layers(&u), finished, "{label}: the path is kept as Escape keeps it");
@@ -105,9 +110,9 @@ fn the_mode_switcher_ends_the_pen_path_too() {
 }
 
 #[test]
-fn a_press_on_the_mode_switcher_does_not_reach_the_canvas() {
-    // The switcher floats over the canvas: the pen must not place an anchor under it.
-    for label in ["Prototype", "Design"] {
+fn a_press_on_workspace_tabs_does_not_reach_the_canvas() {
+    // Workspace controls sit in the right inspector: the press must not place a pen anchor.
+    for label in ["Motion", "Design"] {
         let mut u = Ui::new(Session::new());
         u.app.run("tool.set", json!({"tool": "pen"}));
         let at = mode_button(&mut u, label);

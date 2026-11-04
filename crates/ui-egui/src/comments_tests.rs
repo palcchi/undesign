@@ -42,6 +42,37 @@ fn comments(u: &Ui) -> Value {
 }
 
 #[test]
+fn chat_history_shows_threads_and_selects_the_exact_anchor_across_pages() {
+    let mut s = Session::new();
+    let page = s.page().unwrap();
+    s.execute("page.rename", &json!({"id": page, "name": "Design"})).unwrap();
+    let target = id(&s.execute("shape.rectangle", &json!({"x": 80, "y": 60, "width": 120, "height": 60})).unwrap());
+    s.execute("object.rename", &json!({"ids": [target], "name": "Hero title"})).unwrap();
+    let thread_id = s.execute("comment.add", &json!({"x": 100, "y": 80, "text": "First comment", "author": "Sam", "anchor": target})).unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    s.execute("comment.reply", &json!({"id": thread_id, "text": "Reply in the same thread", "author": "You"})).unwrap();
+    let other_page = id(&s.execute("page.add", &json!({"name": "Other"})).unwrap());
+    assert_eq!(s.page().unwrap(), other_page, "start on another page");
+    let mut u = Ui::new(s);
+    u.app.ui.chat_open = true;
+    u.app.ui.right_tab = crate::RightTab::Design;
+    u.frames(20, Vec::new);
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(crate::live_tests::has_text(&shapes, "Comment history"));
+    assert!(crate::live_tests::has_text(&shapes, "First comment"));
+    assert!(crate::live_tests::has_text(&shapes, "Reply in the same thread"));
+    assert!(crate::live_tests::has_text(&shapes, "Design · Hero title"), "the target chip names the exact object, not just its frame");
+    let chip = crate::live_tests::text_center(&shapes, "Design · Hero title");
+    click(&mut u, chip);
+    assert_eq!(u.app.session.page().unwrap(), page, "the thread opens its page first");
+    assert_eq!(u.app.session.ds().unwrap().selection, vec![target], "then the exact anchor is selected and highlighted");
+    assert_eq!(u.app.ui.comments.open, Some(thread_id));
+    assert!(u.app.session.doc().unwrap().comment(thread_id).is_some(), "placing Comment elsewhere does not discard history");
+}
+
+#[test]
 fn switching_from_comment_to_move_closes_the_unposted_composer() {
     let mut u = Ui::new(Session::new());
     u.app.run("tool.set", json!({"tool": "comment"}));

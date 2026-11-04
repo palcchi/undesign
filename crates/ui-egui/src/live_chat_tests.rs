@@ -88,6 +88,16 @@ fn slash_opens_your_chat_and_enter_or_escape_ends_it() {
 }
 
 #[test]
+fn sidebar_chat_action_opens_comment_history_not_cursor_chat() {
+    let mut h = ready();
+    let shapes = h.frames(1);
+    h.click(text_center(&shapes, "Chat"));
+    h.frames(1);
+    assert!(h.app.ui.chat_open, "the sidebar opens the comment conversation history");
+    assert!(h.app.ui.live.chat.is_none(), "temporary cursor chat remains a separate action");
+}
+
+#[test]
 fn spotlight_banner_and_your_avatar_menu() {
     let mut h = ready();
     let page = h.page();

@@ -232,3 +232,21 @@ fn the_smallest_window_keeps_its_canvas_whatever_the_widths() {
         assert_eq!((app.ui.left_width, app.ui.right_width), asked, "the widths asked for come back in a wider window");
     }
 }
+
+#[test]
+fn narrow_browser_widths_reflow_panels_and_keep_the_canvas_visible() {
+    for width in [320.0, 720.0, 899.0, 900.0, 1440.0] {
+        let mut session = Session::new();
+        session.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 300, "height": 200})).unwrap();
+        let ctx = egui::Context::default();
+        let mut app = FigApp::new(session, Box::new(NoServices));
+        let screen = Rect::from_min_size(Pos2::ZERO, vec2(width, 760.0));
+        for frame in 0..6 {
+            let input = RawInput { screen_rect: Some(screen), time: Some(f64::from(frame) / 60.0), ..Default::default() };
+            ctx.run_ui(input, |ui| app.ui(ui)).textures_delta.clear();
+        }
+        let canvas = app.canvas.rect;
+        assert!(canvas.width() >= CANVAS_MIN, "{width}px: canvas is only {}px wide", canvas.width());
+        assert!(screen.contains_rect(canvas), "{width}px: canvas is outside the viewport: {canvas:?}");
+    }
+}

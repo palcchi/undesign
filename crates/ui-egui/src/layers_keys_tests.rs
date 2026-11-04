@@ -111,7 +111,12 @@ fn a_canvas_press_gives_arrows_back_to_nudging() {
 /// The middle of `page`'s row in the Pages list, found by clicking down the list until it opens;
 /// then back to `back`.
 fn page_row(u: &mut Ui, page: NodeId, back: NodeId) -> Pos2 {
-    for y in (90..400).step_by(4) {
+    u.app.ui.left_tab = crate::LeftTab::Pages;
+    u.app.ui.left_collapsed = false;
+    u.app.ui.pages_open = true;
+    u.app.ui.compact_panel = crate::CompactPanel::Layers;
+    u.frame(vec![]);
+    for y in (160..820).step_by(4) {
         let p = pos2(150.0, y as f32);
         u.button(p, true);
         u.button(p, false);
@@ -207,7 +212,7 @@ fn delete_deletes_no_page_once_the_pages_list_is_off_screen_or_another_file_is_o
     };
     // The Assets tab, a collapsed Pages list, a collapsed left panel.
     let hide: [fn(&mut Ui, bool); 3] = [
-        |u, on| u.app.ui.left_tab = if on { crate::LeftTab::Assets } else { crate::LeftTab::File },
+        |u, on| u.app.ui.left_tab = if on { crate::LeftTab::Assets } else { crate::LeftTab::Pages },
         |u, on| u.app.ui.pages_open = !on,
         |u, on| u.app.ui.left_collapsed = on,
     ];
