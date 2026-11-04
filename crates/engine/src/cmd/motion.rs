@@ -98,6 +98,17 @@ pub fn specs() -> Vec<CommandSpec> {
             composition.tracks.remove(index);
             Ok(json!({"deleted": track_id}))
         }),
+        spec!("motion.track.set_enabled", "Set animation track enabled", "{compositionId, trackId, enabled}", true, |s, p| {
+            let cmd = "motion.track.set_enabled";
+            let composition_id = required_u64(cmd, p, "compositionId")?;
+            let track_id = required_u64(cmd, p, "trackId")?;
+            let enabled = p.get("enabled").and_then(Value::as_bool).ok_or_else(|| bad(cmd, "`enabled` must be a boolean"))?;
+            let doc = s.doc_mut()?;
+            let composition = doc.motion.compositions.iter_mut().find(|c| c.id == composition_id).ok_or_else(|| bad(cmd, "no such composition"))?;
+            let track = composition.tracks.iter_mut().find(|t| t.id == track_id).ok_or_else(|| bad(cmd, "no such track"))?;
+            track.enabled = enabled;
+            Ok(json!({"trackId": track_id, "enabled": enabled}))
+        }),
         spec!("motion.keyframe.set", "Set keyframe", "{compositionId, trackId, frame, value, interpolation?}", true, |s, p| {
             let cmd = "motion.keyframe.set";
             let composition_id = required_u64(cmd, p, "compositionId")?;
@@ -309,6 +320,33 @@ mod tests {
         assert_eq!(frames(&session), vec![(0, 1.0), (15, 0.5), (20, 0.0)]);
         assert!(session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"from":15,"to":61})).is_err());
         assert!(session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"from":99,"to":15})).is_err());
+    }
+
+    #[test]
+    fn track_set_enabled_mutes_undoes_and_keeps_keyframes() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        for (at, value) in [(0, 1.0), (30, 0.0)] {
+            session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":at,"value":value})).unwrap();
+        }
+        let out = session.execute("motion.track.set_enabled", &json!({"compositionId":composition_id,"trackId":track_id,"enabled":false})).unwrap();
+        assert_eq!(out["enabled"], false);
+        let muted = &session.doc().unwrap().motion.compositions[0].tracks[0];
+        assert!(!muted.enabled);
+        assert_eq!(muted.keyframes.len(), 2);
+        assert!(session.undo().unwrap());
+        let restored = &session.doc().unwrap().motion.compositions[0].tracks[0];
+        assert!(restored.enabled);
+        assert_eq!(restored.keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![0, 30]);
+        assert!(session.execute("motion.track.set_enabled", &json!({"compositionId":composition_id,"trackId":track_id})).is_err());
+        assert!(session.execute("motion.track.set_enabled", &json!({"compositionId":composition_id,"trackId":track_id,"enabled":"yes"})).is_err());
+        assert!(session.execute("motion.track.set_enabled", &json!({"compositionId":999_999,"trackId":track_id,"enabled":true})).is_err());
+        assert!(session.execute("motion.track.set_enabled", &json!({"compositionId":composition_id,"trackId":999_999,"enabled":true})).is_err());
+        assert!(session.execute("motion.track.set_enabled", &json!({"compositionId":"main","trackId":track_id,"enabled":true})).is_err());
     }
 
     #[test]

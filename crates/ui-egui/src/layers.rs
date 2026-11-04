@@ -140,40 +140,52 @@ pub fn left_panel(app: &mut FigApp, ui: &mut Ui) {
         return;
     }
     let t = Tokens::get(ui.ctx());
-    let full = ui.max_rect();
-    // Header: file name (or "Assets") + the file's kind + collapse.
-    let (head, _) = ui.allocate_exact_size(vec2(full.width(), 64.0), Sense::hover());
-    if app.ui.left_tab == LeftTab::Assets {
-        ui.painter().text(pos2(head.min.x + 16.0, head.min.y + 24.0), Align2::LEFT_CENTER, tr("Assets"), semibold(13.0), t.text);
-    } else {
-        let name = app.session.doc().map(|d| d.name.clone()).unwrap_or_default();
-        let nr = Rect::from_min_max(pos2(head.min.x + 14.0, head.min.y + 14.0), pos2(head.max.x - 48.0, head.min.y + 34.0));
-        let start = std::mem::take(&mut app.ui.rename_file);
-        if let (Some(new), _) = crate::widgets::rename_field(ui, Id::new("filename"), &name, nr, semibold(13.0), start) {
-            app.run("file.rename", json!({"name": new}));
+    let w = ui.available_width();
+    // Compact Pages / Layers / Assets switcher, matching the editor's workspace panel.
+    let (tabs, _) = ui.allocate_exact_size(vec2(w, 44.0), Sense::hover());
+    let labels = [(crate::LeftSection::Pages, tr("Pages")), (crate::LeftSection::Layers, tr("Layers")), (crate::LeftSection::Assets, tr("Assets"))];
+    let gap = 4.0;
+    let tab_w = (w - 20.0 - gap * 2.0) / 3.0;
+    for (i, (section, label)) in labels.into_iter().enumerate() {
+        let r = Rect::from_min_size(pos2(tabs.min.x + 10.0 + i as f32 * (tab_w + gap), tabs.min.y + 5.0), vec2(tab_w, 30.0));
+        let resp = ui.interact(r, ui.id().with(("left_section", i)), Sense::click()).tip(label);
+        let active = app.ui.left_section == section;
+        a11y::tab(&resp, label, active);
+        if active {
+            ui.painter().rect_filled(r, CornerRadius::same(7), t.selected_row);
+        } else if resp.hovered() || resp.has_focus() {
+            ui.painter().rect_filled(r, CornerRadius::same(7), t.hover);
         }
-        // Figma names the project under the file; Undesign has no projects, so it names
-        // the file's kind instead.
-        let board = app.session.doc().is_ok_and(|d| !d.kind.is_design());
-        let kind = if board { tr("Board") } else { tr("Design") };
-        ui.painter().text(pos2(head.min.x + 16.0, head.min.y + 46.0), Align2::LEFT_CENTER, kind, regular(11.0), t.text_secondary);
-    }
-    let hr = Rect::from_center_size(pos2(head.max.x - 24.0, head.min.y + 24.0), vec2(24.0, 24.0));
-    let hresp = ui.interact(hr, ui.id().with("hideui"), Sense::click()).tip(tr("Collapse panel"));
-    if hresp.hovered() {
-        ui.painter().rect_filled(hr, CornerRadius::same(5), t.hover);
-    }
-    icons::paint(ui.painter(), hr.shrink(5.0), Icon::Panels, t.icon);
-    if hresp.clicked() {
-        app.ui.left_collapsed = true;
-    }
-    ui.painter().line_segment([head.left_bottom(), head.right_bottom()], Stroke::new(1.0, t.border));
-    match app.ui.left_tab {
-        LeftTab::File => {
-            pages(app, ui);
-            layers(app, ui);
+        ui.painter().text(r.center(), Align2::CENTER_CENTER, label, semibold(11.0), if active { t.accent_text } else { t.text_secondary });
+        if resp.clicked() {
+            app.ui.left_section = section;
+            app.ui.left_collapsed = false;
+            if section == crate::LeftSection::Assets {
+                app.ui.left_tab = LeftTab::Assets;
+            } else {
+                app.ui.left_tab = LeftTab::File;
+            }
+            if section != crate::LeftSection::Pages {
+                app.ui.page_search = false;
+            }
+            if section != crate::LeftSection::Layers {
+                app.ui.layer_search = false;
+            }
         }
-        LeftTab::Assets => crate::assets_panel::show(app, ui),
+    }
+    let content_top = tabs.max.y;
+    match app.ui.left_section {
+        crate::LeftSection::Pages => {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(Rect::from_min_max(pos2(tabs.min.x, content_top), ui.max_rect().max)), |ui| {
+                pages(app, ui)
+            });
+        }
+        crate::LeftSection::Layers => {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(Rect::from_min_max(pos2(tabs.min.x, content_top), ui.max_rect().max)), |ui| {
+                layers(app, ui)
+            });
+        }
+        crate::LeftSection::Assets => crate::assets_panel::show(app, ui),
     }
 }
 
@@ -985,8 +997,7 @@ fn layers(app: &mut FigApp, ui: &mut Ui) {
             }
             if resp.clicked() {
                 clicked = Some((row.id, ui.input(|i| i.modifiers)));
-            }
-            if resp.double_clicked() && !crate::menus::dev_mode_refuses(app, "object.rename") {
+            }            if resp.double_clicked() && !crate::menus::dev_mode_refuses(app, "object.rename") {
                 app.ui.rename = Some(Rename { id: row.id, start: true });
             }
             if resp.secondary_clicked() {
