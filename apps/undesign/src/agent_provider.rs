@@ -8,8 +8,9 @@ use url::{Host, Url};
 use zeroize::Zeroizing;
 
 use undesign_ui_egui::agent_provider::{
-    AgentProviderAvailability, AgentProviderConfig, AgentProviderReply, AgentProviderTask, AgentSecret, MAX_PROVIDER_REQUEST_BYTES,
-    MAX_PROVIDER_RESPONSE_BYTES, parse_openai_response, validate_model_id,
+    ANTHROPIC_API_VERSION, ANTHROPIC_ENDPOINT, ANTHROPIC_FALLBACK_BETA, AgentProviderAvailability, AgentProviderConfig, AgentProviderProtocol,
+    AgentProviderReply, AgentProviderTask, AgentSecret, MAX_PROVIDER_REQUEST_BYTES, MAX_PROVIDER_RESPONSE_BYTES, parse_anthropic_response,
+    parse_openai_response, validate_model_id,
 };
 
 const STATUS_MARKER: &[u8] = b"\nUNDESIGN_HTTP_STATUS:";
@@ -36,6 +37,9 @@ pub fn availability() -> AgentProviderAvailability {
 
 pub fn validate_config(config: &AgentProviderConfig) -> Result<(), String> {
     validate_endpoint(config.endpoint())?;
+    if config.protocol() == AgentProviderProtocol::AnthropicMessages && config.endpoint() != ANTHROPIC_ENDPOINT {
+        return Err("The Anthropic provider uses the official Messages endpoint.".to_string());
+    }
     validate_model_id(config.model())
 }
 
@@ -49,12 +53,14 @@ pub fn start_request(config: &AgentProviderConfig, request: Value) -> Result<Age
         return Err("The provider request exceeds the size limit.".to_string());
     }
     let endpoint = config.endpoint().to_string();
+    let protocol = config.protocol();
+    let beta = (protocol == AgentProviderProtocol::AnthropicMessages && request.get("fallbacks").is_some()).then_some(ANTHROPIC_FALLBACK_BETA);
     let secret = config.duplicate_secret_for_request();
     let (sender, receiver) = std::sync::mpsc::channel();
     std::thread::Builder::new()
         .name("undesign-agent-provider".to_string())
         .spawn(move || {
-            let result = send_request(&endpoint, &secret, &request);
+            let result = send_request(&endpoint, protocol, beta, &secret, &request);
             let _ = sender.send(result);
         })
         .map_err(|_| "Could not start the provider request.".to_string())?;
@@ -113,13 +119,19 @@ fn curl_command() -> Command {
     command
 }
 
-fn send_request(endpoint: &str, secret: &AgentSecret, request: &Value) -> Result<AgentProviderReply, String> {
+fn send_request(
+    endpoint: &str,
+    protocol: AgentProviderProtocol,
+    beta: Option<&str>,
+    secret: &AgentSecret,
+    request: &Value,
+) -> Result<AgentProviderReply, String> {
     let endpoint = validate_endpoint(endpoint)?;
     let body = serde_json::to_vec(request).map_err(|_| "Could not encode the provider request.".to_string())?;
     if body.len() > MAX_PROVIDER_REQUEST_BYTES {
         return Err("The provider request exceeds the size limit.".to_string());
     }
-    let config = curl_config(&endpoint, secret, &body)?;
+    let config = curl_config(&endpoint, protocol, beta, secret, &body)?;
     let mut child = curl_command()
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -167,17 +179,33 @@ fn send_request(endpoint: &str, secret: &AgentSecret, request: &Value) -> Result
     }
     let response = std::str::from_utf8(response).map_err(|_| "The provider response is not valid UTF-8.".to_string())?;
     let response = Zeroizing::new(response.to_string());
-    parse_openai_response(&response)
+    match protocol {
+        AgentProviderProtocol::OpenAiCompatible => parse_openai_response(&response),
+        AgentProviderProtocol::AnthropicMessages => parse_anthropic_response(&response),
+    }
 }
 
-fn curl_config(endpoint: &str, secret: &AgentSecret, body: &[u8]) -> Result<CurlConfig, String> {
+fn curl_config(endpoint: &str, protocol: AgentProviderProtocol, beta: Option<&str>, secret: &AgentSecret, body: &[u8]) -> Result<CurlConfig, String> {
     let mut config = Zeroizing::new(Vec::with_capacity(endpoint.len() + secret.expose_bytes().len() + body.len() + 128));
     config.extend_from_slice(b"url = ");
     append_quoted(&mut config, endpoint.as_bytes());
-    config.extend_from_slice(b"header = ");
-    let mut authorization = Zeroizing::new(b"Authorization: Bearer ".to_vec());
-    authorization.extend_from_slice(secret.expose_bytes());
-    append_quoted(&mut config, &authorization);
+    if protocol == AgentProviderProtocol::AnthropicMessages {
+        config.extend_from_slice(b"header = ");
+        let mut api_key = Zeroizing::new(b"x-api-key: ".to_vec());
+        api_key.extend_from_slice(secret.expose_bytes());
+        append_quoted(&mut config, &api_key);
+        config.extend_from_slice(b"header = ");
+        append_quoted(&mut config, format!("anthropic-version: {ANTHROPIC_API_VERSION}").as_bytes());
+        if let Some(beta) = beta {
+            config.extend_from_slice(b"header = ");
+            append_quoted(&mut config, format!("anthropic-beta: {beta}").as_bytes());
+        }
+    } else {
+        config.extend_from_slice(b"header = ");
+        let mut authorization = Zeroizing::new(b"Authorization: Bearer ".to_vec());
+        authorization.extend_from_slice(secret.expose_bytes());
+        append_quoted(&mut config, &authorization);
+    }
     config.extend_from_slice(b"header = \"Content-Type: application/json\"\n");
     config.extend_from_slice(b"data = ");
     append_quoted(&mut config, body);
@@ -242,7 +270,7 @@ mod tests {
         let body = serde_json::to_vec(&json!({"message": "quote \" and newline\n"}));
         assert!(body.is_ok());
         let body = body.unwrap_or_default();
-        let config = curl_config("https://api.example/v1/chat/completions", &secret, &body);
+        let config = curl_config("https://api.example/v1/chat/completions", AgentProviderProtocol::OpenAiCompatible, None, &secret, &body);
         assert!(config.is_ok());
         let Some(config) = config.ok() else { return };
         let text = String::from_utf8_lossy(config.as_bytes());
@@ -251,6 +279,16 @@ mod tests {
         assert!(text.contains("data = \""));
         assert!(text.contains("\\\\n"));
         assert!(!format!("{config:?}").contains(secret_value));
+        assert!(!text.contains("x-api-key"));
+
+        let anthropic = curl_config(ANTHROPIC_ENDPOINT, AgentProviderProtocol::AnthropicMessages, Some(ANTHROPIC_FALLBACK_BETA), &secret, &body);
+        assert!(anthropic.is_ok());
+        let Some(anthropic) = anthropic.ok() else { return };
+        let anthropic = String::from_utf8_lossy(anthropic.as_bytes());
+        assert!(anthropic.contains("x-api-key: synthetic-test-token"));
+        assert!(anthropic.contains(&format!("anthropic-version: {ANTHROPIC_API_VERSION}")));
+        assert!(anthropic.contains(&format!("anthropic-beta: {ANTHROPIC_FALLBACK_BETA}")));
+        assert!(!anthropic.contains("Authorization: Bearer"));
 
         let command = curl_command();
         let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();

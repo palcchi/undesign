@@ -338,9 +338,15 @@ impl Services for Desktop {
     fn agent_provider_model(&self) -> Option<&str> {
         self.agent_provider.as_ref().map(undesign_ui_egui::agent_provider::AgentProviderConfig::model)
     }
+    fn agent_provider_protocol(&self) -> undesign_ui_egui::agent_provider::AgentProviderProtocol {
+        self.agent_provider
+            .as_ref()
+            .map(undesign_ui_egui::agent_provider::AgentProviderConfig::protocol)
+            .unwrap_or(undesign_ui_egui::agent_provider::AgentProviderProtocol::OpenAiCompatible)
+    }
     fn connect_agent_provider(&mut self, config: undesign_ui_egui::agent_provider::AgentProviderConfig) -> Result<(), String> {
         if crate::agent_provider::availability() != undesign_ui_egui::agent_provider::AgentProviderAvailability::NativeOpenAiCompatible {
-            return Err("The native OpenAI-compatible transport is unavailable on this system.".to_string());
+            return Err("The native provider transport is unavailable on this system.".to_string());
         }
         crate::agent_provider::validate_config(&config)?;
         self.agent_provider = Some(config);

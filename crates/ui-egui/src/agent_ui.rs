@@ -13,7 +13,8 @@ use crate::FigApp;
 use crate::a11y;
 use crate::agent::{AgentBackend, AgentConversation, AgentMessage, AgentProposal, AgentRole, AgentToolCall, AgentToolResult};
 use crate::agent_provider::{
-    AgentProviderAvailability, AgentProviderConfig, AgentProviderTask, AgentSecret, build_openai_request, validate_model_id,
+    AgentProviderAvailability, AgentProviderConfig, AgentProviderProtocol, AgentProviderTask, AgentSecret, build_anthropic_request,
+    build_openai_request, validate_model_id,
 };
 use crate::i18n::tr;
 use crate::theme::{Tokens, regular, semibold};
@@ -31,6 +32,7 @@ struct PageScope {
 
 /// Chat and form state is scoped to this app session and is never serialized.
 pub struct AgentPanelState {
+    provider_protocol: AgentProviderProtocol,
     endpoint: String,
     model: String,
     api_key_draft: Zeroizing<String>,
@@ -50,6 +52,7 @@ pub struct AgentPanelState {
 impl Default for AgentPanelState {
     fn default() -> Self {
         Self {
+            provider_protocol: AgentProviderProtocol::OpenAiCompatible,
             endpoint: String::new(),
             model: String::new(),
             api_key_draft: Zeroizing::new(String::new()),
@@ -123,7 +126,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
 
 fn unavailable(ui: &mut Ui, message: &str) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(tr("OpenAI-compatible Chat Completions only")).font(semibold(10.5)).color(t.text));
+    ui.label(RichText::new(tr("Provider")).font(semibold(10.5)).color(t.text));
     ui.add_space(5.0);
     ui.label(RichText::new(message).size(10.5).color(t.text_secondary));
     ui.add_space(5.0);
@@ -148,29 +151,42 @@ fn draw_skill_switch(app: &mut FigApp, ui: &mut Ui) {
 
 fn draw_setup(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(tr("OpenAI-compatible Chat Completions only")).font(semibold(10.5)).color(t.text));
-    ui.add_space(3.0);
-    ui.label(
-        RichText::new(tr("Enter a full chat-completions URL, model ID, and API key. No model is preselected.")).size(9.5).color(t.text_secondary),
-    );
-    ui.label(
-        RichText::new(tr("No shared or default provider is used. Connect your own endpoint, model ID, and key.")).size(9.5).color(t.text_secondary),
-    );
+    let anthropic = app.agent_panel.provider_protocol == AgentProviderProtocol::AnthropicMessages;
+    ui.label(RichText::new(tr("Provider")).font(semibold(10.0)).color(t.text));
+    ui.add_space(2.0);
+    if let Some(choice) = widgets::segmented_text(ui, &[tr("OpenAI-compatible"), tr("Anthropic")], usize::from(anthropic)) {
+        let protocol = if choice == 1 { AgentProviderProtocol::AnthropicMessages } else { AgentProviderProtocol::OpenAiCompatible };
+        select_protocol(&mut app.agent_panel, protocol);
+    }
+    let anthropic = app.agent_panel.provider_protocol == AgentProviderProtocol::AnthropicMessages;
+    ui.add_space(4.0);
+    let intro = if anthropic {
+        tr("Anthropic Messages API. Enter a Claude model ID and your own API key. No model is preselected.")
+    } else {
+        tr("Enter a full chat-completions URL, model ID, and API key. No model is preselected.")
+    };
+    ui.label(RichText::new(intro).size(9.5).color(t.text_secondary));
     ui.add_space(7.0);
 
-    ui.label(RichText::new(tr("Chat completions URL")).font(semibold(10.0)).color(t.text));
-    let field_width = ui.available_width();
-    let endpoint = ui.add(
-        egui::TextEdit::singleline(&mut app.agent_panel.endpoint)
-            .hint_text(tr("https://provider.example/v1/chat/completions"))
-            .desired_width(field_width),
-    );
-    a11y::text(&endpoint, tr("Chat completions URL"), &app.agent_panel.endpoint);
+    if anthropic {
+        ui.label(RichText::new(tr("Endpoint")).font(semibold(10.0)).color(t.text));
+        ui.label(RichText::new(crate::agent_provider::ANTHROPIC_ENDPOINT).size(9.5).color(t.text_secondary));
+    } else {
+        ui.label(RichText::new(tr("Chat completions URL")).font(semibold(10.0)).color(t.text));
+        let field_width = ui.available_width();
+        let endpoint = ui.add(
+            egui::TextEdit::singleline(&mut app.agent_panel.endpoint)
+                .hint_text(tr("https://provider.example/v1/chat/completions"))
+                .desired_width(field_width),
+        );
+        a11y::text(&endpoint, tr("Chat completions URL"), &app.agent_panel.endpoint);
+    }
 
     ui.add_space(5.0);
     ui.label(RichText::new(tr("Model ID")).font(semibold(10.0)).color(t.text));
     let field_width = ui.available_width();
-    let model = ui.add(egui::TextEdit::singleline(&mut app.agent_panel.model).hint_text(tr("Enter a model ID")).desired_width(field_width));
+    let model_hint = if anthropic { tr("Claude model ID, such as claude-opus-5-5") } else { tr("Enter a model ID") };
+    let model = ui.add(egui::TextEdit::singleline(&mut app.agent_panel.model).hint_text(model_hint).desired_width(field_width));
     a11y::text(&model, tr("Model ID"), &app.agent_panel.model);
 
     ui.add_space(5.0);
@@ -205,6 +221,21 @@ fn draw_setup(app: &mut FigApp, ui: &mut Ui) {
         connect_provider(app, false);
     }
     draw_feedback(&app.agent_panel, ui);
+}
+
+/// Switch the setup form between adapters. The model and endpoint are cleared because IDs and URLs
+/// from one provider are not valid for the other; nothing is preselected.
+fn select_protocol(state: &mut AgentPanelState, protocol: AgentProviderProtocol) {
+    if state.provider_protocol == protocol {
+        return;
+    }
+    state.provider_protocol = protocol;
+    state.model.clear();
+    state.endpoint = match protocol {
+        AgentProviderProtocol::AnthropicMessages => crate::agent_provider::ANTHROPIC_ENDPOINT.to_string(),
+        AgentProviderProtocol::OpenAiCompatible => String::new(),
+    };
+    state.error = None;
 }
 
 fn draw_browser_setup(app: &mut FigApp, ui: &mut Ui) {
@@ -287,11 +318,12 @@ fn draw_connected(app: &mut FigApp, ui: &mut Ui, browser_relay: bool) {
         );
     } else {
         ui.label(RichText::new(tr("The API key stays in memory only. Disconnect or close the app to clear it.")).size(9.5).color(t.text_secondary));
-        ui.label(
-            RichText::new(tr("Only OpenAI-compatible Chat Completions are supported. Other provider APIs are not supported by this adapter."))
-                .size(9.5)
-                .color(t.text_secondary),
-        );
+        let adapter = if app.services.agent_provider_protocol() == AgentProviderProtocol::AnthropicMessages {
+            tr("Connected through the Anthropic Messages API.")
+        } else {
+            tr("Connected through an OpenAI-compatible Chat Completions endpoint.")
+        };
+        ui.label(RichText::new(adapter).size(9.5).color(t.text_secondary));
     }
     ui.add_space(5.0);
     let disconnect = widgets::button(ui, tr("Disconnect"), false, app.agent_panel.pending.is_none());
@@ -423,7 +455,11 @@ fn connect_provider(app: &mut FigApp, browser_relay: bool) {
             return;
         }
     };
-    let config = AgentProviderConfig::new(endpoint, model.clone(), secret);
+    let config = if !browser_relay && app.agent_panel.provider_protocol == AgentProviderProtocol::AnthropicMessages {
+        AgentProviderConfig::anthropic(model.clone(), secret)
+    } else {
+        AgentProviderConfig::new(endpoint, model.clone(), secret)
+    };
     match app.services.connect_agent_provider(config) {
         Ok(()) => {
             app.agent_panel.error = None;
@@ -480,7 +516,11 @@ fn start_provider_request(app: &mut FigApp, ctx: &egui::Context, scope: PageScop
             return;
         }
     };
-    let request = match build_openai_request(&model, skill, &app.agent_panel.conversation, &context, allow_tools) {
+    let request = match if app.services.agent_provider_protocol() == AgentProviderProtocol::AnthropicMessages {
+        build_anthropic_request(&model, skill, &app.agent_panel.conversation, &context, allow_tools)
+    } else {
+        build_openai_request(&model, skill, &app.agent_panel.conversation, &context, allow_tools)
+    } {
         Ok(request) => request,
         Err(error) => {
             report_request_failure(&mut app.agent_panel, error);
@@ -792,6 +832,23 @@ mod tests {
         app.agent_panel.prompt = "Create a frame".to_string();
         submit_prompt(&mut app, &egui::Context::default());
         assert_eq!(requests.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn switching_adapters_fixes_the_anthropic_endpoint_and_never_preselects_a_model() {
+        let mut state = AgentPanelState::default();
+        assert_eq!(state.provider_protocol, AgentProviderProtocol::OpenAiCompatible);
+        state.endpoint = "https://provider.example/v1/chat/completions".to_string();
+        state.model = "local-model".to_string();
+        select_protocol(&mut state, AgentProviderProtocol::AnthropicMessages);
+        assert_eq!(state.endpoint, crate::agent_provider::ANTHROPIC_ENDPOINT);
+        assert!(state.model.is_empty());
+        state.model = "claude-opus-5-5".to_string();
+        select_protocol(&mut state, AgentProviderProtocol::AnthropicMessages);
+        assert_eq!(state.model, "claude-opus-5-5");
+        select_protocol(&mut state, AgentProviderProtocol::OpenAiCompatible);
+        assert!(state.endpoint.is_empty());
+        assert!(state.model.is_empty());
     }
 
     #[test]
