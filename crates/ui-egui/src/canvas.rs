@@ -1595,6 +1595,12 @@ pub(crate) fn status_label(n: &undesign_doc::Node) -> Option<(&'static str, Colo
     }
 }
 
+/// The width [`status_badge`] takes for `n` (`None` without a status).
+pub(crate) fn status_badge_width(painter: &egui::Painter, n: &undesign_doc::Node) -> Option<f32> {
+    let (label, _) = status_label(n)?;
+    Some(painter.layout_no_wrap(label.to_string(), semibold(10.0), Color32::WHITE).size().x + 10.0)
+}
+
 /// A frame's or section's handoff status as a small pill left-centred on `at`; the pill's area.
 pub(crate) fn status_badge(painter: &egui::Painter, n: &undesign_doc::Node, at: Pos2) -> Option<Rect> {
     let (label, fill) = status_label(n)?;

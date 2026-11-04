@@ -260,24 +260,22 @@ fn left_panel_contents(app: &mut FigApp, ui: &mut Ui, show_tabs: bool) {
 fn left_panel_tabs(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let width = ui.available_width();
-    let (row, _) = ui.allocate_exact_size(vec2(width, 44.0), Sense::hover());
+    let (row, _) = ui.allocate_exact_size(vec2(width, 40.0), Sense::hover());
     let collapse_w = 30.0;
-    let tab_w = ((row.width() - collapse_w - 4.0) / 2.0).max(0.0);
     let active_tab = if app.ui.left_tab == LeftTab::Assets { LeftTab::Assets } else { LeftTab::Layers };
-    for (i, (tab, label)) in [(LeftTab::Layers, tr("Design")), (LeftTab::Assets, tr("Assets"))].into_iter().enumerate() {
-        let rect = Rect::from_min_size(pos2(row.min.x + i as f32 * tab_w + 2.0, row.min.y + 4.0), vec2((tab_w - 4.0).max(0.0), 32.0));
-        let response = ui.interact(rect, ui.id().with(("left-panel-tab", label)), Sense::click());
+    // Tabs as wide as their names, left-aligned; the active one has a quiet fill (one cue, not two).
+    let mut x = row.min.x + 8.0;
+    for (tab, label) in [(LeftTab::Layers, tr("Design")), (LeftTab::Assets, tr("Assets"))] {
         let active = active_tab == tab;
+        let w = ui.painter().layout_no_wrap(label.to_string(), semibold(11.5), t.text).size().x + 16.0;
+        let rect = Rect::from_min_size(pos2(x, row.center().y - 12.0), vec2(w, 24.0));
+        x += w + 2.0;
+        let response = ui.interact(rect, ui.id().with(("left-panel-tab", label)), Sense::click());
         a11y::tab(&response, label, active);
         if active {
-            ui.painter().rect_filled(rect, CornerRadius::same(6), t.selected_row);
-            ui.painter().rect_filled(
-                Rect::from_center_size(pos2(rect.center().x, rect.max.y - 2.0), vec2(12.0, 2.0)),
-                CornerRadius::same(1),
-                t.accent,
-            );
+            ui.painter().rect_filled(rect, CornerRadius::same(5), t.selected_row);
         } else if response.hovered() || response.has_focus() {
-            ui.painter().rect_filled(rect, CornerRadius::same(6), t.hover);
+            ui.painter().rect_filled(rect, CornerRadius::same(5), t.hover);
         }
         let font = if active { semibold(11.5) } else { regular(11.5) };
         ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font, if active { t.text } else { t.text_secondary });
@@ -1051,8 +1049,6 @@ fn layers(app: &mut FigApp, ui: &mut Ui) {
             let over = resp.contains_pointer();
             if selected {
                 ui.painter().rect_filled(rr, CornerRadius::same(5), if is_comp { t.component_row } else { t.selected_row });
-                let marker = Rect::from_min_size(pos2(rr.min.x, rr.center().y - 5.0), vec2(2.0, 10.0));
-                ui.painter().rect_filled(marker, CornerRadius::same(1), t.accent);
             } else if in_selected {
                 ui.painter().rect_filled(rr, CornerRadius::ZERO, t.selected_row_child);
             } else if over || hover == Some(row.id) {

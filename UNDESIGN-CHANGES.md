@@ -286,3 +286,14 @@ upstream revision so future syncs stay auditable.
   editors, the Home folder list position, keyboard entry into the Interface size menu, an em
   dash removed from a UI label, translated Motion transport tips (English, Indonesian).
 - Tests updated for the shipped layout (one left "Design" tab, the Developer Mode toggle).
+
+## 2026-11-04: Editor in the UI3 arrangement (change #19)
+
+- `crates/ui-egui/src/lib.rs`, `right.rs`, `layers.rs`: the full editor has no header bar or icon
+  rail; `right::file_header` (main menu, file name, file-and-pages menu, save status) tops the
+  left panel, `right::actions_header` (people, Chat, Present, Share, zoom) tops the right panel,
+  `right::help_button` sits in the canvas corner. Side panels and the Motion dock are docked
+  (1 px border, no margins or shadows). Narrow windows keep the rail and cards.
+- `widgets.rs`, `theme.rs`: 24 px controls, radii 5 (inputs, buttons), 12 (panels, dialogs).
+- `frame_labels.rs`, `canvas.rs`: status badges drawn only where they fit over their frame.
+- Tests updated for the docked geometry.

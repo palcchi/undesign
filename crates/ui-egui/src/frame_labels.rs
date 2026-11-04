@@ -117,7 +117,10 @@ pub fn draw(app: &FigApp, painter: &Painter, t: &Tokens, doc: &Document, id: Nod
             crate::icons::paint(painter, ir, crate::icons::Icon::EyeOff, fg);
         }
         painter.galley(r.min + vec2(8.0 + eye, 4.0), galley, fg);
-        status_badge(painter, n, pos2(r.max.x + 6.0, r.center().y));
+        // The badge shows only where it fits over its own section, never over a neighbour.
+        if crate::canvas::status_badge_width(painter, n).is_some_and(|w| r.max.x + 6.0 + w <= tl.x + edge.len) {
+            status_badge(painter, n, pos2(r.max.x + 6.0, r.center().y));
+        }
         r
     } else {
         let mut x = tl.x;
@@ -130,7 +133,11 @@ pub fn draw(app: &FigApp, painter: &Painter, t: &Tokens, doc: &Document, id: Nod
         let size = galley.size();
         let end = x + size.x;
         painter.galley(pos2(x, tl.y - 16.0), galley, col);
-        status_badge(painter, n, pos2(end + 6.0, tl.y - 9.0));
+        // The badge shows only where it fits above its own frame (the Dev Mode panel always
+        // lists the status), so it never covers the next frame's name.
+        if crate::canvas::status_badge_width(painter, n).is_some_and(|w| end + 6.0 + w <= tl.x + edge.len) {
+            status_badge(painter, n, pos2(end + 6.0, tl.y - 9.0));
+        }
         Rect::from_min_max(pos2(tl.x, tl.y - 18.0), pos2(end, tl.y - 16.0 + size.y.max(12.0)))
     };
     turn_since(painter, from, tl, edge.angle);
