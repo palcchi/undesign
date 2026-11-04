@@ -20,9 +20,11 @@ const DIAMOND: f32 = 8.0;
 /// Snap radius in pixels, as in the reference timeline.
 const SNAP_PX: f32 = 8.0;
 
-/// High-contrast blue reserved for Motion active, focused, and selected states.
+/// The single brand accent for active, focused, and selected states: Undesign
+/// selection blue `#315BFF`, lightened one step on dark surfaces so small text
+/// keeps AA contrast (`#8FA6FF` on the `#1D1D1D` panel).
 pub(crate) fn motion_state_accent(t: &Tokens) -> egui::Color32 {
-    if t.dark { egui::Color32::from_rgb(0x6C, 0xB5, 0xFF) } else { egui::Color32::from_rgb(0x17, 0x5E, 0xA8) }
+    if t.dark { egui::Color32::from_rgb(0x8F, 0xA6, 0xFF) } else { egui::Color32::from_rgb(0x31, 0x5B, 0xFF) }
 }
 
 fn label_column_width(available_width: f32) -> f32 {
@@ -530,7 +532,7 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
             }
         }
         let cti_x = ruler.min.x + x_of(cti as f32);
-        ui.painter().rect_filled(Rect::from_center_size(pos2(cti_x, ruler.min.y + 5.0), vec2(9.0, 10.0)), 3.0, motion_state_accent(&t));
+        ui.painter().rect_filled(Rect::from_center_size(pos2(cti_x, ruler.min.y + 5.0), vec2(9.0, 10.0)), 3.0, motion_state_accent(t));
 
         for (row, height) in &rows {
             let is_lane = !matches!(row, RowRef::AddProperty { .. });
@@ -576,7 +578,7 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
                 paint_key(app, ui, t, composition, row_track(row), key, rect.min.x, lane_x0, &x_of, rect.center().y, ppf);
             }
             if is_lane {
-                ui.painter().line_segment([pos2(cti_x, rect.min.y), pos2(cti_x, rect.max.y)], Stroke::new(1.5, motion_state_accent(&t)));
+                ui.painter().line_segment([pos2(cti_x, rect.min.y), pos2(cti_x, rect.max.y)], Stroke::new(1.5, motion_state_accent(t)));
             }
             ui.painter().line_segment([pos2(divider_x, rect.min.y), pos2(divider_x, rect.max.y)], Stroke::new(1.0, t.border));
             paint_label(app, ui, t, composition, row, rect, label_width);
@@ -1014,7 +1016,7 @@ fn keyframe_inspector(app: &mut FigApp, ui: &mut Ui, composition: &Composition, 
     ui.horizontal(|ui| {
         ui.label(tr(property_label(track.property)));
         let display = display_value(track.property, value);
-        let width = ui.available_width().min(196.0).max(72.0);
+        let width = ui.available_width().clamp(72.0, 196.0);
         let edit = crate::widgets::number_field(
             ui,
             egui::Id::new(("motion-key-value", composition.id, track_id, frame)),
@@ -1076,7 +1078,7 @@ fn keyframe_set_params(
     })
 }
 
-fn edit_keyframe_value(
+pub(crate) fn edit_keyframe_value(
     app: &mut FigApp,
     ui: &Ui,
     composition_id: u64,

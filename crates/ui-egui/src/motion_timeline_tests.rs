@@ -4,7 +4,7 @@
 use egui::Pos2;
 use egui::accesskit::{Node, Role};
 use serde_json::json;
-use undesign_doc::{Interpolation, NodeId};
+use undesign_doc::{AnimatedProperty, Interpolation, NodeId};
 use undesign_engine::Session;
 
 use crate::layers_drag_tests::Ui as HeadlessUi;
@@ -354,4 +354,109 @@ fn ruler_prefers_seconds_at_normal_zoom_and_frames_when_zoomed_in() {
     assert_eq!(crate::motion_panel::ruler_label_step(2.0, 30), 30, "normal zoom labels seconds");
     assert_eq!(crate::motion_panel::ruler_label_step(0.5, 30), 150, "distant zoom uses five-second intervals");
     assert_eq!(crate::motion_panel::ruler_label_step(64.0, 30), 1, "close zoom labels individual frames");
+/// A rectangle with one eased opacity keyframe ready to edit.
+fn keyframed_opacity() -> (FigApp, NodeId, u64, u64, Interpolation) {
+    let mut app = app();
+    let target = app.run("shape.rectangle", json!({"x": 10, "y": 10, "width": 100, "height": 50})).unwrap()["id"].as_u64().unwrap();
+    let composition = app.run("motion.composition.create", json!({"durationFrames": 60})).unwrap()["compositionId"].as_u64().unwrap();
+    let track = app.run("motion.track.add", json!({"compositionId": composition, "target": target, "property": "opacity"})).unwrap()["trackId"]
+        .as_u64()
+        .unwrap();
+    let ease = Interpolation::CubicBezier { x1: 0.42, y1: 0.0, x2: 1.0, y2: 1.0 };
+    app.run(
+        "motion.keyframe.set",
+        json!({"compositionId": composition, "trackId": track, "frame": 0, "value": 1.0, "interpolation": serde_json::to_value(ease).unwrap()}),
+    )
+    .unwrap();
+    (app, NodeId(target), composition, track, ease)
+}
+
+fn base_opacity(app: &FigApp, target: NodeId) -> Option<f64> {
+    app.session.doc().ok().and_then(|d| undesign_engine::cmd::motion::current_value(d, target, AnimatedProperty::Opacity))
+}
+
+fn stored_key(app: &FigApp, frame: u32) -> (f64, Interpolation) {
+    let doc = app.session.doc().unwrap();
+    let key = doc.motion.compositions[0].tracks[0].keyframes.iter().find(|k| k.frame == frame).unwrap();
+    (key.value, key.interpolation)
+}
+
+#[test]
+fn editing_a_keyframe_value_keeps_the_base_property_and_interpolation() {
+    let (mut app, target, composition, track, ease) = keyframed_opacity();
+    assert_eq!(base_opacity(&app, target), Some(1.0));
+    let (undo_before, _) = app.session.undo_depth();
+    egui::Context::default()
+        .run_ui(egui::RawInput::default(), |ui| {
+            crate::motion_panel::edit_keyframe_value(
+                &mut app,
+                ui,
+                composition,
+                track,
+                0,
+                AnimatedProperty::Opacity,
+                ease,
+                Some(crate::widgets::FieldEdit::Set(42.0)),
+            );
+        })
+        .textures_delta
+        .clear();
+    assert_eq!(stored_key(&app, 0), (0.42, ease));
+    assert_eq!(base_opacity(&app, target), Some(1.0), "the base Design value never moves");
+    assert_eq!(app.session.undo_depth().0, undo_before + 1);
+    assert!(app.session.undo().unwrap());
+    assert_eq!(stored_key(&app, 0), (1.0, ease));
+    assert!(app.session.redo().unwrap());
+    assert_eq!(stored_key(&app, 0), (0.42, ease));
+}
+
+#[test]
+fn a_keyframe_scrub_is_one_undo_and_escape_cancels_it() {
+    let (mut app, target, composition, track, ease) = keyframed_opacity();
+    let ctx = egui::Context::default();
+    let (undo_before, _) = app.session.undo_depth();
+    let scrub = |app: &mut FigApp, value: f64, done: bool| {
+        ctx.run_ui(egui::RawInput::default(), |ui| {
+            crate::motion_panel::edit_keyframe_value(
+                app,
+                ui,
+                composition,
+                track,
+                0,
+                AnimatedProperty::Opacity,
+                ease,
+                Some(crate::widgets::FieldEdit::Scrub(value, done)),
+            );
+        })
+        .textures_delta
+        .clear();
+    };
+    scrub(&mut app, 60.0, false);
+    assert_eq!(stored_key(&app, 0).0, 0.6);
+    scrub(&mut app, 70.0, true);
+    assert_eq!(stored_key(&app, 0), (0.7, ease));
+    assert_eq!(app.session.undo_depth().0, undo_before + 1, "the whole scrub is one undo step");
+    assert_eq!(base_opacity(&app, target), Some(1.0));
+    assert!(app.session.undo().unwrap());
+    assert_eq!(stored_key(&app, 0), (1.0, ease));
+    assert!(app.session.redo().unwrap());
+
+    scrub(&mut app, 80.0, false);
+    let escape = egui::RawInput {
+        events: vec![egui::Event::Key {
+            key: egui::Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::default(),
+        }],
+        ..Default::default()
+    };
+    ctx.run_ui(escape, |ui| {
+        crate::motion_panel::edit_keyframe_value(&mut app, ui, composition, track, 0, AnimatedProperty::Opacity, ease, None);
+    })
+    .textures_delta
+    .clear();
+    assert_eq!(stored_key(&app, 0), (0.7, ease), "Escape rolls the scrub back");
+    assert!(app.ui.motion_keyframe_interaction.is_none());
 }

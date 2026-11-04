@@ -462,7 +462,9 @@ fn inspect_motion(session: &Session, arguments: &Value) -> AgentResult<Value> {
         return Err(AgentError::invalid("no such Motion composition"));
     }
     if let Some(id) = composition_id {
-        let composition = doc.motion.compositions.iter().find(|composition| composition.id == id).unwrap();
+        let Some(composition) = doc.motion.compositions.iter().find(|composition| composition.id == id) else {
+            return Err(AgentError::invalid("no such Motion composition"));
+        };
         if !composition.tracks.is_empty() && !composition.tracks.iter().any(|track| is_on_page(doc, state.page, track.target)) {
             return Err(AgentError::invalid("Motion composition has no tracks on the current page"));
         }

@@ -668,7 +668,7 @@ fn focusables(ctx: &Context, nav: &Nav, region: Region) -> Vec<(Id, Rect)> {
         let panel_region = matches!(region, Region::Layers | Region::Properties);
         let mut layers = v.prev_pass.widgets.layers().collect::<Vec<_>>();
         layers.sort_by_key(|(layer, _)| (layer.order, layer.id.value()));
-        let mut focusables = layers
+        layers
             .into_iter()
             .filter(|(layer, _)| layer.order == egui::Order::Background || (panel_region && layer.order == egui::Order::Middle))
             .flat_map(|(_, widgets)| widgets.iter())
@@ -682,8 +682,7 @@ fn focusables(ctx: &Context, nav: &Nav, region: Region) -> Vec<(Id, Rect)> {
                     && nav.region_at(w.rect.center()) == Some(region)
             })
             .map(|w| (w.id, w.rect))
-            .collect();
-        focusables
+            .collect()
     })
 }
 
