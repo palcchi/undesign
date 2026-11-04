@@ -218,17 +218,26 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
     y += widgets::FIELD_H + 12.0;
     let tree_rect = Rect::from_min_max(pos2(panel.min.x + 12.0, y), pos2(panel.max.x - 12.0, panel.max.y - 12.0));
     let paths = app.session.prefs.recent_files.clone();
-    egui::ScrollArea::vertical().id_salt("home_folders").max_height(tree_rect.height()).show_viewport(ui, |ui, viewport| {
-        ui.set_min_width(tree_rect.width());
-        folder_tree(app, ui, t, &paths, pos2(tree_rect.min.x, viewport.min.y));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(tree_rect), |ui| {
+        egui::ScrollArea::vertical().id_salt("home_folders").max_height(tree_rect.height()).show(ui, |ui| {
+            ui.set_min_width(tree_rect.width());
+            // The content's own top-left on screen (it moves with the scroll offset).
+            let origin = ui.max_rect().min;
+            let height = folder_tree(app, ui, t, &paths, origin);
+            ui.allocate_space(vec2(tree_rect.width(), height));
+        });
     });
 }
 
-fn folder_tree(app: &mut FigApp, ui: &mut Ui, t: &Tokens, paths: &[String], origin: egui::Pos2) {
+/// The folders the recent files live in, drawn from `origin`; the height it took.
+fn folder_tree(app: &mut FigApp, ui: &mut Ui, t: &Tokens, paths: &[String], origin: egui::Pos2) -> f32 {
     let mut folders = BTreeMap::<String, usize>::new();
     for path in paths {
         let Some(parent) = Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()) else { continue };
         *folders.entry(parent.display().to_string()).or_default() += 1;
+    }
+    if folders.is_empty() {
+        return 0.0;
     }
     ui.painter().text(origin, Align2::LEFT_TOP, tr("Folders"), semibold(12.0), t.text_secondary);
     let mut y = origin.y + 28.0;
@@ -254,6 +263,7 @@ fn folder_tree(app: &mut FigApp, ui: &mut Ui, t: &Tokens, paths: &[String], orig
         }
         y += 30.0;
     }
+    y - origin.y
 }
 
 fn file_matches(name: &str, location: &str, query: &str) -> bool {
@@ -318,7 +328,7 @@ fn subheading(ui: &mut Ui, t: &Tokens, text: &str) {
 /// A compact workspace action. The primary action is filled; secondary actions stay quiet. `sub`
 /// says what the action does and shows on hover (with the title when the title is cut short).
 fn action_button(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, sub: &str, primary: bool) -> bool {
-    let width = (ui.available_width().min(176.0)).max(132.0);
+    let width = ui.available_width().clamp(132.0, 176.0);
     let (r, mut resp) = ui.allocate_exact_size(vec2(width, 36.0), Sense::click());
     a11y::button(&resp, title);
     let fill = if primary {

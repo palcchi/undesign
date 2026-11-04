@@ -76,7 +76,15 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     sync_page_scope(&mut app.agent_panel, &app.session);
     discard_stale_work(&mut app.agent_panel, &app.session);
     poll_provider(app, &ctx);
+    // The same side padding as the other inspector panels, so fields and notes don't touch the
+    // panel's edges.
+    egui::Frame::NONE.inner_margin(egui::Margin::symmetric(widgets::PAD as i8, 0)).show(ui, |ui| {
+        ui.spacing_mut().item_spacing.y = 4.0;
+        panel_body(app, ui, &ctx);
+    });
+}
 
+fn panel_body(app: &mut FigApp, ui: &mut Ui, ctx: &egui::Context) {
     let t = Tokens::get(ui.ctx());
     ui.add_space(8.0);
     ui.label(RichText::new(tr("Agent")).font(semibold(14.0)).color(t.text));
@@ -120,7 +128,7 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
         draw_proposal(app, ui);
     }
     ui.add_space(8.0);
-    draw_composer(app, ui, &ctx);
+    draw_composer(app, ui, ctx);
     draw_feedback(&app.agent_panel, ui);
 }
 
@@ -130,7 +138,7 @@ fn unavailable(ui: &mut Ui, message: &str) {
     ui.add_space(5.0);
     ui.label(RichText::new(message).size(10.5).color(t.text_secondary));
     ui.add_space(5.0);
-    ui.label(RichText::new(tr("No provider is configured. No request is sent.")).size(9.5).color(t.text_tertiary));
+    ui.label(RichText::new(tr("No provider is configured. No request is sent.")).size(10.5).color(t.text_tertiary));
 }
 
 fn draw_skill_switch(app: &mut FigApp, ui: &mut Ui) {
@@ -165,12 +173,12 @@ fn draw_setup(app: &mut FigApp, ui: &mut Ui) {
     } else {
         tr("Enter a full chat-completions URL, model ID, and API key. No model is preselected.")
     };
-    ui.label(RichText::new(intro).size(9.5).color(t.text_secondary));
+    ui.label(RichText::new(intro).size(10.5).color(t.text_secondary));
     ui.add_space(7.0);
 
     if anthropic {
         ui.label(RichText::new(tr("Endpoint")).font(semibold(10.0)).color(t.text));
-        ui.label(RichText::new(crate::agent_provider::ANTHROPIC_ENDPOINT).size(9.5).color(t.text_secondary));
+        ui.label(RichText::new(crate::agent_provider::ANTHROPIC_ENDPOINT).size(10.5).color(t.text_secondary));
     } else {
         ui.label(RichText::new(tr("Chat completions URL")).font(semibold(10.0)).color(t.text));
         let field_width = ui.available_width();
@@ -204,12 +212,12 @@ fn draw_setup(app: &mut FigApp, ui: &mut Ui) {
     ui.add_space(5.0);
     ui.label(
         RichText::new(tr("The key stays in memory for this session and is not saved. HTTPS is required except for loopback local servers."))
-            .size(9.5)
+            .size(10.5)
             .color(t.text_secondary),
     );
     ui.label(
         RichText::new(tr("No request is sent until you press Send. That sends your prompt and bounded current-page context to this endpoint."))
-            .size(9.5)
+            .size(10.5)
             .color(t.text_secondary),
     );
     ui.add_space(8.0);
@@ -243,12 +251,12 @@ fn draw_browser_setup(app: &mut FigApp, ui: &mut Ui) {
     ui.label(RichText::new(tr("Meta AI through secure browser relay only")).font(semibold(10.5)).color(t.text));
     ui.label(
         RichText::new(tr("Enter your Meta model ID and your own API key. The browser sends requests only to the fixed Meta API through this site's same-origin relay."))
-            .size(9.5)
+            .size(10.5)
             .color(t.text_secondary),
     );
     ui.label(
         RichText::new(tr("No other provider or custom endpoint is available in the browser. No model is preselected."))
-            .size(9.5)
+            .size(10.5)
             .color(t.text_secondary),
     );
     ui.add_space(7.0);
@@ -274,14 +282,14 @@ fn draw_browser_setup(app: &mut FigApp, ui: &mut Ui) {
         RichText::new(tr(
             "The key is held in memory only, never stored in browser storage, and sent only after you press Send. Connecting sends no request.",
         ))
-        .size(9.5)
+        .size(10.5)
         .color(t.text_secondary),
     );
     ui.label(
         RichText::new(tr(
             "Send transmits your prompt, chat, and bounded current-page context to the fixed Meta API through this site's secure relay.",
         ))
-        .size(9.5)
+        .size(10.5)
         .color(t.text_secondary),
     );
     ui.add_space(8.0);
@@ -301,29 +309,29 @@ fn draw_connected(app: &mut FigApp, ui: &mut Ui, browser_relay: bool) {
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(tr("Configured for this session")).font(semibold(10.5)).color(t.text));
         if !model.is_empty() {
-            ui.label(RichText::new(model).size(9.5).color(t.text_secondary));
+            ui.label(RichText::new(model).size(10.5).color(t.text_secondary));
         }
     });
     ui.label(
         RichText::new(tr("The endpoint has not been contacted yet. Press Send to transmit the prompt and bounded current-page context."))
-            .size(9.5)
+            .size(10.5)
             .color(t.text_secondary),
     );
     if browser_relay {
-        ui.label(RichText::new(tr("The Meta API key stays in memory only and is not saved in browser storage.")).size(9.5).color(t.text_secondary));
+        ui.label(RichText::new(tr("The Meta API key stays in memory only and is not saved in browser storage.")).size(10.5).color(t.text_secondary));
         ui.label(
             RichText::new(tr("Only Meta through this site's secure same-origin relay is available in the browser."))
-                .size(9.5)
+                .size(10.5)
                 .color(t.text_secondary),
         );
     } else {
-        ui.label(RichText::new(tr("The API key stays in memory only. Disconnect or close the app to clear it.")).size(9.5).color(t.text_secondary));
+        ui.label(RichText::new(tr("The API key stays in memory only. Disconnect or close the app to clear it.")).size(10.5).color(t.text_secondary));
         let adapter = if app.services.agent_provider_protocol() == AgentProviderProtocol::AnthropicMessages {
             tr("Connected through the Anthropic Messages API.")
         } else {
             tr("Connected through an OpenAI-compatible Chat Completions endpoint.")
         };
-        ui.label(RichText::new(adapter).size(9.5).color(t.text_secondary));
+        ui.label(RichText::new(adapter).size(10.5).color(t.text_secondary));
     }
     ui.add_space(5.0);
     let disconnect = widgets::button(ui, tr("Disconnect"), false, app.agent_panel.pending.is_none());
@@ -346,7 +354,7 @@ fn draw_conversation(state: &AgentPanelState, ui: &mut Ui) {
     ui.label(RichText::new(tr("Conversation")).font(semibold(10.5)).color(t.text));
     if state.conversation.messages().is_empty() {
         ui.add_space(3.0);
-        ui.label(RichText::new(tr("No messages yet. Ask about this page or request a Design or Motion change.")).size(9.5).color(t.text_secondary));
+        ui.label(RichText::new(tr("No messages yet. Ask about this page or request a Design or Motion change.")).size(10.5).color(t.text_secondary));
         return;
     }
     let messages = state.conversation.messages();
@@ -373,13 +381,13 @@ fn draw_proposal(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(proposal) = app.agent_panel.proposal.as_ref() else { return };
     ui.label(RichText::new(tr("Proposed changes")).font(semibold(11.0)).color(t.text));
-    ui.label(RichText::new(tr("Review each operation. Apply runs them as one undoable batch.")).size(9.5).color(t.text_secondary));
+    ui.label(RichText::new(tr("Review each operation. Apply runs them as one undoable batch.")).size(10.5).color(t.text_secondary));
     for change in proposal.changes() {
         ui.add_space(5.0);
         ui.label(RichText::new(&change.summary).font(semibold(10.0)).color(t.text));
         if !change.targets.is_empty() {
             let targets = change.targets.iter().map(|id| id.0.to_string()).collect::<Vec<_>>().join(", ");
-            ui.label(RichText::new(format!("{} {targets}", tr("Target layers:"))).size(9.5).color(t.text_secondary));
+            ui.label(RichText::new(format!("{} {targets}", tr("Target layers:"))).size(10.5).color(t.text_secondary));
         }
         let details = serde_json::to_string(&change.details).unwrap_or_else(|_| "{}".to_string());
         ui.label(RichText::new(details).font(regular(9.0)).color(t.text_secondary));
@@ -428,11 +436,11 @@ fn draw_feedback(state: &AgentPanelState, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     if let Some(error) = &state.error {
         ui.add_space(5.0);
-        ui.label(RichText::new(error).size(9.5).color(t.text));
+        ui.label(RichText::new(error).size(10.5).color(t.text));
     }
     if let Some(status) = &state.status {
         ui.add_space(5.0);
-        ui.label(RichText::new(status).size(9.5).color(t.text_secondary));
+        ui.label(RichText::new(status).size(10.5).color(t.text_secondary));
     }
 }
 

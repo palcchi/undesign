@@ -89,7 +89,7 @@ fn turn(shape: &mut Shape, rot: Rot2, angle: f32, pivot: Pos2) {
 
 /// Draw the label of `id` (a top-level frame or a section); the area it covers on screen (its
 /// corners) for hit testing.
-pub fn draw(app: &FigApp, painter: &Painter, t: &Tokens, doc: &Document, id: NodeId, selected: bool, hovered: bool) -> Option<[Pos2; 4]> {
+pub fn draw(app: &FigApp, painter: &Painter, t: &Tokens, doc: &Document, id: NodeId, selected: bool, _hovered: bool) -> Option<[Pos2; 4]> {
     let n = doc.node(id)?;
     let w = doc.world_transform(id);
     let at = |x: f64, y: f64| {
@@ -100,13 +100,7 @@ pub fn draw(app: &FigApp, painter: &Painter, t: &Tokens, doc: &Document, id: Nod
     let edge = label_edge(p00, at(n.width, 0.0), p01);
     let tl = edge.corner;
     let is_comp = matches!(n.kind, NodeKind::Component { .. } | NodeKind::ComponentSet { .. });
-    let col = if is_comp {
-        COMPONENT
-    } else if selected || hovered {
-        crate::theme::canvas_accent(painter.ctx())
-    } else {
-        crate::theme::canvas_accent(painter.ctx())
-    };
+    let col = if is_comp { COMPONENT } else { crate::theme::canvas_accent(painter.ctx()) };
     // Drawn upright at the corner, then turned with the frame.
     let from = painter.add(Shape::Noop);
     let area = if matches!(n.kind, NodeKind::Section { .. }) {

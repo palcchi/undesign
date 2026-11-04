@@ -151,7 +151,9 @@ fn paint_diamond(painter: &egui::Painter, at: egui::Pos2, size: f32, color: egui
 
 pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    if empty_state(app, ui, &t) {
+    if compositions(app).is_empty() {
+        ui.add_space(8.0);
+        egui::Frame::NONE.inner_margin(egui::Margin::symmetric(crate::widgets::PAD as i8, 0)).show(ui, |ui| empty_state(app, ui, &t));
         return;
     }
     let Some(composition) = selected_composition(app) else { return };
@@ -546,7 +548,7 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
         let (ruler, ruler_resp) = ui.allocate_exact_size(vec2(content_w, RULER_H), Sense::click_and_drag());
         crate::a11y::button(&ruler_resp, tr("Timeline"));
         if ruler_resp.has_focus() {
-            ui.painter().rect_stroke(ruler.shrink(1.0), 3.0, Stroke::new(1.0, motion_state_accent(&t)), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(ruler.shrink(1.0), 3.0, Stroke::new(1.0, motion_state_accent(t)), egui::StrokeKind::Inside);
         }
         hovered |= ruler_resp.hovered();
         let fps = u32::from(composition.fps.max(1));

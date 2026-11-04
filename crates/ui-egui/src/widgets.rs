@@ -583,7 +583,9 @@ fn text_field_in(ui: &mut Ui, id: Id, value: &str, rect: Rect, placeholder: &str
 /// its own (the field draws it), showing `hint` while empty.
 fn field_editor(ui: &mut Ui, rect: Rect, id: Id, text: &mut String, hint: &str) -> Response {
     let t = Tokens::get(ui.ctx());
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(8.0, 4.0))));
+    // Centred in the field's height (fields grew to 32 px; the editor is one text line tall).
+    let mut child =
+        ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(8.0, 4.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
     let r = child.add(
         egui::TextEdit::singleline(text)
             .id(id)
@@ -764,7 +766,9 @@ pub fn segmented(ui: &mut Ui, items: &[(Icon, &str)], active: Option<usize>, cel
 /// returns the index clicked. A label too long for its cell ends with an ellipsis.
 pub fn segmented_text(ui: &mut Ui, labels: &[&str], active: usize) -> Option<usize> {
     let cell = (ui.available_width() / labels.len().max(1) as f32).floor();
-    segments(ui, labels, Some(active), cell, false, |ui, r, i, on, t| {
+    // Hover names the options only when one of them doesn't fit its cell.
+    let cut = labels.iter().any(|label| ui.painter().layout_no_wrap(label.to_string(), semibold(11.0), Color32::WHITE).size().x > cell - 12.0);
+    segments(ui, labels, Some(active), cell, cut, |ui, r, i, on, t| {
         let label = labels.get(i).copied().unwrap_or_default();
         let font = if on { semibold(11.0) } else { regular(11.0) };
         let shown = elide_font(ui, label, r.width() - 12.0, font.clone());
