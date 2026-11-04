@@ -11,7 +11,7 @@ use crate::a11y::Tip;
 use crate::i18n::{tr, trf, trn};
 use crate::theme::{Tokens, regular};
 
-const RULER_H: f32 = 20.0;
+const RULER_H: f32 = 24.0;
 const LAYER_H: f32 = 24.0;
 const PROP_H: f32 = 22.0;
 const LABEL_MIN_W: f32 = 112.0;
@@ -119,9 +119,23 @@ fn neighbor_key(composition: &Composition, frame: u32, dir: i8) -> Option<u32> {
     best
 }
 
-/// Ruler label step in frames: the smallest step at least ~40 px wide.
-fn label_step(ppf: f32) -> u32 {
-    [1, 2, 5, 10, 15, 30, 60, 120, 300, 600].into_iter().find(|s| *s as f32 * ppf >= 40.0).unwrap_or(600)
+/// Ruler label step in frames. Prefer readable second marks at normal zoom, then individual
+/// frames when zoomed in; distant zooms use multi-second intervals rather than dense frame labels.
+fn label_step(ppf: f32, fps: u16) -> u32 {
+    let fps = u32::from(fps.max(1));
+    let pixels_per_second = ppf * fps as f32;
+    if (24.0..=800.0).contains(&pixels_per_second) {
+        return fps;
+    }
+    if pixels_per_second > 800.0 {
+        return [1, 2, 5, 10, 15, 30, 60].into_iter().find(|step| *step as f32 * ppf >= 40.0).unwrap_or(60);
+    }
+    [2, 5, 10, 15, 30, 60].into_iter().map(|seconds| seconds * fps).find(|step| *step as f32 * ppf >= 40.0).unwrap_or(60 * fps)
+}
+
+#[cfg(test)]
+pub(crate) fn ruler_label_step(ppf: f32, fps: u16) -> u32 {
+    label_step(ppf, fps)
 }
 
 fn paint_diamond(painter: &egui::Painter, at: egui::Pos2, size: f32, color: egui::Color32) {
@@ -144,32 +158,85 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     composition_combo(app, ui, "motion-composition", ui.available_width());
     meta_row(ui, &composition);
     ui.add_space(8.0);
+    track_list(app, ui, &composition, &t);
+    ui.add_space(8.0);
     keyframe_inspector(app, ui, &composition, &t);
+}
+
+/// A compact, editable track list in the Motion inspector. Track enablement is a real engine
+/// command, and selecting a row makes its keyframes the active editing target.
+fn track_list(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens) {
+    ui.horizontal(|ui| {
+        crate::widgets::section_header(ui, tr("Tracks"), &[], false);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(egui::RichText::new(track_count_label(composition.tracks.len())).size(10.0).color(t.text_secondary));
+        });
+    });
+    if composition.tracks.is_empty() {
+        crate::widgets::note(ui, tr("Add a track from the timeline to animate a layer"), t.text_secondary);
+        return;
+    }
+    for track in &composition.tracks {
+        let selected = app.ui.motion_active_track == Some(track.id) || app.ui.motion_selected.is_some_and(|(id, _)| id == track.id);
+        let label = format!("{} · {}", layer_name(app, track.target), tr(property_label(track.property)));
+        ui.horizontal(|ui| {
+            let mut enabled = track.enabled;
+            if ui.checkbox(&mut enabled, "").changed() {
+                app.run("motion.track.set_enabled", json!({"compositionId": composition.id, "trackId": track.id, "enabled": enabled}));
+            }
+            let response = ui.selectable_label(selected, label);
+            if response.clicked() {
+                app.ui.motion_active_track = Some(track.id);
+                app.ui.motion_selected = None;
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(egui::RichText::new(track.keyframes.len().to_string()).size(10.0).color(t.text_secondary));
+            });
+        });
+    }
 }
 
 /// The Motion timeline docked along the bottom: the same transport and timeline as the side
 /// tab, wide enough to direct on.
 pub fn dock(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    if empty_state(app, ui, &t) {
-        return;
-    }
-    let Some(composition) = selected_composition(app) else { return };
+    let composition = selected_composition(app);
+    let collapsed = app.ui.motion_timeline_collapsed;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Motion Studio").size(13.0).strong().color(t.text));
-        ui.label(egui::RichText::new("BETA").size(9.0).color(t.text_tertiary));
-        ui.separator();
-        composition_combo(app, ui, "motion-composition-dock", 200.0);
-        let meta = format!("{} × {} · {} fps · {:.1}s", composition.width, composition.height, composition.fps, composition.duration_seconds());
-        ui.label(egui::RichText::new(meta).color(t.text_secondary));
+        ui.label(egui::RichText::new(tr("Timeline")).size(12.0).strong().color(t.text));
+        if let Some(composition) = &composition {
+            ui.separator();
+            let combo_width = (ui.available_width() - 160.0).clamp(88.0, 190.0);
+            composition_combo(app, ui, "motion-composition-dock", combo_width);
+            if ui.available_width() > 280.0 {
+                ui.separator();
+                let meta =
+                    format!("{} × {} · {} fps · {:.1}s", composition.width, composition.height, composition.fps, composition.duration_seconds());
+                ui.label(egui::RichText::new(meta).color(t.text_secondary));
+            }
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if crate::widgets::icon_button(ui, crate::icons::Icon::Close, tr("Close")) {
                 app.run("motion.timeline", json!({"on": false}));
             }
+            if crate::widgets::button(ui, if collapsed { tr("Expand") } else { tr("Collapse panel") }, false, true).clicked() {
+                app.ui.motion_timeline_collapsed = !collapsed;
+            }
         });
     });
-    ui.add_space(2.0);
+    if collapsed {
+        return;
+    }
+    ui.add_space(4.0);
+    crate::widgets::separator(ui);
+    ui.add_space(4.0);
+    let Some(composition) = composition else {
+        empty_state(app, ui, &t);
+        return;
+    };
+    advance_playback(app, ui, &composition);
     transport(app, ui, &composition, &t);
+    ui.add_space(4.0);
     egui::ScrollArea::vertical().id_salt("motion-dock-scroll").show(ui, |ui| {
         timeline(app, ui, &composition, &t, "motion-dock-timeline");
     });
@@ -360,8 +427,21 @@ fn layer_name(app: &FigApp, target: NodeId) -> String {
 }
 
 fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens, salt: &str) {
+    let layers = timeline_layers_with_depth(app, composition);
+    if layers.is_empty() {
+        let (empty, _) = ui.allocate_exact_size(vec2(ui.available_width(), 52.0), Sense::hover());
+        ui.painter().rect_filled(empty, egui::CornerRadius::same(8), t.field);
+        ui.painter().rect_stroke(empty, egui::CornerRadius::same(8), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
+        ui.painter().text(
+            empty.center(),
+            Align2::CENTER_CENTER,
+            tr("Add a frame or shape to this page, then select it to animate"),
+            regular(11.0),
+            t.text_secondary,
+        );
+        return;
+    }
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tr("Timeline")).size(11.0).strong().color(t.text));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(egui::RichText::new(track_count_label(composition.tracks.len())).size(10.0).color(t.text_secondary));
             let can_add = can_add_keyframe(app, composition);
@@ -377,13 +457,6 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
     let ppf = app.ui.motion_ppf.unwrap_or(fit_ppf).clamp(0.25, 64.0);
     let x_of = |frame: f32| lane_x0 + frame * ppf;
     let frame_of = |x: f32| ((x - lane_x0) / ppf.max(0.01)).clamp(0.0, composition.duration_frames as f32);
-
-    let layers = timeline_layers_with_depth(app, composition);
-    if layers.is_empty() {
-        ui.add_space(8.0);
-        ui.label(egui::RichText::new("No layers on this page yet").size(11.0).color(t.text_secondary));
-        return;
-    }
     // Rows: each layer plus its active properties and one property chooser when twirled open.
     let mut rows: Vec<(RowRef, f32)> = Vec::new();
     for (target, depth) in &layers {
@@ -406,26 +479,55 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
     egui::ScrollArea::horizontal().id_salt(salt).show(ui, |ui| {
         // Ruler: ticks, frame numbers, and the playhead handle; drag scrubs the CTI.
         let (ruler, ruler_resp) = ui.allocate_exact_size(vec2(content_w, RULER_H), Sense::click_and_drag());
+        crate::a11y::button(&ruler_resp, tr("Timeline"));
+        if ruler_resp.has_focus() {
+            ui.painter().rect_stroke(ruler.shrink(1.0), 3.0, Stroke::new(1.0, motion_state_accent(&t)), egui::StrokeKind::Inside);
+        }
         hovered |= ruler_resp.hovered();
-        let step = label_step(ppf);
+        let fps = u32::from(composition.fps.max(1));
+        let step = label_step(ppf, composition.fps);
         // Only the visible span (long compositions hold hundreds of thousands of frames).
         let vis = ui.clip_rect();
         let first = frame_of(vis.min.x - ruler.min.x).floor().max(0.0) as u32;
         let last = (frame_of(vis.max.x - ruler.min.x).ceil() as u32).min(composition.duration_frames);
+        let first_major = first.checked_add((step - first % step) % step).filter(|at| *at <= last);
         for f in first..=last {
             let x = ruler.min.x + x_of(f as f32);
             if f % step == 0 {
                 ui.painter().line_segment([pos2(x, ruler.max.y - 8.0), pos2(x, ruler.max.y)], Stroke::new(1.0, t.text_tertiary));
                 // Offset past the playhead handle, which wins ties at the CTI.
-                ui.painter().text(pos2(x + 8.0, ruler.min.y + 1.0), Align2::LEFT_TOP, f.to_string(), regular(9.0), t.text_secondary);
+                let label = if f % fps == 0 { format!("{}s", f / fps) } else { f.to_string() };
+                ui.painter().text(pos2(x + 8.0, ruler.min.y + 1.0), Align2::LEFT_TOP, label, regular(9.0), t.text_secondary);
             } else if ppf >= 6.0 {
                 ui.painter().line_segment([pos2(x, ruler.max.y - 4.0), pos2(x, ruler.max.y)], Stroke::new(1.0, t.border));
             }
         }
+        let divider_x = vis.min.x + label_width + 8.0;
+        ui.painter().line_segment([pos2(divider_x, ruler.min.y), pos2(divider_x, ruler.max.y)], Stroke::new(1.0, t.border));
+        ui.painter().line_segment([pos2(vis.min.x, ruler.max.y), pos2(vis.max.x, ruler.max.y)], Stroke::new(1.0, t.border));
         if (ruler_resp.clicked() || ruler_resp.dragged())
             && let Some(pointer) = ruler_resp.interact_pointer_pos()
         {
             app.ui.motion_frame = snap_frame(composition, frame_of(pointer.x - ruler.min.x), ppf);
+        }
+        if ruler_resp.has_focus() {
+            let target = ui.input(|i| {
+                let step = if i.modifiers.shift { 10 } else { 1 };
+                if i.key_pressed(egui::Key::Home) {
+                    Some(0)
+                } else if i.key_pressed(egui::Key::End) {
+                    Some(composition.duration_frames)
+                } else if i.key_pressed(egui::Key::ArrowLeft) {
+                    Some(cti.saturating_sub(step))
+                } else if i.key_pressed(egui::Key::ArrowRight) {
+                    Some(cti.saturating_add(step).min(composition.duration_frames))
+                } else {
+                    None
+                }
+            });
+            if let Some(target) = target {
+                app.ui.motion_frame = target;
+            }
         }
         let cti_x = ruler.min.x + x_of(cti as f32);
         ui.painter().rect_filled(Rect::from_center_size(pos2(cti_x, ruler.min.y + 5.0), vec2(9.0, 10.0)), 3.0, motion_state_accent(&t));
@@ -436,6 +538,18 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
             let (rect, lane_resp) = ui.allocate_exact_size(vec2(content_w, *height), sense);
             if is_lane {
                 hovered |= lane_resp.hovered();
+                if let RowRef::Prop { track, .. } = row
+                    && app.ui.motion_active_track == Some(*track)
+                {
+                    let lane = Rect::from_min_max(pos2(rect.min.x + lane_x0, rect.min.y), pos2(rect.max.x - 8.0, rect.max.y));
+                    ui.painter().rect_filled(lane, 0.0, t.selected_row_child);
+                }
+                if let Some(first_major) = first_major {
+                    for frame in (first_major..=last).step_by(step as usize) {
+                        let x = rect.min.x + x_of(frame as f32);
+                        ui.painter().line_segment([pos2(x, rect.min.y), pos2(x, rect.max.y)], Stroke::new(1.0, t.border));
+                    }
+                }
                 let y = rect.center().y;
                 ui.painter().line_segment([pos2(rect.min.x + lane_x0, y), pos2(rect.max.x - 8.0, y)], Stroke::new(1.0, t.border));
                 if lane_resp.clicked()
@@ -464,6 +578,7 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
             if is_lane {
                 ui.painter().line_segment([pos2(cti_x, rect.min.y), pos2(cti_x, rect.max.y)], Stroke::new(1.5, motion_state_accent(&t)));
             }
+            ui.painter().line_segment([pos2(divider_x, rect.min.y), pos2(divider_x, rect.max.y)], Stroke::new(1.0, t.border));
             paint_label(app, ui, t, composition, row, rect, label_width);
         }
         // Playing follows the playhead (horizontal only; the area never scrolls up).
@@ -897,13 +1012,13 @@ fn keyframe_inspector(app: &mut FigApp, ui: &mut Ui, composition: &Composition, 
 
     ui.label(format!("Frame {frame}"));
     ui.horizontal(|ui| {
-        ui.label(tr("Value"));
+        ui.label(tr(property_label(track.property)));
         let display = display_value(track.property, value);
         let width = ui.available_width().min(196.0).max(72.0);
         let edit = crate::widgets::number_field(
             ui,
             egui::Id::new(("motion-key-value", composition.id, track_id, frame)),
-            crate::widgets::Lead::Named(tr("Value")),
+            crate::widgets::Lead::Named(tr(property_label(track.property))),
             Some(display),
             value_suffix(track.property),
             width,

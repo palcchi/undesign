@@ -524,6 +524,17 @@ pub const RIGHT_PANEL: std::ops::RangeInclusive<f32> = 240.0..=480.0;
 pub const PANEL_DEFAULT: f32 = 240.0;
 pub const CANVAS_MIN: f32 = 160.0;
 
+/// The bottom Motion timeline strip: resizable when open, a fixed header-only bar when collapsed.
+fn motion_dock_panel(app: &mut FigApp, ui: &mut egui::Ui, id: &'static str, default_size: f32, min_size: f32, frame: egui::Frame) {
+    let panel = egui::Panel::bottom(id).frame(frame);
+    let panel = if app.ui.motion_timeline_collapsed {
+        panel.exact_size(48.0).resizable(false)
+    } else {
+        panel.resizable(true).default_size(default_size).min_size(min_size)
+    };
+    panel.show(ui, |ui| motion_panel::dock(app, ui));
+}
+
 /// The widths the side panels are drawn at in `avail` points (the window less the icon rail), from
 /// the widths asked for (none while a panel is closed, which takes no room): each within its
 /// limits, and narrower in a small window so the canvas keeps [`CANVAS_MIN`] (the right panel
@@ -673,6 +684,8 @@ pub struct UiState {
     pub motion_drag: Option<(u64, u32)>,
     /// The Motion timeline docked along the bottom (`motion.timeline`).
     pub motion_timeline: bool,
+    /// Whether the Motion dock is collapsed to its compact header.
+    pub motion_timeline_collapsed: bool,
     /// The tab of the previous frame, to see the right panel change mode.
     pub last_right_tab: RightTab,
     pub left_tab: LeftTab,
@@ -878,6 +891,7 @@ impl Default for UiState {
             motion_keyframe_interaction: None,
             motion_drag: None,
             motion_timeline: false,
+            motion_timeline_collapsed: false,
             last_right_tab: RightTab::Design,
             left_tab: LeftTab::Layers,
             pages_open: true,
@@ -1225,6 +1239,7 @@ impl FigApp {
                 }
                 "panel.design" => {
                     self.ui.chat_open = false;
+                    motion_panel::cancel_keyframe_interaction(self);
                     self.ui.right_tab = RightTab::Design;
                 }
                 "board.editText" => {
@@ -1236,6 +1251,7 @@ impl FigApp {
                 }
                 "panel.prototype" => {
                     self.ui.chat_open = false;
+                    motion_panel::cancel_keyframe_interaction(self);
                     self.ui.right_tab = RightTab::Prototype;
                 }
                 "panel.motionTimeline" => {
@@ -1243,10 +1259,12 @@ impl FigApp {
                 }
                 "panel.designPrototype" => {
                     self.ui.chat_open = false;
+                    motion_panel::cancel_keyframe_interaction(self);
                     self.ui.right_tab = if self.ui.right_tab == RightTab::Prototype { RightTab::Design } else { RightTab::Prototype };
                 }
                 "panel.devMode" => {
                     self.ui.chat_open = false;
+                    motion_panel::cancel_keyframe_interaction(self);
                     self.ui.right_tab = if self.ui.right_tab == RightTab::Inspect { RightTab::Design } else { RightTab::Inspect };
                 }
                 "panel.leftSidebar" => self.ui.left_collapsed = !self.ui.left_collapsed,
@@ -1904,9 +1922,7 @@ impl FigApp {
         if compact {
             if !hidden {
                 if self.ui.motion_timeline && self.ui.right_tab == RightTab::Motion {
-                    egui::Panel::bottom("motion_timeline_compact").resizable(true).default_size(176.0).min_size(96.0).frame(card()).show(ui, |ui| {
-                        motion_panel::dock(self, ui);
-                    });
+                    motion_dock_panel(self, ui, "motion_timeline_compact", 176.0, 96.0, card());
                 }
                 let inspector_height = (ui.available_height() * 0.30).clamp(124.0, 224.0);
                 egui::Panel::bottom("compact_inspector").resizable(true).default_size(inspector_height).min_size(112.0).frame(card()).show(
@@ -1928,9 +1944,7 @@ impl FigApp {
             // The docked Motion timeline spans the full width below the side panels, so it claims
             // its strip before they do.
             if !hidden && self.ui.motion_timeline {
-                egui::Panel::bottom("motion_timeline").resizable(true).default_size(232.0).frame(card()).show(ui, |ui| {
-                    motion_panel::dock(self, ui);
-                });
+                motion_dock_panel(self, ui, "motion_timeline", 232.0, 160.0, card());
             }
             if !hidden {
                 egui::Panel::left("left_rail")
@@ -2155,6 +2169,7 @@ impl FigApp {
             "importReport": self.ui.import_report.as_ref().map(import_report::Report::inspect),
         });
         state["homeSearch"] = json!(self.ui.home_view.file_query);
+        state["motionTimeline"] = json!({"open": self.ui.motion_timeline, "collapsed": self.ui.motion_timeline_collapsed});
         // Set apart from the literal above, which is at the macro recursion limit.
         state["uiScale"] = json!({"choice": self.session.prefs.ui_scale, "zoom": self.ui.ui_scale.zoom, "drawn": self.ui.ui_scale.drawn, "limited": self.ui.ui_scale.limited});
         state["pendingOpens"] = json!(self.ui.pending_opens.len());

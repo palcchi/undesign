@@ -8,6 +8,7 @@
 name = "English"
 
 [ui]
+"Draw" = "Draw"
 "Bring in a local design" = "Bring in a local design"
 "Enter a code or invite link" = "Enter a code or invite link"
 "Import file" = "Import file"
@@ -1910,3 +1911,4 @@ name = "English"
 "Timeline" = "Timeline"
 "{property} keyframe at frame {frame}" = "{property} keyframe at frame {frame}"
 "All changes saved" = "All changes saved"
+"Add a frame or shape to this page, then select it to animate" = "Add a frame or shape to this page, then select it to animate"

@@ -8,6 +8,8 @@ name = "Español"
 status = "draft — needs native review"
 
 [ui]
+"Draw" = "Dibujar"
+"Developer Mode" = "Modo desarrollador"
 "Folders" = "Carpetas"
 "AI Generator" = "Generador de IA"
 "Effect" = "Efecto"
