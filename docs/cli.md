@@ -156,8 +156,8 @@ undesign-cli export dashboard.undesign -o dashboard.png
 
 ### Confining a run: `--automation-read-root DIR` / `--automation-write-root DIR`
 
-`info`, `export`, `convert`, `render` and `run` take these two flags, with the same meaning they
-have on the desktop app with `--control`: each is
+`info`, `export`, `convert`, `render`, `run` and `code-connect publish` take these two flags, with
+the same meaning they have on the desktop app with `--control`: each is
 repeatable, each folder must exist, and together they confine every file that subcommand touches.
 Reads are allowed inside a read or write root, writes only inside a write root, and everything else
 is refused — so a run given only a read root cannot write at all. Without either flag a subcommand
@@ -180,6 +180,17 @@ the flags leave the output identical when nothing strays outside the roots.
 
 Every command with its label, shortcut, undoable flag (`*`) and parameter docs; `--json` for
 machines.
+
+### `code-connect publish <design.undesign> --mappings <undesign.connect.json> -o <out.undesign>`
+
+Applies the repository's `undesign.connect.json` mappings to components in the design, then saves a
+new `.undesign` file. The input design is left untouched. Matching component names are linked; links
+for missing components and invalid entries are skipped with warnings, and the output summary reports
+the number linked. Malformed or unsupported mapping files fail without writing the output.
+
+```sh
+undesign-cli code-connect publish app.undesign --mappings src/undesign.connect.json -o app-connected.undesign
+```
 
 ### `plugin publish <folder> --server ws://host:port/[?key=KEY]`
 

@@ -4,6 +4,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 mod args;
+mod code_connect;
 mod files;
 mod perf;
 
@@ -22,8 +23,9 @@ USAGE:
   undesign-cli convert <in> <out>
   undesign-cli render <file> -o <out.png> [--scale N] [--page NAME]
   undesign-cli run <script.json|script.jsonl> [--in <file>] [--out <file>]
-  (info, export, convert, render and run also take --automation-read-root DIR / --automation-write-root DIR)
+  (info, export, convert, render, run and code-connect publish also take --automation-read-root DIR / --automation-write-root DIR)
   undesign-cli commands [--json] [--filter TEXT]
+  undesign-cli code-connect publish <design.undesign> --mappings <undesign.connect.json> -o <out.undesign>
   undesign-cli plugin publish <folder> --server ws://host:port/[?key=KEY]
   undesign-cli perf [--layers N[,N...]] [--instances N[,N...]]
   undesign-cli help | --help | --version   (a subcommand followed by --help or -h prints this too)
@@ -164,6 +166,24 @@ fn run(argv: &[String]) -> CliResult<ExitCode> {
             }
             commands(a.flag("json"), a.value("filter").as_deref());
             Ok(ExitCode::SUCCESS)
+        }
+        "code-connect" => {
+            let valued = [&["mappings", "o", "out"][..], &ROOT_FLAGS[..]].concat();
+            let a = Args::parse(rest, &valued, &[])?;
+            match a.positional.as_slice() {
+                [verb, design] if verb == "publish" => {
+                    let mappings =
+                        a.value("mappings").ok_or_else(|| CliError::Usage("code-connect publish needs --mappings <undesign.connect.json>".into()))?;
+                    let out = a
+                        .value("o")
+                        .or_else(|| a.value("out"))
+                        .ok_or_else(|| CliError::Usage("code-connect publish needs -o <out.undesign>".into()))?;
+                    confined(&a, || code_connect::publish(design, &mappings, &out))
+                }
+                _ => Err(CliError::Usage(
+                    "expected: code-connect publish <design.undesign> --mappings <undesign.connect.json> -o <out.undesign>".into(),
+                )),
+            }
         }
         "plugin" => {
             let a = Args::parse(rest, &["server"], &[])?;
