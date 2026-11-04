@@ -997,7 +997,8 @@ fn layers(app: &mut FigApp, ui: &mut Ui) {
             }
             if resp.clicked() {
                 clicked = Some((row.id, ui.input(|i| i.modifiers)));
-            }            if resp.double_clicked() && !crate::menus::dev_mode_refuses(app, "object.rename") {
+            }
+            if resp.double_clicked() && !crate::menus::dev_mode_refuses(app, "object.rename") {
                 app.ui.rename = Some(Rename { id: row.id, start: true });
             }
             if resp.secondary_clicked() {
