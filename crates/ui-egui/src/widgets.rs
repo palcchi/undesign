@@ -11,7 +11,8 @@ use crate::icons::{self, Icon};
 use crate::theme::{Tokens, regular, semibold};
 
 pub const ROW_H: f32 = 32.0;
-pub const FIELD_H: f32 = 24.0;
+pub const FIELD_H: f32 = 32.0;
+pub const LABELLED_FIELD_H: f32 = 36.0;
 pub const PAD: f32 = 16.0;
 
 /// What a numeric field's label shows: text ("X") or an icon with the field's name (for screen
@@ -216,7 +217,11 @@ fn number_field_impl(
     empty: Empty<'_>,
 ) -> (Option<Edit>, Option<BindEvent>) {
     let t = Tokens::get(ui.ctx());
-    let (rect, _) = ui.allocate_exact_size(vec2(width, FIELD_H), Sense::hover());
+    let field_h = match lead {
+        Lead::Text(_) | Lead::Icon(..) => LABELLED_FIELD_H,
+        Lead::None | Lead::Named(_) => FIELD_H,
+    };
+    let (rect, _) = ui.allocate_exact_size(vec2(width, field_h), Sense::hover());
     if let Some(Some(name)) = binding {
         return (None, bound_field(ui, id, lead, rect, name));
     }
@@ -226,7 +231,7 @@ fn number_field_impl(
         Lead::Text(s) => text_lead_width(ui, s, width),
         Lead::Icon(..) => 24.0,
     };
-    let lead_rect = Rect::from_min_size(rect.min, vec2(lead_w, FIELD_H));
+    let lead_rect = Rect::from_min_size(rect.min, vec2(lead_w, field_h));
     let edit_rect = Rect::from_min_max(pos2(rect.min.x + lead_w, rect.min.y), rect.max);
     let editing_id = id.with("editing");
     let mut editing: Option<String> = ui.data(|d| d.get_temp(editing_id));
@@ -236,9 +241,9 @@ fn number_field_impl(
     // The label scrubs with the pointer; the keyboard stops at the value only.
     let lead_resp = ui.interact(lead_rect, id.with("lead"), Sense::CLICK | Sense::DRAG);
     let hovered = field_resp.hovered() || lead_resp.hovered() || editing.is_some();
-    ui.painter().rect_filled(rect, CornerRadius::same(8), if hovered { t.hover } else { t.field });
+    ui.painter().rect_filled(rect, CornerRadius::same(crate::theme::NUMERIC_RADIUS), if hovered { t.hover } else { t.field });
     let border = if editing.is_some() { t.focus } else { t.control_border };
-    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, border), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, CornerRadius::same(crate::theme::NUMERIC_RADIUS), Stroke::new(1.0, border), StrokeKind::Inside);
     match lead {
         Lead::Text(s) => {
             let galley = crate::bidi::name_galley(ui.painter(), s, regular(11.0), t.text_secondary, lead_w - 12.0);
@@ -418,9 +423,9 @@ pub fn bound_field(ui: &mut Ui, id: Id, lead: Lead, rect: Rect, name: &str) -> O
     let t = Tokens::get(ui.ctx());
     let resp = ui.interact(rect, id.with("bound"), Sense::click());
     a11y::combo(&resp, lead.name(), name, false);
-    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(crate::theme::NUMERIC_RADIUS), t.field);
     if resp.hovered() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(crate::theme::NUMERIC_RADIUS), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
     }
     let lead_w = match lead {
         Lead::None | Lead::Named(_) => 4.0,
@@ -479,17 +484,21 @@ pub fn multiline_field(ui: &mut Ui, id: Id, value: &str, hint: &str, rows: usize
     ui.horizontal(|ui| {
         ui.add_space(PAD);
         let w = ui.available_width() - PAD;
-        let r = egui::Frame::NONE.fill(t.field).corner_radius(CornerRadius::same(8)).inner_margin(egui::Margin::same(6)).show(ui, |ui| {
-            ui.add(
-                egui::TextEdit::multiline(&mut text)
-                    .id(te)
-                    .frame(egui::Frame::NONE)
-                    .font(regular(11.0))
-                    .hint_text(hint)
-                    .desired_rows(rows)
-                    .desired_width(w - 12.0),
-            )
-        });
+        let r = egui::Frame::NONE
+            .fill(t.field)
+            .corner_radius(CornerRadius::same(crate::theme::INPUT_RADIUS))
+            .inner_margin(egui::Margin::same(6))
+            .show(ui, |ui| {
+                ui.add(
+                    egui::TextEdit::multiline(&mut text)
+                        .id(te)
+                        .frame(egui::Frame::NONE)
+                        .font(regular(11.0))
+                        .hint_text(hint)
+                        .desired_rows(rows)
+                        .desired_width(w - 12.0),
+                )
+            });
         done = r.inner.lost_focus();
     });
     if done {
@@ -534,9 +543,9 @@ fn text_field_in(ui: &mut Ui, id: Id, value: &str, rect: Rect, placeholder: &str
     let mut editing: Option<String> = ui.data(|d| d.get_temp(editing_id));
     let resp = ui.interact(rect, id.with("click"), Sense::click());
     a11y::text(&resp, name, value);
-    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(crate::theme::INPUT_RADIUS), t.field);
     let border = if editing.is_some() { t.focus } else { t.control_border };
-    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, border), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, CornerRadius::same(crate::theme::INPUT_RADIUS), Stroke::new(1.0, border), StrokeKind::Inside);
     let started = editing.is_none() && resp.clicked();
     if started {
         editing = Some(value.to_string());
@@ -593,10 +602,10 @@ fn field_editor(ui: &mut Ui, rect: Rect, id: Id, text: &mut String, hint: &str) 
 pub fn text_input(ui: &mut Ui, id: Id, text: &mut String, width: f32, hint: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, _) = ui.allocate_exact_size(vec2(width, FIELD_H), Sense::hover());
-    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
+    ui.painter().rect_filled(rect, CornerRadius::same(crate::theme::INPUT_RADIUS), t.field);
     let r = field_editor(ui, rect, id, text, hint);
     let border = if r.has_focus() { t.focus } else { t.control_border };
-    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, border), StrokeKind::Inside);
+    ui.painter().rect_stroke(rect, CornerRadius::same(crate::theme::INPUT_RADIUS), Stroke::new(1.0, border), StrokeKind::Inside);
     r
 }
 
@@ -682,9 +691,9 @@ pub fn dropdown_lead(ui: &mut Ui, label: &str, width: f32, lead: Option<DropLead
     let (rect, resp) = ui.allocate_exact_size(vec2(width, FIELD_H), Sense::click());
     a11y::combo(&resp, "", label, a11y::menu_open(&resp));
     let bg = t.field;
-    ui.painter().rect_filled(rect, CornerRadius::same(8), bg);
+    ui.painter().rect_filled(rect, CornerRadius::same(crate::theme::INPUT_RADIUS), bg);
     if resp.hovered() {
-        ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, CornerRadius::same(crate::theme::INPUT_RADIUS), Stroke::new(1.0, t.field_hover_border), StrokeKind::Inside);
     }
     let mut x = rect.min.x + 8.0;
     match lead {
@@ -877,7 +886,7 @@ pub fn canvas_banner<R>(ctx: &egui::Context, id: Id, canvas: Rect, add: impl FnO
             egui::Frame::NONE
                 .fill(t.panel)
                 .stroke(Stroke::new(1.0, t.border))
-                .corner_radius(CornerRadius::same(8))
+                .corner_radius(CornerRadius::same(crate::theme::PANEL_RADIUS))
                 .shadow(egui::epaint::Shadow { offset: [0, 2], blur: 12, spread: 0, color: t.shadow })
                 .inner_margin(egui::Margin { left: 14, right: 8, top: 8, bottom: 8 })
                 .show(ui, |ui| {
@@ -1161,3 +1170,5 @@ pub fn sublabels(ui: &mut Ui, a: &str, b: Option<&str>) {
 pub fn col_width(w: f32) -> f32 {
     ((w - PAD * 2.0 - 8.0 - 32.0) / 2.0).max(40.0)
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

@@ -105,7 +105,7 @@ pub fn draw(app: &FigApp, painter: &Painter, t: &Tokens, doc: &Document, id: Nod
     } else if selected || hovered {
         crate::theme::canvas_accent(painter.ctx())
     } else {
-        t.text_secondary
+        crate::theme::canvas_accent(painter.ctx())
     };
     // Drawn upright at the corner, then turned with the frame.
     let from = painter.add(Shape::Noop);
@@ -220,3 +220,5 @@ mod tests {
         assert!(close(r.rect.center(), pos2(0.0, 20.0)) && (r.angle - std::f32::consts::FRAC_PI_2).abs() < 1e-6);
     }
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

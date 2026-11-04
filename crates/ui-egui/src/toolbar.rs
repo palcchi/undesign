@@ -440,7 +440,7 @@ pub(crate) fn pill_rect(canvas: Rect, width: f32) -> Rect {
     Rect::from_min_size(min, size)
 }
 
-/// The toolbar pill stays static and transparent; contained controls remain independently usable.
+/// The toolbar pill is a compact floating surface; contained controls remain independently usable.
 fn pill(ui: &Ui, nav: &mut Nav, canvas: Rect, width: f32, t: &Tokens) -> (Rect, egui::Response) {
     let rect = pill_rect(canvas, width);
     // Keep a whole-pill hit target for keyboard navigation, hover scrolling, and the canvas anchor.
@@ -452,16 +452,9 @@ fn pill(ui: &Ui, nav: &mut Nav, canvas: Rect, width: f32, t: &Tokens) -> (Rect, 
 fn paint_pill(ui: &Ui, rect: Rect, t: &Tokens) -> egui::Response {
     let resp = ui.interact(rect, ui.id().with("pill"), Sense::CLICK);
     let painter = ui.painter();
-    // Paint only an outside halo so the pill interior remains fully transparent.
-    for (i, a) in [(6.0, 10u8), (3.0, 16), (1.0, 24)] {
-        painter.rect_stroke(
-            rect.expand(i).translate(vec2(0.0, i * 0.5)),
-            CornerRadius::same((22.0 + i) as u8),
-            Stroke::new(1.0, Color32::from_black_alpha(a)),
-            StrokeKind::Outside,
-        );
-    }
-    painter.rect_stroke(rect, CornerRadius::same(22), Stroke::new(1.0, t.border), StrokeKind::Inside);
+    painter.rect_filled(rect.translate(vec2(0.0, 2.0)), CornerRadius::same(12), t.shadow);
+    painter.rect_filled(rect, CornerRadius::same(12), t.panel);
+    painter.rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0, t.border), StrokeKind::Inside);
     resp
 }
 
@@ -472,17 +465,17 @@ pub(crate) fn tool_cell(ui: &mut Ui, t: &Tokens, r: Rect, id: impl egui::AsIdSal
     });
     a11y::toggle(&resp, tip, active);
     let bg = if active {
-        t.accent
+        t.selected_row
     } else if resp.hovered() {
         t.hover
     } else {
         Color32::TRANSPARENT
     };
     ui.painter().rect_filled(r, CornerRadius::same(8), bg);
-    paint_icon(ui.painter(), glyph_rect(r), icon, if active { t.accent_on } else { t.icon });
+    paint_icon(ui.painter(), glyph_rect(r), icon, t.icon);
     if active {
         let marker = Rect::from_center_size(pos2(r.center().x, r.max.y - 3.0), vec2(8.0, 2.0));
-        ui.painter().rect_filled(marker, CornerRadius::same(1), t.accent_on);
+        ui.painter().rect_filled(marker, CornerRadius::same(1), t.accent);
     }
     resp
 }
@@ -688,3 +681,5 @@ mod tests {
         assert!(main_width(GROUPS, false) > 0.0);
     }
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

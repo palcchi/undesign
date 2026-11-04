@@ -1,8 +1,7 @@
 //! Design tokens (UI3 light and dark) and fonts.
 //!
-//! Radius scale (points): 2, 3, 4, 5, 6, 8, 10, 12, 13, 16. Full-round pills and circular
-//! swatches use half their height instead, and canvas selection handles stay sharp like the
-//! incumbent's.
+//! Shared surface radii (points): panels 20, inputs 12, numeric controls 8. Small controls retain
+//! their compact radii; full-round pills and circular swatches use half their height.
 
 use std::sync::{Arc, OnceLock};
 
@@ -51,6 +50,11 @@ pub struct Tokens {
     /// the panels and the canvas.
     pub focus: Color32,
 }
+
+/// Shared corner-radius tokens from the UI spec, in points.
+pub const PANEL_RADIUS: u8 = 20;
+pub const INPUT_RADIUS: u8 = 12;
+pub const NUMERIC_RADIUS: u8 = 8;
 
 /// Light grayscale surface used for brand marks and canvas overlays on dark pages.
 pub const BRAND: Color32 = Color32::from_rgb(0xD8, 0xD8, 0xD8);
@@ -223,8 +227,8 @@ fn visuals(t: Tokens) -> Visuals {
     v.faint_bg_color = t.hover;
     v.override_text_color = Some(t.text);
     v.window_stroke = Stroke::new(1.0, t.border);
-    v.window_corner_radius = egui::CornerRadius::same(12);
-    v.menu_corner_radius = egui::CornerRadius::same(12);
+    v.window_corner_radius = egui::CornerRadius::same(PANEL_RADIUS);
+    v.menu_corner_radius = egui::CornerRadius::same(INPUT_RADIUS);
     v.selection.bg_fill = t.selected_row;
     // Also the color of selected text on that highlight (and a focused text box's outline): use
     // the theme's high-contrast neutral token in both modes.
@@ -460,6 +464,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ui_radius_tokens_match_the_reference_scale() {
+        assert_eq!(PANEL_RADIUS, 20);
+        assert_eq!(INPUT_RADIUS, 12);
+        assert_eq!(NUMERIC_RADIUS, 8);
+        let light = visuals(Tokens::light());
+        assert_eq!(light.window_corner_radius, egui::CornerRadius::same(PANEL_RADIUS));
+        assert_eq!(light.menu_corner_radius, egui::CornerRadius::same(INPUT_RADIUS));
+    }
+
+    #[test]
     fn canvas_overlays_choose_the_grayscale_with_stronger_contrast() {
         let ctx = Context::default();
         assert_eq!(canvas_accent(&ctx), ACCENT, "before any page shows");
@@ -579,3 +593,5 @@ mod tests {
         });
     }
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

@@ -1909,3 +1909,6 @@ name = "English"
 "Select {property} track" = "Select {property} track"
 "Timeline" = "Timeline"
 "{property} keyframe at frame {frame}" = "{property} keyframe at frame {frame}"
+"All changes saved" = "All changes saved"
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

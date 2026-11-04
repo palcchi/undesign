@@ -26,36 +26,32 @@ upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 - Reference screenshots of the incumbent stay local under the gitignored `plan/figma/screenshots/`
   and are never committed, published or used as assets.
 
-### Assets: third-party product assets prohibited, except the owner's narrow Figma toolbar approval
-- **The sole product-icon exception is the project owner's explicit approval to copy only these
-  monochrome Figma editor toolbar glyphs: Move, Frame, Rectangle, Pen, Text, Comment, Actions/sparkle,
-  and Dev Mode/Code.** The permitted visual reference is the public toolbar image from Figma's
-  [Help Center article](https://help.figma.com/hc/en-us/articles/360041064174-Access-design-tools-from-the-toolbar),
-  identified in [`ATTRIBUTION.md`](ATTRIBUTION.md); use only the glyph paths, never the screenshot.
-  This is a narrow, user-authorized exception, not general permission to use Figma or other product
-  assets. Keep the glyph renderer monochrome.
-- **Do not claim these glyphs are CC BY 4.0.** Figma's Community guidance says free Community files
-  are CC BY 4.0, but the Figma UI3 kit listing has no license badge, and the cited Help Center
-  screenshot/article states no redistribution licence. Record this condition accurately in
-  [`ATTRIBUTION.md`](ATTRIBUTION.md); the source/licence status for these specific glyphs remains
-  unconfirmed.
-- Otherwise, never add, copy, trace, redraw-from, embed or ship any third-party icon, image,
-  illustration, cursor, logo, template, UI kit, preset library, font file or screenshot from Figma,
-  Adobe, Avid, Autodesk or another product, or from any source whose licence doesn't allow it. No
-  other product's iconography is permitted. Never inspect a logged-in app, proprietary app bundle or
-  private network traffic to obtain assets; the clean-room rules above still apply.
-- Every image, icon, font or other asset must be one of:
-  - original work created for Undesign by a contributor (licensed MIT OR Apache-2.0);
-  - OSI open source;
-  - public domain / CC0;
-  - Creative Commons with redistribution allowed.
-- **Every asset file must have a row in [`ATTRIBUTION.md`](ATTRIBUTION.md)** (path, author, source,
+### Assets: third-party product assets prohibited, with this task-scoped owner approval
+- **For the isolated `figma-editor-2026-11-04` task only, the project owner explicitly expanded the
+  earlier eight-toolbar-glyph approval to Figma-like silhouettes across the full editor-visible icon
+  set.** This applies only in `/workspace/undesign-figma-editor`; it supersedes the earlier eight-only
+  wording for this pass, not for future tasks or other branches. Keep glyphs monochrome and draw them
+  in code; do not add separate visual asset files.
+- Use public references only: Figma's [toolbar article](https://help.figma.com/hc/en-us/articles/360041064174-Access-design-tools-from-the-toolbar),
+  [UI3 overview](https://www.figma.com/blog/our-approach-to-designing-ui3/),
+  [left-sidebar guide](https://help.figma.com/hc/en-us/articles/360039831974-Explore-the-navigation-bar-and-left-sidebar),
+  and [right-sidebar guide](https://help.figma.com/hc/en-us/articles/360039832014-Design-prototype-and-explore-layer-properties-in-the-right-sidebar).
+  Never use the references' screenshots as assets. Never inspect a logged-in app, proprietary app
+  bundle, private web bundle, or private network traffic; the clean-room rules above still apply.
+- **Figma-derived glyph licensing is unconfirmed.** The UI3 Community listing has no licence badge;
+  Figma's general CC BY 4.0 guidance does not establish that these glyphs are covered. Record the
+  condition in [`ATTRIBUTION.md`](ATTRIBUTION.md); do not claim CC BY 4.0, MIT, or Apache-2.0 for
+  reproduced Figma shapes, and do not push, distribute, deploy, or integrate this task's local branch.
+- Outside this explicit task, never add, copy, trace, redraw-from, embed or ship third-party icons,
+  images, illustrations, cursors, logos, templates, UI kits, preset libraries, fonts or screenshots
+  unless a separate owner approval and a compatible licence allow it.
+- Every asset file must have a row in [`ATTRIBUTION.md`](ATTRIBUTION.md) (path, author, source,
   licence, notes). `cargo xtask assets` (part of `cargo xtask ci`) fails on any unlisted file under
   `assets/` or `docs/images/`.
 - The inherited UI glyph set is drawn in code (`crates/ui-egui/src/icons.rs`) and adapted from
   FigCraft's original icon artwork. Preserve the upstream FigCraft copyright and licence notices.
-  The Undesign `Logo` glyph is original. Only the eight Figma editor toolbar glyphs named above may
-  use that user-authorized exception; all other new glyphs must be designed from scratch.
+  The Undesign `Logo` glyph is original. The full-set Figma-like shapes in this task are covered only
+  by the owner's isolated task authorization above; future glyphs still require their own review.
 - The app icon is a placeholder U mark drawn for Undesign (`assets/app-icon/README.md`);
   `cargo xtask icon` renders the PNGs and `.ico` from `assets/app-icon/undesign.svg`.
 - **Fonts live in [storytold/craft-fonts](https://github.com/storytold/craft-fonts), never in this
@@ -65,7 +61,8 @@ upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 - Demo and test content is synthetic or public domain; never personal photos or data.
 - Code and original assets are MIT OR Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`, `NOTICE`).
   Upstream FigCraft code keeps its copyright (see `NOTICE` and `UNDESIGN-CHANGES.md`); never drop
-  that attribution.
+  that attribution. This does not assert an open-source licence for the task-authorized Figma-derived
+  glyph shapes.
 - If the provenance of an asset is unclear, don't add it.
 
 ### Never crash
@@ -142,3 +139,5 @@ Only an explicit choice of antislop during or after selects a session mode. A re
 If the mode is unresolved, ask during/after and end the response; wait for the answer before any UI review, planning, or concept. For read-only tasks, put the active-mode notice only at the start of the final answer, never in progress messages. For editing tasks, announce before the first edit and omit it from the final answer.
 To update antislop later: `npx antislop-ai --update`, or run `npx antislop-ai` and pick Overwrite them.
 <!-- antislop:end -->
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

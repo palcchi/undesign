@@ -9,19 +9,20 @@ adapted from FigCraft's original icon set, imported at the revision recorded in 
 `UNDESIGN-CHANGES.md`. The inherited glyph artwork remains under MIT OR Apache-2.0, with FigCraft
 copyright retained in `LICENSE-MIT` and `NOTICE`. The Undesign `Logo` glyph is original artwork.
 
-The project owner has explicitly approved a narrow, code-only exception for monochrome copies of
-these common Figma editor toolbar glyphs: Move, Frame, Rectangle, Pen, Text, Comment, Actions/sparkle,
-and Dev Mode/Code. The visual reference is the toolbar shown in Figma's public
-[Help Center article](https://help.figma.com/hc/en-us/articles/360041064174-Access-design-tools-from-the-toolbar).
+For the isolated `figma-editor-2026-11-04` task, the project owner explicitly expanded the earlier
+eight-toolbar-glyph approval to the full editor-visible icon set, including Figma-like silhouettes
+drawn as monochrome code paths. The public references are Figma's [toolbar article](https://help.figma.com/hc/en-us/articles/360041064174-Access-design-tools-from-the-toolbar),
+[UI3 overview](https://www.figma.com/blog/our-approach-to-designing-ui3/),
+[left-sidebar guide](https://help.figma.com/hc/en-us/articles/360039831974-Explore-the-navigation-bar-and-left-sidebar),
+and [right-sidebar guide](https://help.figma.com/hc/en-us/articles/360039832014-Design-prototype-and-explore-layer-properties-in-the-right-sidebar).
+This is task-scoped owner authorization, not a Figma licence or a general permission for future work.
 The [official UI3 Community file listing](https://www.figma.com/community/file/1486123838948777078/ui3-figmas-ui-kit)
-is noted as related public context, but it does not show a licence badge. Figma's
-[Community copyright and licensing guidance](https://help.figma.com/hc/en-us/articles/360042296374-Figma-Community-copyright-and-licensing)
-says free Community files are CC BY 4.0; that general statement does not establish that this UI3 file
-or the Help Center screenshot is covered by that licence. Neither the listing nor the screenshot/article
-states a redistribution licence for the referenced glyphs, so no CC BY 4.0 claim is made for them and
-their source/licence status remains unconfirmed. The local reference screenshot is not bundled or used
-as an image asset. This exception records the owner's authorization for the specified glyphs; it is
-not a determination of third-party licensing. No other third-party iconography is permitted.
+has no licence badge. Figma's [Community copyright and licensing guidance](https://help.figma.com/hc/en-us/articles/360042296374-Figma-Community-copyright-and-licensing)
+says free Community files are CC BY 4.0; that general statement does not establish that the UI3 file
+or Help Center references are covered by that licence. No CC BY 4.0, MIT, or Apache-2.0 claim is made
+for Figma-derived glyph shapes; their redistribution status remains unconfirmed. No Figma screenshots,
+bundled images, fonts, logos, or private app assets are used. Preserve the inherited FigCraft licence
+for unchanged artwork and the original Undesign `Logo` attribution above.
 
 ## Assets in this repository
 
@@ -46,3 +47,5 @@ Release builds embed fonts from the optional craft-fonts build input
 | BIZ UDPGothic, BIZ UDMincho, Shippori Mincho, Noto Sans Arabic | SIL Open Font License 1.1 | Google Fonts (see craft-fonts) |
 
 egui's default fonts (compiled into the `egui`/`epaint` crates) keep their own licences (OFL / Apache-2.0 / Ubuntu Font Licence); see those crates.
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

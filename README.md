@@ -101,6 +101,8 @@ Every design below was built entirely through Undesign's command API, the same o
 and exported at 2x by Undesign's own renderer. The source files are in
 [`examples/`](examples).
 
+The [Daybreak Motion Study](examples/daybreak-motion-study.undesign) is a **Design + Motion** sample.
+
 <table>
 <tr>
 <td width="33%" valign="top">
@@ -136,6 +138,24 @@ and exported at 2x by Undesign's own renderer. The source files are in
 <td colspan="3" valign="top">
   <img src="docs/images/art-ds-colour.png" alt="Ridgeline UI colour ramps: six swatches each of Pine greens, Sunset oranges and Slate greys, each labelled with its name and hex value" width="100%">
   <p align="center"><sub><b>Ridgeline UI</b>: colour ramps where every swatch is a paint style, exported through a slice</sub></p>
+</td>
+</tr>
+</table>
+
+## Local redesign branch preview — not production
+
+> These are review-only captures from a local run of the unintegrated
+> `figma-editor-2026-11-04` branch. They are **not production screenshots** and do not represent the shipped application.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+  <img src="docs/images/local-redesign-preview-1440x900.png" alt="Local, non-production redesign branch preview with a selected rectangle at a 1440 by 900 viewport" width="100%">
+  <p align="center"><sub><b>1440 × 900</b> · local redesign branch preview</sub></p>
+</td>
+<td width="50%" valign="top">
+  <img src="docs/images/local-redesign-preview-800x500.png" alt="Local, non-production redesign branch preview with the Dimensions fields visible at an 800 by 500 viewport" width="100%">
+  <p align="center"><sub><b>800 × 500</b> · local redesign branch preview</sub></p>
 </td>
 </tr>
 </table>
@@ -279,3 +299,5 @@ there.
 ## Star history
 
 [![Star History Chart](https://api.star-history.com/svg?repos=palcchi/undesign&type=Date&legend=top-left)](https://www.star-history.com/?repos=palcchi%2Fundesign&type=date&legend=top-left)
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

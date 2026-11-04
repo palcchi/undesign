@@ -1895,7 +1895,7 @@ impl FigApp {
             egui::Frame::NONE
                 .fill(t.panel)
                 .stroke(egui::Stroke::new(1.0, t.border))
-                .corner_radius(egui::CornerRadius::same(12))
+                .corner_radius(egui::CornerRadius::same(theme::PANEL_RADIUS))
                 .outer_margin(egui::Margin::same(8))
                 .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
         };
@@ -2224,3 +2224,5 @@ mod type_settings_tests;
 
 #[cfg(test)]
 mod typography_scrub_tests;
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

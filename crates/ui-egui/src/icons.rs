@@ -1,5 +1,6 @@
-//! Undesign's code-drawn icon set, adapted from FigCraft's original glyph artwork (MIT OR
-//! Apache-2.0). The Undesign `Logo` glyph is original; no third-party icon sets are used.
+//! Undesign's code-drawn editor icon set, adapted from FigCraft's original glyph artwork (MIT OR
+//! Apache-2.0). Common editor roles use the task-authorized Figma-like glyph family; see
+//! `ATTRIBUTION.md`. The Undesign `Logo` glyph is original, and no screenshots or binary assets are used.
 //!
 //! At 16 px, stroke centre-lines sit on pixel centres and fill edges on whole pixels. Stroke
 //! weight scales proportionally with larger glyphs; smaller ones are hinted so straight strokes
@@ -500,6 +501,9 @@ impl P<'_> {
 
 /// Paint `icon` centred in `rect` (a 16-unit glyph scaled to fit) in `color`.
 pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
+    if crate::app_glyphs::paint_compat(painter, rect, icon, color) {
+        return;
+    }
     let ppp = painter.ctx().pixels_per_point();
     let px = 1.0 / ppp;
     // Physical pixels per grid unit: whole steps from 16 px up (quarter steps on fractional
@@ -521,18 +525,7 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
 fn draw(p: &P, icon: Icon) {
     use Icon::*;
     match icon {
-        Move => {
-            // Four arrows out of a centre dot.
-            p.dot(8.0, 8.0, 1.4);
-            p.line(8.0, 6.2, 8.0, 3.4);
-            p.line(8.0, 9.8, 8.0, 12.6);
-            p.line(6.2, 8.0, 3.4, 8.0);
-            p.line(9.8, 8.0, 12.6, 8.0);
-            p.poly(&[(6.6, 4.8), (8.0, 3.2), (9.4, 4.8)], false);
-            p.poly(&[(6.6, 11.2), (8.0, 12.8), (9.4, 11.2)], false);
-            p.poly(&[(4.8, 6.6), (3.2, 8.0), (4.8, 9.4)], false);
-            p.poly(&[(11.2, 6.6), (12.8, 8.0), (11.2, 9.4)], false);
-        }
+        Move => p.poly(&[(4.0, 2.5), (4.0, 12.5), (6.8, 9.8), (9.0, 13.8), (10.7, 12.9), (8.6, 9.1), (13.0, 9.1)], true),
         Scale => {
             p.rect(2.5, 8.5, 7.5, 13.5, 1.0);
             p.line(5.5, 10.5, 12.5, 3.5);
@@ -1459,7 +1452,8 @@ mod tests {
                 .unwrap_or_default()
         }
 
-        for (size, expected) in [(16.0, 1.25), (24.0, 1.875), (32.0, 2.5)] {
+        for size in [16.0, 24.0, 32.0] {
+            let expected = 1.85 * size / 24.0;
             assert!((width(size) - expected).abs() < 0.01, "{size}px glyph should use a {expected}px stroke");
         }
     }
@@ -1596,23 +1590,20 @@ mod tests {
         }
     }
 
-    /// Slice is one knife (#739): a filled blade and a solid handle that overlap, so the two
-    /// read as one mark rather than separate pieces.
+    /// Slice is a crop tool: four open corner brackets, with no detached blade or filled handle.
     #[test]
-    fn slice_is_one_connected_knife() {
+    fn slice_uses_four_open_crop_brackets() {
         let shapes = shapes_at_32(Icon::Slice);
-        let fills: Vec<Vec<Pos2>> = shapes
+        let paths: Vec<_> = shapes
             .iter()
             .filter_map(|s| match s {
-                Shape::Path(p) if p.fill != Color32::TRANSPARENT => Some(p.points.clone()),
-                Shape::Mesh(m) => Some(m.vertices.iter().map(|v| v.pos).collect()),
+                Shape::Path(p) => Some(p),
                 _ => None,
             })
             .collect();
-        assert_eq!(fills.len(), 2, "a blade and a handle, nothing else");
-        // The two outlines meet: some blade point sits within a grid unit of a handle point.
-        let gap = fills[0].iter().flat_map(|a| fills[1].iter().map(|b| (*a - *b).length())).fold(f32::INFINITY, f32::min);
-        assert!(gap <= 2.0, "blade and handle join: closest points {gap:.1}pt apart");
+        assert_eq!(paths.len(), 8, "two open strokes per crop corner");
+        assert!(paths.iter().all(|p| !p.closed && p.points.len() == 2), "crop brackets are open straight strokes");
+        assert!(shapes.iter().all(|s| !matches!(s, Shape::Mesh(_))), "crop icon has no detached filled pieces");
     }
 
     /// Each corner's icon shows its own corner: no two of the four draw alike.
@@ -1629,3 +1620,5 @@ mod tests {
         }
     }
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

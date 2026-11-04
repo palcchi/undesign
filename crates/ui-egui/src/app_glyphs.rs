@@ -1,8 +1,8 @@
-//! Monochrome UI glyphs for the Undesign workspace shell and primary controls.
+//! Monochrome UI glyphs for the full Undesign editor icon family and workspace shell.
 //!
 //! The inherited geometric marks follow a shared 24-unit grid, round-ended strokes and a consistent
-//! optical weight. The common toolbar marks use monochrome Figma editor glyph paths by explicit
-//! project-owner approval; `paint` still takes one color for the complete glyph.
+//! optical weight. Figma-like silhouettes across editor-visible roles are explicitly owner-approved
+//! for this isolated task; `paint` still takes one color for the complete glyph.
 
 use egui::{Color32, CornerRadius, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, pos2};
 
@@ -31,6 +31,9 @@ pub enum Glyph {
     Components,
     Puzzle,
     Actions,
+    More,
+    Menu,
+    Shapes,
     Motion,
     Design,
     Prototype,
@@ -51,6 +54,7 @@ pub enum Glyph {
     Close,
     Check,
     Eye,
+    EyeOff,
     Code,
     Clock,
     PaintBucket,
@@ -94,6 +98,9 @@ impl Glyph {
         Glyph::Components,
         Glyph::Puzzle,
         Glyph::Actions,
+        Glyph::More,
+        Glyph::Menu,
+        Glyph::Shapes,
         Glyph::Motion,
         Glyph::Design,
         Glyph::Prototype,
@@ -114,6 +121,7 @@ impl Glyph {
         Glyph::Close,
         Glyph::Check,
         Glyph::Eye,
+        Glyph::EyeOff,
         Glyph::Code,
         Glyph::Clock,
         Glyph::PaintBucket,
@@ -133,8 +141,8 @@ impl Glyph {
     ];
 }
 
-/// Map familiar control roles to the common monochrome glyphs in this module.
-/// Unmapped specialist icons can continue using the app's broader feature icon renderer.
+/// Map common editor roles to the shared monochrome glyph family.
+/// Unmapped specialist roles keep their dedicated feature shapes in `icons`.
 pub fn from_icon(icon: crate::icons::Icon) -> Option<Glyph> {
     use crate::icons::Icon as I;
     Some(match icon {
@@ -176,7 +184,8 @@ pub fn from_icon(icon: crate::icons::Icon) -> Option<Glyph> {
         I::LiveShared | I::LivePrivate => Glyph::Online,
         I::Close => Glyph::Close,
         I::Check => Glyph::Check,
-        I::Eye | I::EyeOff => Glyph::Eye,
+        I::Eye => Glyph::Eye,
+        I::EyeOff => Glyph::EyeOff,
         I::Code => Glyph::Code,
         I::Clock => Glyph::Clock,
         I::PaintBucket | I::Fill => Glyph::PaintBucket,
@@ -188,7 +197,7 @@ pub fn from_icon(icon: crate::icons::Icon) -> Option<Glyph> {
         I::Marker => Glyph::Marker,
         I::Highlighter => Glyph::Highlighter,
         I::Connector => Glyph::Connector,
-        I::Shapes => Glyph::Polygon,
+        I::Shapes => Glyph::Shapes,
         I::Board => Glyph::Board,
         I::Stamp => Glyph::Stamp,
         I::Panels => Glyph::Panels,
@@ -196,7 +205,8 @@ pub fn from_icon(icon: crate::icons::Icon) -> Option<Glyph> {
         I::Preview => Glyph::Play,
         I::Effects => Glyph::Effects,
         I::Adjust => Glyph::Design,
-        I::Dots | I::Menu => Glyph::Actions,
+        I::Dots => Glyph::More,
+        I::Menu => Glyph::Menu,
         I::Styles => Glyph::Styles,
         _ => return None,
     })
@@ -282,10 +292,19 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
             path(&[(20.0, 16.0), (20.0, 20.0), (16.0, 20.0)], false);
         }
         Frame => {
-            line((7.0, 3.0), (7.0, 21.0));
-            line((17.0, 3.0), (17.0, 21.0));
-            line((3.0, 7.0), (21.0, 7.0));
-            line((3.0, 17.0), (21.0, 17.0));
+            // Open frame corners with a subtle center cross, rather than a heavy grid.
+            line((5.0, 10.0), (5.0, 5.0));
+            line((5.0, 5.0), (10.0, 5.0));
+            line((14.0, 5.0), (19.0, 5.0));
+            line((19.0, 5.0), (19.0, 10.0));
+            line((19.0, 14.0), (19.0, 19.0));
+            line((19.0, 19.0), (14.0, 19.0));
+            line((10.0, 19.0), (5.0, 19.0));
+            line((5.0, 19.0), (5.0, 14.0));
+            line((12.0, 8.0), (12.0, 10.0));
+            line((12.0, 14.0), (12.0, 16.0));
+            line((8.0, 12.0), (10.0, 12.0));
+            line((14.0, 12.0), (16.0, 12.0));
         }
         Section => {
             path(&[(5.0, 7.0), (5.0, 18.0), (19.0, 18.0), (19.0, 7.0), (13.0, 7.0), (11.0, 5.0), (6.0, 5.0), (5.0, 7.0)], true);
@@ -404,6 +423,21 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
             line((18.0, 18.0), (22.0, 18.0));
             line((20.0, 16.0), (20.0, 20.0));
         }
+        More => {
+            dot((6.0, 12.0), 1.2);
+            dot((12.0, 12.0), 1.2);
+            dot((18.0, 12.0), 1.2);
+        }
+        Menu => {
+            line((5.0, 7.0), (19.0, 7.0));
+            line((5.0, 12.0), (19.0, 12.0));
+            line((5.0, 17.0), (19.0, 17.0));
+        }
+        Shapes => {
+            outline_rect((4.0, 4.0), (11.0, 11.0), 1.0);
+            circle((16.0, 8.0), 4.0);
+            path(&[(5.0, 20.0), (10.0, 13.0), (15.0, 20.0), (5.0, 20.0)], true);
+        }
         Motion => {
             line((7.0, 4.0), (7.0, 20.0));
             line((4.0, 18.0), (20.0, 18.0));
@@ -472,9 +506,13 @@ pub fn paint(painter: &Painter, rect: Rect, glyph: Glyph, color: Color32) {
             line((17.0, 7.0), (7.0, 17.0));
         }
         Check => path(&[(5.0, 12.0), (10.0, 17.0), (19.0, 7.0)], false),
-        Eye => {
+        Eye | EyeOff => {
             path(&[(3.0, 12.0), (7.0, 7.0), (12.0, 5.0), (17.0, 7.0), (21.0, 12.0), (17.0, 17.0), (12.0, 19.0), (7.0, 17.0), (3.0, 12.0)], true);
-            circle((12.0, 12.0), 2.5);
+            if glyph == Eye {
+                circle((12.0, 12.0), 2.5);
+            } else {
+                line((5.0, 19.0), (19.0, 5.0));
+            }
         }
         Code => {
             path(&[(9.0, 6.0), (4.0, 12.0), (9.0, 18.0)], false);
@@ -571,19 +609,60 @@ mod tests {
     }
 
     #[test]
-    fn approved_figma_toolbar_roles_map_to_the_expected_glyphs() {
+    fn full_editor_common_roles_map_to_the_expected_glyphs() {
         use crate::icons::Icon as I;
         for (icon, expected) in [
             (I::Move, Glyph::Select),
+            (I::Hand, Glyph::Hand),
+            (I::Scale, Glyph::Scale),
             (I::Frame, Glyph::Frame),
+            (I::Section, Glyph::Section),
+            (I::Slice, Glyph::Slice),
             (I::Rectangle, Glyph::Rectangle),
+            (I::Line, Glyph::Line),
+            (I::Arrow, Glyph::Arrow),
+            (I::Ellipse, Glyph::Ellipse),
+            (I::Polygon, Glyph::Polygon),
+            (I::Star, Glyph::Star),
             (I::Pen, Glyph::Pen),
+            (I::Pencil, Glyph::Pencil),
+            (I::ShapeBuilder, Glyph::ShapeBuilder),
+            (I::ShapeBuilderRemove, Glyph::ShapeBuilderRemove),
+            (I::Bend, Glyph::Bend),
             (I::Text, Glyph::Text),
+            (I::TextOnPath, Glyph::TextOnPath),
             (I::Comment, Glyph::Comment),
+            (I::Component, Glyph::Components),
+            (I::Instance, Glyph::Components),
+            (I::ComponentSet, Glyph::Components),
             (I::Actions, Glyph::Actions),
+            (I::Motion, Glyph::Motion),
+            (I::Prototype, Glyph::Prototype),
+            (I::Page, Glyph::Page),
+            (I::Layers, Glyph::Layers),
+            (I::Search, Glyph::Search),
+            (I::Chevron, Glyph::ChevronDown),
+            (I::ChevronRight, Glyph::ChevronRight),
+            (I::Plus, Glyph::Plus),
+            (I::Minus, Glyph::Minus),
+            (I::Eye, Glyph::Eye),
+            (I::EyeOff, Glyph::EyeOff),
             (I::Code, Glyph::Code),
+            (I::Menu, Glyph::Menu),
+            (I::Dots, Glyph::More),
+            (I::Shapes, Glyph::Shapes),
         ] {
             assert_eq!(from_icon(icon), Some(expected), "wrong glyph for {icon:?}");
         }
     }
+
+    #[test]
+    fn specialist_property_icons_keep_their_dedicated_shapes() {
+        use crate::icons::Icon as I;
+        for icon in [I::AlignLeft, I::GradientLinear, I::CornerRadius, I::PaddingTop, I::LinkOn] {
+            assert_eq!(from_icon(icon), None, "{icon:?} remains in the feature renderer");
+        }
+    }
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

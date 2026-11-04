@@ -97,8 +97,20 @@ pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
     let people = Rect::from_min_size(pos2(share.min.x - 8.0 - people_width, top.min.y), vec2(people_width, top.height()));
     let file_right = people.min.x - 8.0;
     let slot_width = (file_right - file_left).clamp(64.0, 220.0);
-    let name_rect = Rect::from_min_size(pos2(file_left, top.center().y - 14.0), vec2((slot_width - 22.0).max(40.0), 28.0));
-    let (file_name, is_design) = app.session.doc().map(|doc| (doc.name.clone(), doc.kind.is_design())).unwrap_or_default();
+    let (file_name, is_design, dirty, in_review) =
+        app.session.ds().map(|ds| (ds.doc.name.clone(), ds.doc.kind.is_design(), ds.is_dirty(), ds.branch_of.is_some())).unwrap_or_default();
+    let status_label = if in_review {
+        tr("In review")
+    } else if dirty {
+        tr("Unsaved changes")
+    } else {
+        tr("All changes saved")
+    };
+    let status_galley = ui.painter().layout_no_wrap(status_label.to_string(), regular(9.0), t.text_secondary);
+    let status_width = status_galley.size().x + 12.0;
+    let show_status = slot_width >= status_width + 74.0;
+    let name_width = if show_status { (slot_width - status_width - 22.0).max(40.0) } else { (slot_width - 22.0).max(40.0) };
+    let name_rect = Rect::from_min_size(pos2(file_left, top.center().y - 14.0), vec2(name_width, 28.0));
     let start = std::mem::take(&mut app.ui.rename_file);
     if let (Some(new), _) = widgets::rename_field(ui, Id::new("filename"), &file_name, name_rect, semibold(11.5), start) {
         app.run("file.rename", json!({"name": new}));
@@ -111,6 +123,31 @@ pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
     }
     app_glyphs::paint(ui.painter(), Rect::from_center_size(file_menu.center(), vec2(12.0, 12.0)), Glyph::ChevronDown, t.icon_secondary);
     file_page_menu(app, &fresp, is_design);
+    if show_status {
+        let status_rect = Rect::from_min_size(pos2(file_menu.max.x + 4.0, top.center().y - 8.0), vec2(status_width, 16.0));
+        let status_resp = ui.interact(status_rect, ui.id().with("save_status"), Sense::hover()).tip(status_label.clone());
+        a11y::status(
+            &status_resp,
+            status_label,
+            if in_review {
+                "In review"
+            } else if dirty {
+                "Unsaved changes"
+            } else {
+                "All changes saved"
+            },
+        );
+        let dot = Rect::from_center_size(pos2(status_rect.min.x + 4.0, status_rect.center().y), vec2(5.0, 5.0));
+        let dot_color = if in_review {
+            t.warning
+        } else if dirty {
+            t.accent
+        } else {
+            t.success
+        };
+        ui.painter().circle_filled(dot.center(), 2.5, dot_color);
+        ui.painter().galley(pos2(status_rect.min.x + 10.0, status_rect.center().y - status_galley.size().y / 2.0), status_galley, t.text_secondary);
+    }
 
     crate::live::people_bar(app, ui, people);
     let sresp = ui.interact(share, ui.id().with("share"), Sense::click()).tip(tr("Share: live session, export"));
@@ -271,7 +308,7 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
         app.ui.chat_open = false;
     }
     let chat_view = app.ui.chat_open;
-    let header_h = if chat_view { 36.0 } else { 64.0 };
+    let header_h = 36.0;
     let (tabs, _) = ui.allocate_exact_size(vec2(w, header_h), Sense::hover());
     ui.painter().line_segment([tabs.left_top(), tabs.right_top()], Stroke::new(1.0, t.border));
     if chat_view {
@@ -304,50 +341,43 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
     });
 }
 
-/// Three primary workspaces sit above their independent inspector controls. Prototype remains a
-/// Design-side tab; Agent stays reachable from the same panel without becoming a workspace mode.
+/// Four equal workspace tabs share one 36 px row. Dev Mode remains a separate toolbar mode.
 fn workspace_header(app: &mut FigApp, ui: &mut Ui, tabs: Rect) {
     let t = Tokens::get(ui.ctx());
     let state_accent = crate::motion_panel::motion_state_accent(&t);
-    let active_workspace = match app.ui.right_tab {
-        RightTab::Design | RightTab::Prototype => Some(RightTab::Design),
-        RightTab::Motion => Some(RightTab::Motion),
-        RightTab::Inspect => Some(RightTab::Inspect),
-        RightTab::Agent => None,
-    };
     let modes = [
         (RightTab::Design, tr("Design"), tr("Design workspace")),
+        (RightTab::Prototype, tr("Prototype"), tr("Prototype workspace")),
         (RightTab::Motion, tr("Motion"), tr("Motion workspace")),
-        (RightTab::Inspect, tr("Inspect"), tr("Inspect workspace")),
+        (RightTab::Agent, tr("Agent"), tr("Agent workspace")),
     ];
-    let inset = 6.0;
-    let gap = 3.0;
-    let mode_w = ((tabs.width() - inset * 2.0 - gap * 2.0) / 3.0).max(52.0);
+    let inset = 4.0;
+    let gap = 2.0;
+    let mode_w = ((tabs.width() - inset * 2.0 - gap * 3.0) / 4.0).max(1.0);
     for (i, (mode, label, accessible_label)) in modes.into_iter().enumerate() {
         let x = tabs.min.x + inset + i as f32 * (mode_w + gap);
-        let r = Rect::from_min_size(pos2(x, tabs.min.y + 4.0), vec2(mode_w, 28.0));
-        let active = active_workspace == Some(mode);
-        let resp = ui.interact(r, ui.id().with(("workspace-tab", label)), Sense::click());
+        let r = Rect::from_min_size(pos2(x, tabs.min.y), vec2(mode_w, tabs.height()));
+        let active = app.ui.right_tab == mode;
+        let resp = ui.interact(r, ui.id().with(("workspace-tab", label)), Sense::click()).on_hover_text(accessible_label);
         a11y::tab(&resp, accessible_label, active);
         if active {
-            ui.painter().rect_filled(r, CornerRadius::same(6), t.selected_row);
-            let indicator = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(12.0, 2.0));
+            let indicator = Rect::from_min_max(pos2(r.min.x + 8.0, r.max.y - 2.0), pos2(r.max.x - 8.0, r.max.y));
             ui.painter().rect_filled(indicator, CornerRadius::same(1), state_accent);
         } else if resp.hovered() || resp.has_focus() {
-            ui.painter().rect_filled(r, CornerRadius::same(6), t.hover);
+            ui.painter().rect_filled(r.shrink2(vec2(1.0, 2.0)), CornerRadius::same(6), t.hover);
         }
         let galley = ui.painter().layout_no_wrap(
             label.into(),
-            if active { semibold(11.0) } else { regular(11.0) },
-            if active { state_accent } else { t.text_secondary },
+            if active { semibold(10.5) } else { regular(10.5) },
+            if active { t.text } else { t.text_secondary },
         );
         ui.painter().galley(
             pos2(r.center().x - galley.size().x / 2.0, r.center().y - galley.size().y / 2.0),
             galley,
-            if active { state_accent } else { t.text_secondary },
+            if active { t.text } else { t.text_secondary },
         );
         if resp.has_focus() {
-            ui.painter().rect_stroke(r, CornerRadius::same(6), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(r.shrink2(vec2(1.0, 1.0)), CornerRadius::same(6), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
         }
         if resp.clicked() {
             app.ui.chat_open = false;
@@ -360,111 +390,25 @@ fn workspace_header(app: &mut FigApp, ui: &mut Ui, tabs: Rect) {
                     app.ui.right_tab = RightTab::Design;
                     app.ui.compact_panel = crate::CompactPanel::Design;
                 }
+                RightTab::Prototype => {
+                    crate::proto_panel::open_editor(ui.ctx(), None);
+                    app.ui.motion_timeline = false;
+                    app.ui.right_tab = RightTab::Prototype;
+                    app.ui.compact_panel = crate::CompactPanel::Prototype;
+                }
                 RightTab::Motion => {
                     app.ui.right_tab = RightTab::Motion;
                     app.ui.compact_panel = crate::CompactPanel::Motion;
                     app.ui.motion_timeline = true;
                 }
-                RightTab::Inspect => {
+                RightTab::Agent => {
                     app.ui.motion_timeline = false;
-                    app.ui.right_tab = RightTab::Inspect;
-                    app.ui.compact_panel = crate::CompactPanel::Inspect;
+                    app.ui.right_tab = RightTab::Agent;
+                    app.ui.compact_panel = crate::CompactPanel::Agent;
                 }
-                _ => {}
+                RightTab::Inspect => {}
             }
         }
-    }
-
-    let sub_y = tabs.min.y + 36.0;
-    let sub_h = 22.0;
-    match app.ui.right_tab {
-        RightTab::Design | RightTab::Prototype => {
-            let mut x = tabs.min.x + inset;
-            for (tab, label) in [(RightTab::Design, tr("Design")), (RightTab::Prototype, tr("Prototype"))] {
-                let galley = ui.painter().layout_no_wrap(label.into(), regular(10.0), t.text_secondary);
-                let r = Rect::from_min_size(pos2(x, sub_y), vec2(galley.size().x + 16.0, sub_h));
-                let active = app.ui.right_tab == tab;
-                let resp = ui.interact(r, ui.id().with(("inspector-tab", label)), Sense::click());
-                a11y::tab(&resp, label, active);
-                if active {
-                    ui.painter().rect_filled(r, CornerRadius::same(5), t.selected_row);
-                } else if resp.hovered() || resp.has_focus() {
-                    ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
-                }
-                ui.painter().galley(
-                    pos2(r.min.x + 8.0, r.center().y - galley.size().y / 2.0),
-                    galley,
-                    if active { state_accent } else { t.text_secondary },
-                );
-                if resp.has_focus() {
-                    ui.painter().rect_stroke(r, CornerRadius::same(5), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
-                }
-                if resp.clicked() {
-                    if tab == RightTab::Prototype && app.ui.right_tab != tab {
-                        crate::proto_panel::open_editor(ui.ctx(), None);
-                    }
-                    crate::motion_panel::cancel_keyframe_interaction(app);
-                    app.ui.chat_open = false;
-                    app.ui.motion_timeline = false;
-                    app.ui.right_tab = tab;
-                    app.ui.compact_panel = if tab == RightTab::Design { crate::CompactPanel::Design } else { crate::CompactPanel::Prototype };
-                }
-                x = r.max.x + 3.0;
-            }
-        }
-        RightTab::Motion => {
-            let label = tr("Timeline");
-            let r = Rect::from_min_size(pos2(tabs.min.x + inset, sub_y), vec2(78.0, sub_h));
-            let resp = ui.interact(r, ui.id().with("motion-timeline-toggle"), Sense::click());
-            a11y::toggle(&resp, label, app.ui.motion_timeline);
-            if app.ui.motion_timeline {
-                ui.painter().rect_filled(r, CornerRadius::same(5), t.selected_row);
-            } else if resp.hovered() || resp.has_focus() {
-                ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
-            }
-            if resp.has_focus() {
-                ui.painter().rect_stroke(r, CornerRadius::same(5), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
-            }
-            ui.painter().text(
-                r.center(),
-                Align2::CENTER_CENTER,
-                label,
-                regular(10.0),
-                if app.ui.motion_timeline { state_accent } else { t.text_secondary },
-            );
-            if resp.clicked() {
-                app.ui.motion_timeline = !app.ui.motion_timeline;
-            }
-        }
-        RightTab::Inspect => {}
-        RightTab::Agent => {}
-    }
-
-    let agent_label = tr("Agent");
-    let agent_active = app.ui.right_tab == RightTab::Agent;
-    let agent_galley = ui.painter().layout_no_wrap(agent_label.into(), regular(10.0), if agent_active { state_accent } else { t.text_secondary });
-    let agent_r = Rect::from_min_size(pos2(tabs.max.x - agent_galley.size().x - 28.0, sub_y), vec2(agent_galley.size().x + 22.0, sub_h));
-    let agent_resp = ui.interact(agent_r, ui.id().with("right-agent-tab"), Sense::click());
-    a11y::button(&agent_resp, agent_label);
-    if agent_active {
-        ui.painter().rect_filled(agent_r, CornerRadius::same(5), t.selected_row);
-    } else if agent_resp.hovered() || agent_resp.has_focus() {
-        ui.painter().rect_filled(agent_r, CornerRadius::same(5), t.hover);
-    }
-    if agent_resp.has_focus() {
-        ui.painter().rect_stroke(agent_r, CornerRadius::same(5), Stroke::new(1.0, state_accent), egui::StrokeKind::Inside);
-    }
-    ui.painter().galley(
-        pos2(agent_r.min.x + 11.0, agent_r.center().y - agent_galley.size().y / 2.0),
-        agent_galley,
-        if agent_active { state_accent } else { t.text_secondary },
-    );
-    if agent_resp.clicked() {
-        crate::motion_panel::cancel_keyframe_interaction(app);
-        app.ui.chat_open = false;
-        app.ui.motion_timeline = false;
-        app.ui.right_tab = RightTab::Agent;
-        app.ui.compact_panel = crate::CompactPanel::Agent;
     }
 }
 
@@ -2648,3 +2592,5 @@ fn inspect(app: &mut FigApp, ui: &mut Ui) {
     crate::dev_mode::connect_section(app, ui, &doc, first, lang);
     crate::dev_mode::plugins_section(app, ui);
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

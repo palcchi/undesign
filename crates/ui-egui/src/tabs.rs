@@ -204,7 +204,7 @@ pub fn tab_bar(app: &mut FigApp, ui: &mut Ui) {
                 Some(false) => trf("{name}, online, open only to you", &[("name", name)]),
                 None => name.clone(),
             };
-            let resp = if live.is_some() { resp.on_hover_text(&label) } else { resp };
+            let resp = resp.on_hover_text(&label);
             crate::a11y::tab(&resp, &label, active);
             let progress = open_progress(&opening, d.uid, now);
             let paint_r = r.translate(vec2(-28.0 * (1.0 - progress).powi(2), 0.0));
@@ -706,3 +706,5 @@ mod layout_tests {
         assert!(motion.opening.is_empty(), "Reduce motion opens tabs at once");
     }
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

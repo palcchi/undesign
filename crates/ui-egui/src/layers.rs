@@ -97,7 +97,7 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
     y += 12.0;
     let items = [(Icon::Styles, tr("Variables"), None)];
     for (icon, label, tab) in items {
-        let ir = Rect::from_center_size(pos2(r.center().x, y + 14.0), vec2(36.0, 28.0));
+        let ir = Rect::from_center_size(pos2(r.center().x, y + 22.0), vec2(36.0, 36.0));
         let hit = Rect::from_min_max(pos2(r.min.x, y), pos2(r.max.x, y + 48.0));
         let resp = ui.interact(hit, ui.id().with(("rail", label)), Sense::click()).tip(label);
         let active = tab.is_some_and(|_| !app.ui.left_collapsed && !app.ui.versions.open);
@@ -110,8 +110,6 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
             ui.painter().rect_filled(ir, CornerRadius::same(6), t.hover);
         }
         icons::paint(ui.painter(), Rect::from_center_size(ir.center(), vec2(16.0, 16.0)), icon, if active { t.accent_text } else { t.icon });
-        let shown = crate::widgets::elide_font(ui, label, (r.width() - 6.0).max(0.0), regular(10.0));
-        ui.painter().text(pos2(r.center().x, y + 38.0), Align2::CENTER_CENTER, shown, regular(10.0), t.text);
         if resp.clicked() {
             match tab {
                 Some(tb) => {
@@ -134,13 +132,13 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
                 }
             }
         }
-        y += 60.0;
+        y += 52.0;
     }
     y += 4.0;
     ui.painter().line_segment([pos2(r.min.x + 18.0, y), pos2(r.max.x - 18.0, y)], Stroke::new(1.0, t.border));
     y += 12.0;
     for (label, action) in [(tr("Agent"), "agent"), (tr("Chat"), "chat")] {
-        let ir = Rect::from_center_size(pos2(r.center().x, y + 14.0), vec2(36.0, 28.0));
+        let ir = Rect::from_center_size(pos2(r.center().x, y + 22.0), vec2(36.0, 36.0));
         let hit = Rect::from_min_max(pos2(r.min.x, y), pos2(r.max.x, y + 48.0));
         let resp = ui.interact(hit, ui.id().with(("rail_action", action)), Sense::click()).tip(label);
         let active = (action == "agent" && app.ui.right_tab == crate::RightTab::Agent) || (action == "chat" && app.ui.chat_open);
@@ -155,8 +153,6 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
             }
             _ => icons::paint(ui.painter(), ir.shrink(8.0), Icon::Comment, t.icon),
         }
-        let shown = crate::widgets::elide_font(ui, label, (r.width() - 6.0).max(0.0), regular(10.0));
-        ui.painter().text(pos2(r.center().x, y + 38.0), Align2::CENTER_CENTER, shown, regular(10.0), t.text);
         if resp.clicked() {
             match action {
                 "agent" => {
@@ -171,7 +167,7 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
                 }
             }
         }
-        y += 60.0;
+        y += 52.0;
     }
 }
 
@@ -1047,6 +1043,8 @@ fn layers(app: &mut FigApp, ui: &mut Ui) {
             let over = resp.contains_pointer();
             if selected {
                 ui.painter().rect_filled(rr, CornerRadius::same(5), if is_comp { t.component_row } else { t.selected_row });
+                let marker = Rect::from_min_size(pos2(rr.min.x, rr.center().y - 5.0), vec2(2.0, 10.0));
+                ui.painter().rect_filled(marker, CornerRadius::same(1), t.accent);
             } else if in_selected {
                 ui.painter().rect_filled(rr, CornerRadius::ZERO, t.selected_row_child);
             } else if over || hover == Some(row.id) {
@@ -1364,3 +1362,5 @@ fn layers(app: &mut FigApp, ui: &mut Ui) {
     }
     let _ = Color32::TRANSPARENT;
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

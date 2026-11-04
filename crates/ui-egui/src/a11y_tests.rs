@@ -125,14 +125,11 @@ fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 2, "left and right Design tabs");
     assert!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).all(|n| n.is_selected() == Some(true)));
     assert_eq!(find(&nodes, Role::Tab, "Design workspace").is_selected(), Some(true));
+    assert_eq!(find(&nodes, Role::Tab, "Prototype workspace").is_selected(), Some(false));
     assert_eq!(find(&nodes, Role::Tab, "Motion workspace").is_selected(), Some(false));
-    assert_eq!(find(&nodes, Role::Tab, "Inspect workspace").is_selected(), Some(false));
-    assert_eq!(find(&nodes, Role::Tab, "Prototype").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Agent workspace").is_selected(), Some(false));
     assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
-    assert!(
-        nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Agent" | "Dev Mode")))),
-        "Agent and Dev Mode are not right-panel tabs"
-    );
+    assert!(nodes.iter().all(|n| n.role() != Role::Tab || n.label() != Some("Inspect workspace")), "Dev Mode remains a separate toolbar mode");
     find(&nodes, Role::Button, "Agent");
     find(&nodes, Role::Button, "Chat");
     find(&nodes, Role::Button, "Comment");
@@ -171,15 +168,12 @@ fn tablet_width_uses_desktop_sidebar_tabs_and_the_shared_header() {
     assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 2);
     assert!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).all(|n| n.is_selected() == Some(true)));
     assert_eq!(find(&nodes, Role::Tab, "Design workspace").is_selected(), Some(true));
+    assert_eq!(find(&nodes, Role::Tab, "Prototype workspace").is_selected(), Some(false));
     assert_eq!(find(&nodes, Role::Tab, "Motion workspace").is_selected(), Some(false));
-    assert_eq!(find(&nodes, Role::Tab, "Inspect workspace").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Agent workspace").is_selected(), Some(false));
     assert_eq!(find(&nodes, Role::Tab, "Assets").is_selected(), Some(false));
-    assert_eq!(find(&nodes, Role::Tab, "Prototype").is_selected(), Some(false));
     assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
-    assert!(
-        nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Agent" | "Dev Mode")))),
-        "Agent and Dev Mode are not right-panel tabs"
-    );
+    assert!(nodes.iter().all(|n| n.role() != Role::Tab || n.label() != Some("Inspect workspace")), "Dev Mode remains a separate toolbar mode");
     find(&nodes, Role::Button, "Agent");
     find(&nodes, Role::Button, "Chat");
     find(&nodes, Role::Button, "Comment");
@@ -534,3 +528,5 @@ fn the_align_buttons_are_off_for_a_layer_alone_on_the_page() {
     u.app.run("select.set", json!({"ids": [inner]}));
     assert!(!align_left(&tree(&mut u)), "one in a frame aligns to it");
 }
+
+[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]
