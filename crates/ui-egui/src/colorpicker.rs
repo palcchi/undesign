@@ -722,7 +722,7 @@ pub fn show(app: &mut FigApp, ctx: &egui::Context) {
                 // The image's own colour profile (decoding converts it into the file's).
                 let source = app.session.doc().ok().and_then(|d| undesign_render::images::profile_name(&img.image, d.images.get(&img.image)));
                 let source = match source.as_deref() {
-                    None => tr("Unknown — treated as sRGB"),
+                    None => tr("Unknown (treated as sRGB)"),
                     Some("") => tr("Embedded profile"),
                     Some(name) => name,
                 };

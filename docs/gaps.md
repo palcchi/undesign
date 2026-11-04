@@ -29,7 +29,7 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
 | 13 | Vector tail: none left (boolean hit testing on the result landed 2026-10-11) | Feature | — | [target-app-parity](target-app-parity.md) |
 | 14 | Variables: extended collections checked on real libraries (the tail landed 2026-10-12) | Feature | 0–1 | [components-parity](components-parity.md) |
 | 15 | Prototyping: media triggers and actions; controllers on macOS, Linux and FreeBSD (controller buttons on key/gamepad triggers, widgets in prototypes landed) | Feature | 2–5 | [prototyping-parity](prototyping-parity.md) |
-| 16 | Dev Mode: publishing mappings from the code repository; the editor extension is out of scope (measurements kept on the canvas and a read-only layers panel landed 2026-10-24) | Feature | 1–2 | [dev-mode-parity](dev-mode-parity.md) |
+| 16 | Dev Mode: publishing is CLI-only (`undesign-cli code-connect publish`, landed 2026-11-04); the editor extension is out of scope (measurements kept on the canvas and a read-only layers panel landed 2026-10-24) | Feature | 0–1 | [dev-mode-parity](dev-mode-parity.md) |
 | 17 | Branching: branches in live sessions, lists other than fills, strokes and effects merged whole (a branch's own version history and per-item list merges landed 2026-10-12) | Feature | 1–2 | [collaboration-parity](collaboration-parity.md) |
 | 18 | Display P3 on screen: blocked upstream (egui-wgpu picks an 8-bit sRGB surface); gamut warning and soft-proof sRGB landed, as did several windows | Hardware | 4–8 | [hardware-parity](hardware-parity.md) |
 | 19 | AI features | AI | 30–60 | [target-app-parity](target-app-parity.md) |
@@ -402,11 +402,17 @@ No alpha blockers: the alpha gate in [`roadmap.md`](roadmap.md#alpha-gate) passe
 - **Landed (2026-10-24):** files dropped on the canvas, the Pages list and the Assets panel no
   longer edit the design in Dev Mode (a dropped document still opens as a file of its own, and
   the Pages list only opens pages).
-- **Missing:** publishing mappings from the code repository with a CLI. An editor extension is out
+- **Landed (2026-11-04, PR #2):** publishing mappings from the code repository:
+  `undesign-cli code-connect publish <design> --mappings <undesign.connect.json> -o <out>` links
+  matching component names and writes a new file (the input is untouched); missing components and
+  invalid entries are skipped with warnings, a malformed mapping file writes nothing, and the run
+  honours `--automation-read-root` / `--automation-write-root`. Publishing from inside the app is
+  not built.
+- **Missing:** publishing from inside the app. An editor extension is out
   of scope: the control channel already serves design data, code and the connected snippets to scripts
   and editors. The file name field in the left panel still renames the file in Dev Mode
   (`file.rename`); whether Figma allows that in Dev Mode needs checking before it changes.
-- **Estimate:** 1–2 h.
+- **Estimate:** 0–1 h.
 
 ### 17. Branching and merging
 - **Landed (2026-10-11):** branches of a file (`branch.*`): File ▸ Create branch… (or the Branches
