@@ -59,6 +59,7 @@ fn the_publish_dialog() {
     key(&mut h, Key::Escape);
     assert!(h.app.ui.live.publish.is_none(), "Escape closes it");
     // From the Share popover, then publish.
+    h.app.session.prefs.publish_server = "wss://share.example/".into();
     let shapes = h.frames(2);
     h.click(text_center(&shapes, "Share"));
     let shapes = h.frames(2);

@@ -3,6 +3,10 @@ import "./styles.css";
 
 type SiteContent = typeof siteContent;
 const copy: SiteContent = siteContent;
+const RUNTIME_STARTUP_TIMEOUT_MS = 120_000;
+const RUNTIME_PROBE_TIMEOUT_MS = 10_000;
+const RUNTIME_READY_MESSAGE = "undesign-runtime:ready";
+const RUNTIME_ERROR_MESSAGE = "undesign-runtime:error";
 const root: HTMLDivElement = (() => {
   const element = document.querySelector<HTMLDivElement>("#app");
   if (!element) throw new Error("The showcase root element is missing.");
@@ -175,97 +179,177 @@ function hasRequiredBrowserSupport(): boolean {
   return webAssemblyReady && (webglReady || webgpuReady);
 }
 
-function renderEditorStub(): string {
-  const properties = copy.app.previewLayerProperties;
-  const markers = copy.app.previewTimelineMarkers.map((label) => `<span>${escapeHtml(label)}</span>`).join("");
-  const layerRows = copy.app.previewLayerNames
-    .map((name, index) => `<div class="stub-layer"><span class="layer-marker" aria-hidden="true"></span><span>${escapeHtml(name)}</span></div><div class="stub-track"><span>${escapeHtml(properties[index] ?? properties[0])}</span><i class="stub-track-line"><b class="stub-diamond"></b></i></div>`)
-    .join("");
-  return `<div class="editor-stub" role="img" aria-label="${escapeHtml(copy.app.stubCanvasLabel)}"><div class="stub-toolbar"><span class="stub-project-mark" aria-hidden="true">U</span><strong>${escapeHtml(copy.app.previewProject)}</strong><div class="stub-toolbar-tabs"><span>${escapeHtml(copy.app.previewTabDesign)}</span><span>${escapeHtml(copy.app.previewTabPrototype)}</span><span class="selected">${escapeHtml(copy.app.previewTabMotion)}</span></div></div><div class="stub-editor"><aside class="stub-left"><strong>${escapeHtml(copy.home.previewFolderHeading)}</strong><span class="stub-layer-selected">${escapeHtml(copy.app.previewLayerGroup)}</span>${copy.app.previewLayerNames.map((name) => `<span>${escapeHtml(name)}</span>`).join("")}</aside><section class="stub-workarea"><div class="stub-artboard"><div class="stub-artboard-head"><strong>${escapeHtml(copy.app.previewProject)}</strong><span>${escapeHtml(copy.app.previewLayerGroup)}</span></div><div class="stub-artboard-content"><div><h3>${escapeHtml(copy.app.previewCanvasTitle)}</h3><p>${escapeHtml(copy.app.previewCanvasCopy)}</p><span class="stub-continue">${escapeHtml(copy.app.previewCanvasButton)}</span></div><div class="stub-mini-chart" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div><div class="stub-stats"><span></span><span></span><span></span></div></div><div class="stub-floating-tools" aria-hidden="true"><span class="toolbar-tool"></span><span class="toolbar-tool"></span><span class="toolbar-tool"></span><b>${escapeHtml(copy.app.previewTabMotion)}</b></div></section><aside class="stub-properties"><strong>${escapeHtml(copy.app.previewSidebarTitle)}</strong><span>${escapeHtml(copy.app.previewComposition)}</span><span>${escapeHtml(copy.app.previewSelectedLayer)}</span><span>${escapeHtml(copy.app.previewDuration)}</span><span>${escapeHtml(copy.app.previewEasing)}</span></aside></div><div class="stub-timeline"><div class="stub-timeline-head"><strong>${escapeHtml(copy.app.previewTimelineTitle)}</strong>${markers}</div>${layerRows}</div></div>`;
-}
-
 function buildAppShell(): void {
   setPageMeta(copy.app.title, copy.meta.description);
-  root.innerHTML = `<div class="app-shell" id="app-shell"><header class="app-header"><a class="app-brand" href="/" aria-label="${escapeHtml(copy.nav.brand)}"><span class="brand-mark" aria-hidden="true">U</span><span><strong>${escapeHtml(copy.app.title)}</strong><small>${escapeHtml(copy.app.subtitle)}</small></span></a><a class="app-back" href="/">${escapeHtml(copy.app.backToShowcase)}${icon("arrow")}</a></header><main class="app-main"><div class="app-stage" id="app-stage"><section class="app-loading" id="app-loading" role="status" aria-live="polite"><div class="loading-spinner" aria-hidden="true"></div><strong>${escapeHtml(copy.app.loadingTitle)}</strong><p>${escapeHtml(copy.app.loadingCopy)}</p><div class="loading-track" role="progressbar" aria-label="${escapeHtml(copy.app.loadingAccessible)}"><span></span></div></section><section class="app-message" id="app-message" hidden><h1></h1><p></p><a class="button button-secondary" href="/">${escapeHtml(copy.app.backToShowcase)}</a></section><section class="app-content" id="app-content" hidden></section></div></main><button class="judge-float-toggle" id="judge-float-toggle" type="button" aria-controls="judge-panel" aria-expanded="false" hidden>${escapeHtml(copy.app.judgesButton)}</button><aside class="judge-panel" id="judge-panel" aria-labelledby="judge-panel-title" hidden><div class="judge-panel-head"><div><p class="eyebrow">${escapeHtml(copy.judges.eyebrow)}</p><h2 id="judge-panel-title">${escapeHtml(copy.app.judgePanelTitle)}</h2><p>${escapeHtml(copy.app.judgePanelIntro)}</p></div><button class="icon-button judge-panel-close" id="judge-panel-close" type="button" aria-label="${escapeHtml(copy.app.judgePanelClose)}">${icon("close")}</button></div><ol class="prompt-list app-prompt-list">${buildPromptItems(copy.judges.prompts, copy.app.copyPromptAria, copy.app.copyAction)}</ol><p class="copy-status" id="app-copy-status" role="status" aria-live="polite"></p><div class="provider-note"><strong>${escapeHtml(copy.app.providerTitle)}</strong><p>${escapeHtml(copy.app.providerCopy)}</p></div></aside></div>`;
+  root.innerHTML = `<div class="app-shell" id="app-shell"><main class="app-main"><div class="app-stage" id="app-stage"><section class="app-loading" id="app-loading" role="status" aria-live="polite"><div class="loading-spinner" aria-hidden="true"></div><strong>${escapeHtml(copy.app.loadingTitle)}</strong><p>${escapeHtml(copy.app.loadingCopy)}</p><div class="loading-track" role="progressbar" aria-label="${escapeHtml(copy.app.loadingAccessible)}"><span></span></div></section><section class="app-message" id="app-message" role="alert" hidden><h1></h1><p></p></section><section class="app-content" id="app-content" hidden></section></div></main></div>`;
 
   const loading = document.querySelector<HTMLElement>("#app-loading");
   const message = document.querySelector<HTMLElement>("#app-message");
   const content = document.querySelector<HTMLElement>("#app-content");
   const appShell = document.querySelector<HTMLElement>("#app-shell");
-  const toggle = document.querySelector<HTMLButtonElement>("#judge-float-toggle");
-  const panel = document.querySelector<HTMLElement>("#judge-panel");
-  const close = document.querySelector<HTMLButtonElement>("#judge-panel-close");
-  if (!loading || !message || !content || !appShell || !toggle || !panel || !close) return;
+  if (!loading || !message || !content || !appShell) return;
+
+  const retry = document.createElement("button");
+  retry.className = "button button-primary runtime-retry";
+  retry.type = "button";
+  retry.textContent = copy.app.runtimeRetryAction;
+  retry.hidden = true;
+  message.append(retry);
+  message.setAttribute("role", "alert");
+  loading.tabIndex = -1;
+  content.setAttribute("aria-label", copy.app.title);
+  let startupTimer: number | undefined;
+  const clearStartupTimer = (): void => {
+    if (startupTimer !== undefined) {
+      window.clearTimeout(startupTimer);
+      startupTimer = undefined;
+    }
+  };
 
   const showMessage = (title: string, detail: string): void => {
+    clearStartupTimer();
     loading.hidden = true;
     content.hidden = true;
     message.hidden = false;
+    retry.hidden = true;
+    appShell.classList.remove("app-shell-ready");
     const heading = message.querySelector("h1");
     const paragraph = message.querySelector("p");
     if (heading) heading.textContent = title;
     if (paragraph) paragraph.textContent = detail;
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
   };
 
-  if (window.matchMedia("(max-width: 900px)").matches) {
-    showMessage(copy.app.desktopTitle, copy.app.desktopCopy);
-    return;
-  }
+  const frame = document.createElement("iframe");
+  frame.className = "runtime-frame";
+  frame.title = copy.app.title;
+  frame.allow = "fullscreen";
+  let attempt = 0;
+  let runtimeRequested = false;
 
-  window.setTimeout(async () => {
-    const runtimeHtml = await findInstalledRuntime();
-    if (runtimeHtml && !hasRequiredBrowserSupport()) {
+  const showRuntimeFailure = (detail: string): void => {
+    clearStartupTimer();
+    loading.hidden = true;
+    content.hidden = true;
+    message.hidden = false;
+    retry.hidden = false;
+    appShell.classList.remove("app-shell-ready");
+    const heading = message.querySelector("h1");
+    const paragraph = message.querySelector("p");
+    if (heading) heading.textContent = copy.app.runtimeErrorTitle;
+    if (paragraph) paragraph.textContent = detail;
+    if (!retry.isConnected) message.append(retry);
+    retry.focus({ preventScroll: true });
+  };
+
+  const focusRuntimeFrameWhenIdle = (): void => {
+    const active = document.activeElement;
+    if (active === null || active === document.body || active === loading || loading.contains(active)) {
+      frame.focus({ preventScroll: true });
+    }
+  };
+
+  const showRuntimeReady = (): void => {
+    clearStartupTimer();
+    loading.hidden = true;
+    message.hidden = true;
+    content.hidden = false;
+    retry.hidden = true;
+    appShell.classList.add("app-shell-ready");
+    focusRuntimeFrameWhenIdle();
+  };
+
+  const runtimeUrl = new URL("/app/runtime.html", window.location.origin);
+  if (new URLSearchParams(window.location.search).has("webgl")) {
+    runtimeUrl.searchParams.set("webgl", "");
+  }
+  const runtimePath = `${runtimeUrl.pathname}${runtimeUrl.search}`;
+
+  const loadRuntime = (): void => {
+    clearStartupTimer();
+    attempt += 1;
+    const target = new URL(runtimePath, window.location.origin);
+    if (attempt > 1) target.searchParams.set("undesign-retry", String(Date.now()));
+    loading.hidden = false;
+    message.hidden = true;
+    content.hidden = false;
+    retry.hidden = true;
+    appShell.classList.add("app-shell-ready");
+    startupTimer = window.setTimeout(() => showRuntimeFailure(copy.app.runtimeTimeoutCopy), RUNTIME_STARTUP_TIMEOUT_MS);
+    runtimeRequested = true;
+    frame.src = `${target.pathname}${target.search}${target.hash}`;
+  };
+
+  window.addEventListener("message", (event: MessageEvent<unknown>) => {
+    if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
+    if (event.data === RUNTIME_READY_MESSAGE) showRuntimeReady();
+    else if (event.data === RUNTIME_ERROR_MESSAGE) showRuntimeFailure(copy.app.runtimeLoadError);
+  });
+  frame.addEventListener("load", () => {
+    if (!runtimeRequested) return;
+    const frameDocument = frame.contentDocument;
+    if (frameDocument?.URL === "about:blank") return;
+    const hasRuntimeMarker = frameDocument?.querySelector('meta[name="undesign-runtime"][content="true"]');
+    if (!hasRuntimeMarker) showRuntimeFailure(copy.app.runtimeLoadError);
+  });
+
+  const startProbe = async (): Promise<void> => {
+    clearStartupTimer();
+    loading.hidden = false;
+    message.hidden = true;
+    content.hidden = true;
+    retry.hidden = true;
+    appShell.classList.remove("app-shell-ready");
+    const runtimeInstalled = await findInstalledRuntime();
+    if (!runtimeInstalled) {
+      showRuntimeFailure(copy.app.runtimeLoadError);
+      return;
+    }
+    if (!hasRequiredBrowserSupport()) {
       showMessage(copy.app.unsupportedTitle, copy.app.unsupportedCopy);
       return;
     }
-    const runtimeUrl = new URL("/app/runtime.html", window.location.origin);
-    if (new URLSearchParams(window.location.search).has("webgl")) {
-      runtimeUrl.searchParams.set("webgl", "");
-    }
-    const runtimePath = `${runtimeUrl.pathname}${runtimeUrl.search}`;
-    loading.hidden = true;
-    content.hidden = false;
-    appShell.classList.add("app-shell-ready");
-    toggle.hidden = false;
-    content.innerHTML = runtimeHtml
-      ? `<iframe class="runtime-frame" src="${escapeHtml(runtimePath)}" title="${escapeHtml(copy.app.title)}" allow="fullscreen"></iframe>`
-      : `<div class="stub-banner"><div><span class="status-badge">${escapeHtml(copy.app.stubBadge)}</span><h1>${escapeHtml(copy.app.stubTitle)}</h1><p>${escapeHtml(copy.app.stubCopy)}</p><p class="stub-note">${escapeHtml(copy.app.noRuntime)}</p></div></div>${renderEditorStub()}`;
+    if (!frame.isConnected) content.replaceChildren(frame);
+    loadRuntime();
+  };
 
-    const frame = content.querySelector<HTMLIFrameElement>(".runtime-frame");
-    frame?.addEventListener("load", () => {
-      const hasRuntimeMarker = frame.contentDocument?.querySelector('meta[name="undesign-runtime"][content="true"]');
-      if (!hasRuntimeMarker) {
-        content.innerHTML = `<p class="runtime-error" role="alert">${escapeHtml(copy.app.runtimeLoadError)}</p>`;
-      }
-    });
-
-    const status = document.querySelector<HTMLElement>("#app-copy-status");
-    if (status) attachCopyActions(status, copy.app.copySuccess, copy.app.copyFailure);
-    toggle.addEventListener("click", () => {
-      appShell.classList.add("judges-open");
-      panel.hidden = false;
-      toggle.hidden = true;
-      toggle.setAttribute("aria-expanded", "true");
-      close.focus();
-    });
-    close.addEventListener("click", () => {
-      appShell.classList.remove("judges-open");
-      panel.hidden = true;
-      toggle.hidden = false;
-      toggle.setAttribute("aria-expanded", "false");
-      toggle.focus();
-    });
+  retry.addEventListener("click", () => {
+    if (frame.isConnected) loadRuntime();
+    else void startProbe();
+    loading.focus({ preventScroll: true });
+  });
+  window.setTimeout(() => {
+    void startProbe();
   }, 0);
 }
 
-async function findInstalledRuntime(): Promise<boolean> {
+async function findInstalledRuntime(timeoutMs: number = RUNTIME_PROBE_TIMEOUT_MS): Promise<boolean> {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  let probeTimer: number | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    probeTimer = window.setTimeout(() => {
+      controller?.abort();
+      reject(new Error("Runtime probe timed out."));
+    }, timeoutMs);
+  });
   try {
-    const response = await fetch("/app/runtime.html", { cache: "no-store" });
-    if (!response.ok) return false;
-    const html = await response.text();
-    return html.includes('name="undesign-runtime" content="true"');
+    const probe = (async (): Promise<boolean> => {
+      const response = await fetch("/app/runtime.html", {
+        cache: "no-store",
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      if (!response.ok) return false;
+      const html = await response.text();
+      return html.includes('name="undesign-runtime" content="true"');
+    })();
+    return await Promise.race([probe, timeout]);
   } catch {
     return false;
+  } finally {
+    if (probeTimer !== undefined) window.clearTimeout(probeTimer);
   }
 }
 
@@ -275,9 +359,6 @@ function renderCurrentRoute(): void {
     renderHome();
   } else if (pathname === "/" || pathname === "/app" || pathname.startsWith("/app/")) {
     buildAppShell();
-    root.querySelectorAll<HTMLAnchorElement>(".app-back, #app-message a").forEach((link) => {
-      link.href = "/showcase/";
-    });
   } else {
     renderHome();
   }

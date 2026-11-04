@@ -11,6 +11,7 @@ use super::*;
 fn dynamic_keys() -> BTreeSet<String> {
     let mut keys: BTreeSet<String> = undesign_engine::catalog::MENU.iter().flat_map(|m| m.menu.split('/')).map(str::to_string).collect();
     keys.extend(dynamic_labels().into_iter().map(str::to_string));
+    keys.extend(["Ease In", "Ease In & Out", "Ease Out", "Hold/Step"].into_iter().map(str::to_string));
     keys
 }
 

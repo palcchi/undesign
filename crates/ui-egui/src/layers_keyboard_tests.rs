@@ -51,7 +51,7 @@ fn setup() -> (Ui, NodeId, NodeId) {
 
 /// F6 to the layers panel, on the selected layer's row.
 fn to_layers(u: &mut Ui) {
-    for _ in 0..4 {
+    for _ in 0..8 {
         press(u, Key::F6, Modifiers::NONE);
         if u.app.ui.nav.region == Region::Layers {
             return;

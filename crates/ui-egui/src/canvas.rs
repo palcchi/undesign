@@ -333,6 +333,24 @@ pub fn show(app: &mut FigApp, ui: &mut Ui, worker: &mut Worker) {
     }
 }
 
+/// Center the first-action prompt on an empty page rather than in the Layers list.
+pub fn empty_state(app: &FigApp, ui: &mut Ui) {
+    let empty_page = app.session.ds().ok().and_then(|ds| ds.doc.node(ds.page)).is_some_and(|page| page.children.is_empty());
+    if !empty_page || app.ui.right_tab == crate::RightTab::Inspect {
+        return;
+    }
+    let t = Tokens::get(ui.ctx());
+    let center = app.canvas.rect.center();
+    crate::app_glyphs::paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(center.x, center.y - 15.0), vec2(24.0, 24.0)),
+        crate::app_glyphs::Glyph::Frame,
+        t.icon_secondary,
+    );
+    let galley = ui.painter().layout_no_wrap(tr("Add a frame (F) or a shape (R) to get started").to_string(), regular(15.0), t.text_secondary);
+    ui.painter().galley(pos2(center.x - galley.size().x * 0.5, center.y + 8.0), galley, t.text_secondary);
+}
+
 /// The image's screen rect; align native-density renders to device pixels to avoid linear filtering
 /// blending neighbouring texels. Stale and pixel-preview renders retain their original projection.
 pub(super) fn presented_image_rect(tl: Pos2, view: &undesign_render::View, zoom: f64, ppp: f32, pixel_preview: bool) -> Rect {
@@ -555,12 +573,22 @@ fn zoom_tool(app: &mut FigApp, ui: &Ui, resp: &egui::Response, pos: Pos2, mods: 
 /// the pointer (a comment pin, a ruler guide, a gradient or padding handle): the tool's cursor
 /// then doesn't show.
 fn input(app: &mut FigApp, ui: &mut Ui, resp: &egui::Response) -> bool {
+    let ctx = ui.ctx().clone();
+    let pointer = ctx.input(|i| i.pointer.hover_pos());
+    if !app.canvas.dragging && pointer.is_some_and(|p| app.ui.nav.contains(crate::a11y::Region::Toolbar, p)) {
+        if std::mem::take(&mut app.canvas.hovering) {
+            app.session.vector_pointer_left();
+        }
+        if let Ok(ds) = app.session.ds_mut() {
+            ds.hover = None;
+        }
+        return false;
+    }
     if crate::proto_canvas::input(app, ui, resp) {
         // A prototype gesture is a press on the canvas too: the Pages list gives up the keyboard.
         app.ui.pages_focus = None;
         return true;
     }
-    let ctx = ui.ctx().clone();
     let (mods, scroll, zoom_delta, hover_pos, space) =
         ctx.input(|i| (i.modifiers, i.smooth_scroll_delta, i.zoom_delta(), i.pointer.hover_pos(), i.key_down(egui::Key::Space)));
     let editing_text = app.session.ds().map(|d| d.text_edit.is_some()).unwrap_or(false);

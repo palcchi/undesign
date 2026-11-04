@@ -5,19 +5,46 @@ use serde_json::Value;
 use undesign_engine::Session;
 use undesign_ui_egui::{ContentsFuture, FigApp, Services};
 use wasm_bindgen::JsCast as _;
+use wasm_bindgen::JsValue;
 
 const CANVAS_ID: &str = "undesign_canvas";
 const LOADING_ID: &str = "undesign_loading";
+const STATUS_ID: &str = "undesign_runtime_status";
+const READY_MESSAGE: &str = "undesign-runtime:ready";
+const ERROR_MESSAGE: &str = "undesign-runtime:error";
+
+/// Update the screen-reader status and, when embedded, tell the same-origin shell what happened.
+fn report_runtime_status(message: &str, parent_message: &str) {
+    if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+        if let Some(status) = document.get_element_by_id(STATUS_ID) {
+            status.set_text_content(Some(message));
+        }
+        if let Some(loading) = document.get_element_by_id(LOADING_ID) {
+            loading.set_text_content(Some(message));
+        }
+    }
+    let Some(window) = web_sys::window() else { return };
+    let Ok(origin) = window.location().origin() else { return };
+    if origin.is_empty() || origin == "null" {
+        return;
+    }
+    let Ok(Some(parent)) = window.parent() else { return };
+    if let Err(error) = parent.post_message(&JsValue::from_str(parent_message), &origin) {
+        log::warn!("could not report editor startup status to its host: {error:?}");
+    }
+}
 
 pub fn start() {
     eframe::WebLogger::init(log::LevelFilter::Info).ok();
     wasm_bindgen_futures::spawn_local(async {
         let Some(document) = web_sys::window().and_then(|w| w.document()) else {
             log::error!("no document");
+            report_runtime_status("The editor could not start.", ERROR_MESSAGE);
             return;
         };
         let Some(canvas) = document.get_element_by_id(CANVAS_ID).and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok()) else {
             log::error!("missing <canvas id=\"{CANVAS_ID}\">");
+            report_runtime_status("The editor could not start.", ERROR_MESSAGE);
             return;
         };
         let mut options = eframe::WebOptions::default();
@@ -57,14 +84,19 @@ pub fn start() {
                         let link = js_sys::decode_uri_component(link).ok().and_then(|s| s.as_string()).unwrap_or_else(|| link.to_string());
                         undesign_ui_egui::live::open_invite(&mut fig, &link);
                     }
-                    Ok(Box::new(WebShell { fig }))
+                    Ok(Box::new(WebShell { fig, ready: false }))
                 }),
             )
             .await;
-        if let Some(el) = document.get_element_by_id(LOADING_ID) {
-            match result {
-                Ok(()) => el.remove(),
-                Err(e) => el.set_inner_html(&format!("<p>Undesign failed to start: {e:?}</p><p>A browser with WebGPU or WebGL2 is required.</p>")),
+        match result {
+            Ok(()) => {
+                if let Some(loading) = document.get_element_by_id(LOADING_ID) {
+                    loading.remove();
+                }
+            }
+            Err(error) => {
+                log::error!("Undesign WebAssembly editor failed to start: {error:?}");
+                report_runtime_status("The editor could not start. Try reloading the page.", ERROR_MESSAGE);
             }
         }
     });
@@ -76,12 +108,21 @@ fn query() -> String {
 
 struct WebShell {
     fig: FigApp,
+    ready: bool,
 }
 
 impl eframe::App for WebShell {
     // `FigApp::ui` runs its own per-frame logic first (fonts, theme), like the desktop app.
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.fig.ui(ui);
+        if !self.ready {
+            self.ready = true;
+            report_runtime_status("Undesign editor ready.", READY_MESSAGE);
+            if let Some(loading) = web_sys::window().and_then(|window| window.document()).and_then(|document| document.get_element_by_id(LOADING_ID))
+            {
+                loading.remove();
+            }
+        }
     }
 }
 

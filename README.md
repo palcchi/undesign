@@ -268,9 +268,13 @@ Undesign is a modification of the open-source FigCraft editor
 © 2026 ArtCraft Team and the FigCraft contributors). Every local change against the imported
 upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 
-The UI glyph set is code-drawn and adapted from FigCraft; Undesign's U logo and app icon are
-original project artwork. Bundled fonts, images and other assets keep their applicable open
-licenses, with their authors and sources listed in [ATTRIBUTION.md](ATTRIBUTION.md).
+The inherited UI glyph set is code-drawn and adapted from FigCraft; Undesign's U logo and app icon
+are original project artwork. By explicit project-owner approval, the code also includes monochrome
+copies of eight common Figma editor toolbar glyphs from the public Help Center toolbar reference.
+The licence for those specific glyphs is unconfirmed; no CC BY 4.0 claim is made. The screenshot is
+not included. See [ATTRIBUTION.md](ATTRIBUTION.md) for the scope and source caveat. Bundled fonts,
+images and other assets keep their applicable open licenses, with their authors and sources listed
+there.
 
 ## Star history
 

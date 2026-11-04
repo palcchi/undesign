@@ -4,11 +4,24 @@ Every asset bundled in this repository (images, icons, fonts, data files) is lis
 author, source and licence. `cargo xtask assets` fails if a file under `assets/` or
 `docs/images/` is missing from this list.
 
-Undesign's user-interface glyphs are drawn in code (`crates/ui-egui/src/icons.rs`) and are
+Undesign's inherited user-interface glyphs are drawn in code (`crates/ui-egui/src/icons.rs`) and are
 adapted from FigCraft's original icon set, imported at the revision recorded in `NOTICE` and
 `UNDESIGN-CHANGES.md`. The inherited glyph artwork remains under MIT OR Apache-2.0, with FigCraft
 copyright retained in `LICENSE-MIT` and `NOTICE`. The Undesign `Logo` glyph is original artwork.
-No third-party icon sets are used.
+
+The project owner has explicitly approved a narrow, code-only exception for monochrome copies of
+these common Figma editor toolbar glyphs: Move, Frame, Rectangle, Pen, Text, Comment, Actions/sparkle,
+and Dev Mode/Code. The visual reference is the toolbar shown in Figma's public
+[Help Center article](https://help.figma.com/hc/en-us/articles/360041064174-Access-design-tools-from-the-toolbar).
+The [official UI3 Community file listing](https://www.figma.com/community/file/1486123838948777078/ui3-figmas-ui-kit)
+is noted as related public context, but it does not show a licence badge. Figma's
+[Community copyright and licensing guidance](https://help.figma.com/hc/en-us/articles/360042296374-Figma-Community-copyright-and-licensing)
+says free Community files are CC BY 4.0; that general statement does not establish that this UI3 file
+or the Help Center screenshot is covered by that licence. Neither the listing nor the screenshot/article
+states a redistribution licence for the referenced glyphs, so no CC BY 4.0 claim is made for them and
+their source/licence status remains unconfirmed. The local reference screenshot is not bundled or used
+as an image asset. This exception records the owner's authorization for the specified glyphs; it is
+not a determination of third-party licensing. No other third-party iconography is permitted.
 
 ## Assets in this repository
 

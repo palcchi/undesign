@@ -2,22 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Undesign</title>
   <link data-trunk rel="rust" data-bin="undesign-web" data-cargo-profile="web-release" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int --enable-sign-ext --enable-reference-types --enable-multivalue" data-weak-refs />
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #f5f5f5; }
     #undesign_canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .skip-link { position: absolute; z-index: 2; top: 8px; left: 8px; padding: 10px 14px; transform: translateY(-160%); border: 1px solid #737373; border-radius: 8px; background: #ffffff; color: #181818; font: 14px system-ui, sans-serif; }
+    .skip-link:focus { transform: translateY(0); }
     #undesign_loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
       color: #6b6b6b; font: 14px system-ui, sans-serif; pointer-events: none; }
     @media (prefers-color-scheme: dark) {
       html, body { background: #2c2c2c; }
       #undesign_loading { color: #b8b8b8; }
+      .skip-link { border-color: #737373; background: #1d1d1d; color: #f2f2f2; }
     }
   </style>
 </head>
 <body>
-  <canvas id="undesign_canvas"></canvas>
-  <div id="undesign_loading">Loading Undesign&hellip;</div>
+  <header class="visually-hidden"><h1 id="undesign_title">Undesign Web editor</h1></header>
+  <nav aria-label="Editor navigation"><a class="skip-link" href="#undesign_main">Skip to editor</a></nav>
+  <main id="undesign_main" tabindex="-1" aria-labelledby="undesign_title">
+    <canvas id="undesign_canvas" role="img" aria-label="Undesign design canvas"></canvas>
+    <div id="undesign_loading" role="status" aria-live="polite" aria-atomic="true">Loading Undesign&hellip;</div>
+  </main>
+  <footer class="visually-hidden"><p id="undesign_runtime_status" role="status" aria-live="polite">Starting editor.</p></footer>
 </body>
 </html>

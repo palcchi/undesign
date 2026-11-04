@@ -5,13 +5,14 @@
 //! canvas where shortcuts work again, and a pointer press ends keyboard mode.
 
 use egui::accesskit::{Node, Role, Toggled};
-use egui::{Event, Key, Modifiers};
+use egui::{Event, Key, Modifiers, Pos2, RawInput, Rect, vec2};
 use serde_json::json;
 use undesign_doc::NodeId;
 use undesign_engine::{Session, ToolId};
 
 use crate::a11y::{Region, focused_name};
 use crate::layers_drag_tests::Ui;
+use crate::{FigApp, NoServices};
 
 fn id(v: serde_json::Value) -> NodeId {
     NodeId(v["id"].as_u64().unwrap())
@@ -61,13 +62,50 @@ fn find<'a>(nodes: &'a [Node], role: Role, label: &str) -> &'a Node {
     nodes.iter().find(|n| n.role() == role && n.label() == Some(label)).unwrap_or_else(|| panic!("no {role:?} named {label:?}"))
 }
 
+fn button_center(u: &mut Ui, label: &str) -> Pos2 {
+    let nodes = tree(u);
+    let b = find(&nodes, Role::Button, label).bounds().expect("button bounds");
+    Pos2::new(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32)
+}
+
+fn click(u: &mut Ui, p: Pos2) {
+    u.button(p, true);
+    u.button(p, false);
+    u.frame(vec![]);
+}
+
+fn tablet_tree() -> Vec<Node> {
+    let mut session = Session::new();
+    session.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 40, "height": 30})).unwrap();
+    let ctx = egui::Context::default();
+    let mut app = FigApp::new(session, Box::new(NoServices));
+    let screen = Rect::from_min_size(Pos2::ZERO, vec2(720.0, 760.0));
+    let mut time = 0.0;
+    let frame = |ctx: &egui::Context, app: &mut FigApp, time: &mut f64| {
+        *time += 1.0 / 60.0;
+        let input = RawInput { screen_rect: Some(screen), time: Some(*time), ..Default::default() };
+        ctx.run_ui(input, |ui| app.ui(ui)).textures_delta.clear();
+    };
+    for _ in 0..6 {
+        frame(&ctx, &mut app, &mut time);
+    }
+    ctx.enable_accesskit();
+    frame(&ctx, &mut app, &mut time);
+    let out = {
+        time += 1.0 / 60.0;
+        let input = RawInput { screen_rect: Some(screen), time: Some(time), ..Default::default() };
+        ctx.run_ui(input, |ui| app.ui(ui))
+    };
+    out.platform_output.accesskit_update.expect("an AccessKit update").nodes.into_iter().map(|(_, node)| node).collect()
+}
+
 #[test]
 fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     let (mut u, ..) = setup();
     let nodes = tree(&mut u);
     // Regions are named containers.
     find(&nodes, Role::Toolbar, "Tools");
-    find(&nodes, Role::Pane, "Layers");
+    find(&nodes, Role::Toolbar, "Top bar");
     find(&nodes, Role::Pane, "Design");
     // Tools: toggle buttons with their key, the current one pressed.
     let mv = find(&nodes, Role::Button, "Select");
@@ -84,16 +122,100 @@ fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     assert_eq!((w.value(), w.numeric_value()), (Some("40"), Some(40.0)));
     assert_eq!(find(&nodes, Role::SpinButton, "Rotation").value(), Some("0°"));
     // Tabs and dropdowns.
-    assert_eq!(find(&nodes, Role::Tab, "Design").is_selected(), Some(true));
+    assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 2, "left and right Design tabs");
+    assert!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).all(|n| n.is_selected() == Some(true)));
+    assert_eq!(find(&nodes, Role::Tab, "Design workspace").is_selected(), Some(true));
+    assert_eq!(find(&nodes, Role::Tab, "Motion workspace").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Inspect workspace").is_selected(), Some(false));
     assert_eq!(find(&nodes, Role::Tab, "Prototype").is_selected(), Some(false));
-    assert_eq!(find(&nodes, Role::Tab, "Motion").is_selected(), Some(false));
-    assert_eq!(find(&nodes, Role::Tab, "Agent").is_selected(), Some(false));
+    assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
+    assert!(
+        nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Agent" | "Dev Mode")))),
+        "Agent and Dev Mode are not right-panel tabs"
+    );
+    find(&nodes, Role::Button, "Agent");
+    find(&nodes, Role::Button, "Chat");
+    find(&nodes, Role::Button, "Comment");
+    assert!(nodes.iter().all(|n| n.label() != Some("Dev Mode")), "Inspect replaces the obsolete Dev Mode control");
+    find(&nodes, Role::Button, "Assets");
+    find(&nodes, Role::Button, "File and pages");
+    find(&nodes, Role::Button, "Help and resources");
+    find(&nodes, Role::Button, "Present");
     assert_eq!(find(&nodes, Role::ComboBox, "Zoom").is_expanded(), Some(false));
-    // Icon buttons are named by their tooltip.
-    find(&nodes, Role::Button, "Add new page");
+    assert_eq!(find(&nodes, Role::Button, "Pages").is_expanded(), Some(true));
+    assert_eq!(find(&nodes, Role::Tab, "Assets").is_selected(), Some(false));
+    find(&nodes, Role::Button, "Collapse panel");
     // The canvas describes the selection.
     let canvas = find(&nodes, Role::Group, "Canvas");
     assert_eq!(canvas.description(), Some("Rect A, Rectangle, 40 by 30, selected"));
+}
+
+#[test]
+fn expanding_the_pages_section_exposes_page_actions() {
+    let mut u = Ui::new(Session::new());
+    u.app.ui.pages_open = false;
+    let nodes = tree(&mut u);
+    assert_eq!(find(&nodes, Role::Button, "Pages").is_expanded(), Some(false));
+    let bounds = find(&nodes, Role::Button, "Pages").bounds().expect("Pages section bounds");
+    click(&mut u, Pos2::new(((bounds.x0 + bounds.x1) / 2.0) as f32, ((bounds.y0 + bounds.y1) / 2.0) as f32));
+    let nodes = tree(&mut u);
+    assert_eq!(find(&nodes, Role::Button, "Pages").is_expanded(), Some(true));
+    find(&nodes, Role::Button, "Add new page");
+    let page = u.app.session.doc().unwrap().node(u.app.session.page().unwrap()).unwrap().name.clone();
+    find(&nodes, Role::ListBoxOption, &page);
+}
+
+#[test]
+fn tablet_width_uses_desktop_sidebar_tabs_and_the_shared_header() {
+    let nodes = tablet_tree();
+    assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 2);
+    assert!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).all(|n| n.is_selected() == Some(true)));
+    assert_eq!(find(&nodes, Role::Tab, "Design workspace").is_selected(), Some(true));
+    assert_eq!(find(&nodes, Role::Tab, "Motion workspace").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Inspect workspace").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Assets").is_selected(), Some(false));
+    assert_eq!(find(&nodes, Role::Tab, "Prototype").is_selected(), Some(false));
+    assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
+    assert!(
+        nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Agent" | "Dev Mode")))),
+        "Agent and Dev Mode are not right-panel tabs"
+    );
+    find(&nodes, Role::Button, "Agent");
+    find(&nodes, Role::Button, "Chat");
+    find(&nodes, Role::Button, "Comment");
+    assert!(nodes.iter().all(|n| n.label() != Some("Dev Mode")));
+    find(&nodes, Role::Button, "Assets");
+    find(&nodes, Role::Button, "File and pages");
+    find(&nodes, Role::Button, "Help and resources");
+    assert_eq!(find(&nodes, Role::ComboBox, "Zoom").is_expanded(), Some(false));
+    find(&nodes, Role::Button, "Collapse panel");
+    find(&nodes, Role::Button, "Share");
+    find(&nodes, Role::Pane, "Design");
+    find(&nodes, Role::Group, "Canvas");
+}
+
+#[test]
+fn global_rail_and_toolbar_actions_open_their_destinations() {
+    let mut agent = Ui::new(Session::new());
+    agent.frame(vec![]);
+    let at = button_center(&mut agent, "Agent");
+    click(&mut agent, at);
+    assert_eq!(agent.app.ui.right_tab, crate::RightTab::Agent);
+    assert_eq!(agent.app.ui.compact_panel, crate::CompactPanel::Agent);
+
+    let mut comments = Ui::new(Session::new());
+    comments.frame(vec![]);
+    let at = button_center(&mut comments, "Comment");
+    click(&mut comments, at);
+    assert_eq!(comments.app.session.tool.tool, ToolId::Comment);
+
+    let mut chat = Ui::new(Session::new());
+    chat.frame(vec![]);
+    let at = button_center(&mut chat, "Chat");
+    click(&mut chat, at);
+    assert!(chat.app.ui.chat_open, "Chat opens the comment conversation history");
+    assert_eq!(chat.app.ui.right_tab, crate::RightTab::Design);
+    assert!(chat.app.ui.live.chat.is_none(), "temporary cursor chat is still separate");
 }
 
 #[test]
@@ -105,6 +227,9 @@ fn f6_cycles_the_regions_and_lands_on_the_active_tool_and_the_selected_row() {
     assert_eq!(region(&u), Region::Properties);
     assert!(u.app.ui.nav.keyboard, "keyboard mode: the focus ring shows");
     assert!(!name(&u).is_empty(), "a control in the properties panel has the keyboard");
+    f6(&mut u, false);
+    assert_eq!(region(&u), Region::Header);
+    assert!(!name(&u).is_empty(), "a top-bar control has the keyboard");
     f6(&mut u, false);
     assert_eq!((region(&u), name(&u)), (Region::Toolbar, "Select".to_string()));
     f6(&mut u, false);
@@ -254,6 +379,8 @@ fn arrows_walk_the_layer_rows_and_the_keyboard_follows_the_selection() {
 fn a_menu_opened_from_the_keyboard_takes_it_and_escape_gives_it_back() {
     let (mut u, ..) = setup();
     f6(&mut u, false);
+    f6(&mut u, false);
+    assert_eq!(region(&u), Region::Header);
     for _ in 0..100 {
         if name(&u) == "Zoom" {
             break;
@@ -268,7 +395,7 @@ fn a_menu_opened_from_the_keyboard_takes_it_and_escape_gives_it_back() {
     press(&mut u, Key::Escape, Modifiers::NONE);
     u.frame(vec![]);
     assert_eq!(name(&u), "Zoom");
-    assert_eq!(region(&u), Region::Properties, "closing the menu stays in the panel");
+    assert_eq!(region(&u), Region::Header, "closing the menu stays in the top bar");
 }
 
 #[test]
@@ -354,10 +481,12 @@ fn every_accessibility_path_runs_with_the_tree_on_without_nested_context_locks()
         let out = u.frame_output(vec![]);
         assert!(out.platform_output.accesskit_update.is_some());
     }
-    // Properties: Tab, a field edit, the zoom menu from the keyboard and back.
+    // Properties: Tab and field edit. The zoom menu is now in the Top bar region.
     while region(&u) != Region::Properties {
         f6(&mut u, false);
     }
+    f6(&mut u, false);
+    assert_eq!(region(&u), Region::Header);
     for _ in 0..100 {
         if name(&u) == "Zoom" {
             break;

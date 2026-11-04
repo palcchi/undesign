@@ -200,6 +200,7 @@ fn dev_mode_pages_list_opens_pages_but_edits_none() {
     let specs = id(&s.execute("page.add", &json!({"name": "Specs"})).unwrap());
     s.execute("page.select", &json!({"id": home})).unwrap();
     let mut u = crate::layers_drag_tests::Ui::new(s);
+    u.app.ui.left_tab = crate::LeftTab::Pages;
     u.app.ui.right_tab = crate::RightTab::Inspect;
     let shapes = |u: &mut crate::layers_drag_tests::Ui| crate::live_tests::flat(&u.frame_output(vec![]).shapes);
     let s = shapes(&mut u);

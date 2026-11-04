@@ -227,9 +227,9 @@ pub fn invoke(app: &mut FigApp, id: &str) {
         "pref.language" | "pref.userName" | "pref.publishServer" | "pref.nudge" => {
             app.run("app.preferences", json!({}));
         }
-        // The file name in the left panel's header turns into its editor, the name selected.
+        // The file name in the editor header turns into its editor, the name selected.
         "file.rename" => {
-            app.ui.left_tab = crate::LeftTab::File;
+            app.ui.left_tab = crate::LeftTab::Layers;
             app.ui.left_collapsed = false;
             app.ui.rename_file = true;
         }
@@ -244,7 +244,7 @@ pub fn invoke(app: &mut FigApp, id: &str) {
         }
         "tool.set" => app.ui.tool_flyout = Some("move"),
         "page.select" => {
-            app.ui.left_tab = crate::LeftTab::File;
+            app.ui.left_tab = crate::LeftTab::Layers;
             app.ui.left_collapsed = false;
             app.ui.pages_open = true;
         }
@@ -1065,8 +1065,7 @@ fn palette(app: &mut FigApp, ctx: &egui::Context) {
     let t = Tokens::get(ctx);
     // Same centre and width as the toolbar pill (it centres on the canvas, not the window),
     // floating 8 px above it. Fixed size: switching tabs never resizes the panel.
-    let bar_w = crate::toolbar::bar_width(app);
-    let bar = crate::toolbar::pill_rect(app.canvas.rect, bar_w);
+    let bar = crate::toolbar::palette_pill_rect(app);
     let area = Rect::from_min_max(pos2(bar.min.x, bar.min.y - 8.0 - (PALETTE_H + 16.0)), pos2(bar.max.x, bar.min.y - 8.0));
     let mut run: Option<String> = None;
     let mut close = false;
@@ -1097,7 +1096,7 @@ fn palette(app: &mut FigApp, ctx: &egui::Context) {
             .show(ui, |ui| {
                 // Same outer width as the toolbar pill, and a fixed height: switching tabs
                 // never resizes the panel.
-                let inner = bar_w - 16.0;
+                let inner = bar.width() - 16.0;
                 ui.set_width(inner);
                 ui.set_height(PALETTE_H);
                 let r = ui.add(

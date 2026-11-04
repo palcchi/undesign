@@ -96,7 +96,16 @@ fn a_colour_field_opens_the_colour_picker_and_two_panels_show_side_by_side() {
     u.frame(vec![]);
     let nodes = |u: &mut Ui| u.frame_output(vec![]).platform_output.accesskit_update.unwrap().nodes;
     // The swatch beside a colour field opens the colour picker on it.
-    let swatch = nodes(&mut u).iter().map(|(_, n)| n).find(|n| n.label() == Some("Color")).and_then(|n| n.bounds()).unwrap();
+    let panel_rect = crate::plugins_ui::field_window(&u.app, &u.ctx, "org.test.panel").expect("plugin panel bounds");
+    let swatch = nodes(&mut u)
+        .iter()
+        .map(|(_, n)| n)
+        .find(|n| {
+            n.label() == Some("Color")
+                && n.bounds().is_some_and(|b| panel_rect.contains(Pos2::new(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32)))
+        })
+        .and_then(|n| n.bounds())
+        .unwrap();
     let at = Pos2::new(((swatch.x0 + swatch.x1) / 2.0) as f32, ((swatch.y0 + swatch.y1) / 2.0) as f32);
     u.button(at, true);
     u.button(at, false);

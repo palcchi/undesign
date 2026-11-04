@@ -95,8 +95,8 @@ fn right_panel_dropdown_menus_fit_the_panel() {
         }
     }
     let menu = menu.expect("the Ready for dev filter menu opens");
-    // The dropdown spans the panel less its padding; its three short options fit in that.
-    let dropdown = app.ui.right_width - 2.0 * crate::widgets::PAD;
+    // The right-panel card has an 8 px outer margin on each side before the filter's inner padding.
+    let dropdown = app.ui.right_width - 16.0 - 2.0 * crate::widgets::PAD;
     assert!(menu.width() >= dropdown - 16.0, "menu {menu:?} at least as wide as its dropdown ({dropdown})");
     assert!(menu.width() <= app.ui.right_width, "menu {menu:?} fits the {} px panel", app.ui.right_width);
     assert!(menu.max.x <= SCREEN.x && menu.min.x >= panel_left - 8.0, "menu {menu:?} inside the window, under the panel");

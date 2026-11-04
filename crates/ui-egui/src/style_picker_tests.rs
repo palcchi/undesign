@@ -235,6 +235,28 @@ fn local_styles_list_draws_by_type_and_folder() {
     assert_eq!(editing.as_deref(), Some("Danger"), "a local style opens in the style editor");
 }
 
+#[test]
+fn an_empty_local_styles_section_is_hidden_before_export() {
+    let mut app = FigApp::new(Session::new(), Box::new(NoServices));
+    let ctx = egui::Context::default();
+    let mut time = 0.0;
+    for _ in 0..4 {
+        time += 1.0 / 60.0;
+        frame(&ctx, &mut app, &mut time);
+    }
+    let mut output = ctx
+        .run_ui(RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))), time: Some(time), ..Default::default() }, |ui| {
+            app.ui(ui)
+        });
+    let shapes = crate::live_tests::flat(&output.shapes);
+    output.textures_delta.clear();
+    assert!(!crate::live_tests::has_text(&shapes, "Local styles"), "empty section header is omitted");
+    assert!(
+        crate::live_tests::has_text(&shapes, "Export") && crate::live_tests::has_text(&shapes, "Export page as PNG"),
+        "the next useful section stays visible"
+    );
+}
+
 fn edit_local_for_test(app: &mut FigApp, ctx: &egui::Context) {
     let mut out = ctx.run_ui(RawInput::default(), |ui| edit_local(app, ui, StyleSlot::Fill, "Danger"));
     out.textures_delta.clear();

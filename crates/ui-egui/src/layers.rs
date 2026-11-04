@@ -74,7 +74,7 @@ pub fn node_icon(doc: &Document, id: NodeId) -> Icon {
     }
 }
 
-/// The slim icon rail at the far left: main menu, File, Assets, Variables.
+/// The slim icon rail at the far left: main menu, Variables, Agent and Chat.
 pub fn rail(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let r = ui.max_rect();
@@ -95,13 +95,12 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
     y += 44.0;
     ui.painter().line_segment([pos2(r.min.x + 18.0, y), pos2(r.max.x - 18.0, y)], Stroke::new(1.0, t.border));
     y += 12.0;
-    let items =
-        [(Icon::Page, tr("File"), Some(LeftTab::File)), (Icon::Assets, tr("Assets"), Some(LeftTab::Assets)), (Icon::Styles, tr("Variables"), None)];
+    let items = [(Icon::Styles, tr("Variables"), None)];
     for (icon, label, tab) in items {
         let ir = Rect::from_center_size(pos2(r.center().x, y + 14.0), vec2(36.0, 28.0));
         let hit = Rect::from_min_max(pos2(r.min.x, y), pos2(r.max.x, y + 48.0));
         let resp = ui.interact(hit, ui.id().with(("rail", label)), Sense::click()).tip(label);
-        let active = tab.is_some_and(|tb| tb == app.ui.left_tab && !app.ui.left_collapsed && !app.ui.versions.open);
+        let active = tab.is_some_and(|_| !app.ui.left_collapsed && !app.ui.versions.open);
         if tab.is_some() {
             a11y::tab(&resp, label, active);
         }
@@ -116,6 +115,11 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
         if resp.clicked() {
             match tab {
                 Some(tb) => {
+                    app.ui.compact_panel = match tb {
+                        LeftTab::File | LeftTab::Layers => crate::CompactPanel::Layers,
+                        LeftTab::Pages => crate::CompactPanel::Layers,
+                        LeftTab::Assets => crate::CompactPanel::Assets,
+                    };
                     // Leaving the version history shows the tab rather than collapsing it.
                     if active {
                         app.ui.left_collapsed = true;
@@ -132,16 +136,66 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
         }
         y += 60.0;
     }
+    y += 4.0;
+    ui.painter().line_segment([pos2(r.min.x + 18.0, y), pos2(r.max.x - 18.0, y)], Stroke::new(1.0, t.border));
+    y += 12.0;
+    for (label, action) in [(tr("Agent"), "agent"), (tr("Chat"), "chat")] {
+        let ir = Rect::from_center_size(pos2(r.center().x, y + 14.0), vec2(36.0, 28.0));
+        let hit = Rect::from_min_max(pos2(r.min.x, y), pos2(r.max.x, y + 48.0));
+        let resp = ui.interact(hit, ui.id().with(("rail_action", action)), Sense::click()).tip(label);
+        let active = (action == "agent" && app.ui.right_tab == crate::RightTab::Agent) || (action == "chat" && app.ui.chat_open);
+        if active {
+            ui.painter().rect_filled(ir, CornerRadius::same(6), t.selected_row);
+        } else if resp.hovered() || resp.has_focus() {
+            ui.painter().rect_filled(ir, CornerRadius::same(6), t.hover);
+        }
+        match action {
+            "agent" => {
+                crate::app_glyphs::paint(ui.painter(), ir.shrink(8.0), crate::app_glyphs::Glyph::Agent, if active { t.accent_text } else { t.icon })
+            }
+            _ => icons::paint(ui.painter(), ir.shrink(8.0), Icon::Comment, t.icon),
+        }
+        let shown = crate::widgets::elide_font(ui, label, (r.width() - 6.0).max(0.0), regular(10.0));
+        ui.painter().text(pos2(r.center().x, y + 38.0), Align2::CENTER_CENTER, shown, regular(10.0), t.text);
+        if resp.clicked() {
+            match action {
+                "agent" => {
+                    app.ui.chat_open = false;
+                    app.ui.right_tab = crate::RightTab::Agent;
+                    app.ui.compact_panel = crate::CompactPanel::Agent;
+                }
+                _ => {
+                    app.ui.chat_open = true;
+                    app.ui.right_tab = crate::RightTab::Design;
+                    app.ui.compact_panel = crate::CompactPanel::Design;
+                }
+            }
+        }
+        y += 60.0;
+    }
+}
+
+const LEFT_FOOTER_HEIGHT: f32 = 36.0;
+
+#[derive(Clone, Default)]
+struct FooterCounts {
+    doc: Option<Arc<Document>>,
+    page: Option<NodeId>,
+    layers: usize,
+    locked: usize,
 }
 
 pub fn left_panel(app: &mut FigApp, ui: &mut Ui) {
+    left_panel_contents(app, ui, true);
+}
+
+pub fn compact_left_panel(app: &mut FigApp, ui: &mut Ui) {
     if app.ui.versions.open {
         crate::versions::panel(app, ui);
         return;
     }
     let t = Tokens::get(ui.ctx());
     let full = ui.max_rect();
-    // Header: file name (or "Assets") + the file's kind + collapse.
     let (head, _) = ui.allocate_exact_size(vec2(full.width(), 64.0), Sense::hover());
     if app.ui.left_tab == LeftTab::Assets {
         ui.painter().text(pos2(head.min.x + 16.0, head.min.y + 24.0), Align2::LEFT_CENTER, tr("Assets"), semibold(13.0), t.text);
@@ -152,8 +206,6 @@ pub fn left_panel(app: &mut FigApp, ui: &mut Ui) {
         if let (Some(new), _) = crate::widgets::rename_field(ui, Id::new("filename"), &name, nr, semibold(13.0), start) {
             app.run("file.rename", json!({"name": new}));
         }
-        // Figma names the project under the file; Undesign has no projects, so it names
-        // the file's kind instead.
         let board = app.session.doc().is_ok_and(|d| !d.kind.is_design());
         let kind = if board { tr("Board") } else { tr("Design") };
         ui.painter().text(pos2(head.min.x + 16.0, head.min.y + 46.0), Align2::LEFT_CENTER, kind, regular(11.0), t.text_secondary);
@@ -169,12 +221,126 @@ pub fn left_panel(app: &mut FigApp, ui: &mut Ui) {
     }
     ui.painter().line_segment([head.left_bottom(), head.right_bottom()], Stroke::new(1.0, t.border));
     match app.ui.left_tab {
-        LeftTab::File => {
+        LeftTab::File | LeftTab::Pages | LeftTab::Layers => {
             pages(app, ui);
             layers(app, ui);
         }
         LeftTab::Assets => crate::assets_panel::show(app, ui),
     }
+}
+
+fn left_panel_contents(app: &mut FigApp, ui: &mut Ui, show_tabs: bool) {
+    if app.ui.versions.open {
+        crate::versions::panel(app, ui);
+        return;
+    }
+    if show_tabs {
+        left_panel_tabs(app, ui);
+    }
+    let width = ui.available_width();
+    let height = (ui.available_height() - LEFT_FOOTER_HEIGHT).max(0.0);
+    ui.allocate_ui_with_layout(vec2(width, height), egui::Layout::top_down(egui::Align::Min), |ui| {
+        if app.ui.left_tab == LeftTab::Assets {
+            crate::assets_panel::show(app, ui);
+        } else {
+            pages(app, ui);
+            let (rule, _) = ui.allocate_exact_size(vec2(ui.available_width(), 8.0), Sense::hover());
+            let t = Tokens::get(ui.ctx());
+            ui.painter().line_segment([rule.left_center(), rule.right_center()], Stroke::new(1.0, t.border));
+            layers(app, ui);
+        }
+    });
+    left_panel_footer(app, ui);
+}
+
+fn left_panel_tabs(app: &mut FigApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let width = ui.available_width();
+    let (row, _) = ui.allocate_exact_size(vec2(width, 44.0), Sense::hover());
+    let collapse_w = 30.0;
+    let tab_w = ((row.width() - collapse_w - 4.0) / 2.0).max(0.0);
+    let active_tab = if app.ui.left_tab == LeftTab::Assets { LeftTab::Assets } else { LeftTab::Layers };
+    for (i, (tab, label)) in [(LeftTab::Layers, tr("Design")), (LeftTab::Assets, tr("Assets"))].into_iter().enumerate() {
+        let rect = Rect::from_min_size(pos2(row.min.x + i as f32 * tab_w + 2.0, row.min.y + 4.0), vec2((tab_w - 4.0).max(0.0), 32.0));
+        let response = ui.interact(rect, ui.id().with(("left-panel-tab", label)), Sense::click());
+        let active = active_tab == tab;
+        a11y::tab(&response, label, active);
+        if active {
+            ui.painter().rect_filled(rect, CornerRadius::same(6), t.selected_row);
+            ui.painter().rect_filled(
+                Rect::from_center_size(pos2(rect.center().x, rect.max.y - 2.0), vec2(12.0, 2.0)),
+                CornerRadius::same(1),
+                t.accent,
+            );
+        } else if response.hovered() || response.has_focus() {
+            ui.painter().rect_filled(rect, CornerRadius::same(6), t.hover);
+        }
+        let font = if active { semibold(11.5) } else { regular(11.5) };
+        ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font, if active { t.text } else { t.text_secondary });
+        if response.clicked() {
+            app.ui.left_tab = tab;
+            app.ui.left_collapsed = false;
+            app.ui.compact_panel = match tab {
+                LeftTab::Assets => crate::CompactPanel::Assets,
+                _ => crate::CompactPanel::Layers,
+            };
+            app.ui.versions = Default::default();
+        }
+    }
+    let collapse = Rect::from_center_size(pos2(row.max.x - collapse_w / 2.0 - 1.0, row.center().y), vec2(26.0, 26.0));
+    let response = ui.interact(collapse, ui.id().with("hideui"), Sense::click()).tip(tr("Collapse panel"));
+    a11y::button(&response, tr("Collapse panel"));
+    if response.hovered() || response.has_focus() {
+        ui.painter().rect_filled(collapse, CornerRadius::same(5), t.hover);
+    }
+    icons::paint(ui.painter(), collapse.shrink(5.0), Icon::Panels, t.icon);
+    if response.clicked() {
+        app.ui.left_collapsed = true;
+    }
+    ui.painter().line_segment([row.left_bottom(), row.right_bottom()], Stroke::new(1.0, t.border));
+}
+
+fn left_panel_footer(app: &FigApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let (footer, _) = ui.allocate_exact_size(vec2(ui.available_width(), LEFT_FOOTER_HEIGHT), Sense::hover());
+    ui.painter().line_segment([footer.left_top(), footer.right_top()], Stroke::new(1.0, t.border));
+    let Ok(ds) = app.session.ds() else { return };
+    let (layers, locked) = footer_counts(ui, &ds.doc, ds.page);
+    let y = footer.center().y;
+    let layer_label = trn("{n} layers", layers, &[]);
+    ui.painter().text(pos2(footer.min.x + 12.0, y), Align2::LEFT_CENTER, layer_label, regular(10.5), t.text_secondary);
+    let locked_label = trn("{n} layers locked", locked, &[]);
+    let galley = ui.painter().layout_no_wrap(locked_label, regular(10.5), t.text_secondary);
+    let text_x = footer.max.x - 12.0 - galley.size().x;
+    icons::paint(ui.painter(), Rect::from_center_size(pos2(text_x - 9.0, y), vec2(12.0, 12.0)), Icon::Lock, t.icon_secondary);
+    ui.painter().galley(pos2(text_x, y - galley.size().y / 2.0), galley, t.text_secondary);
+}
+
+fn footer_counts(ui: &Ui, doc: &Arc<Document>, page: NodeId) -> (usize, usize) {
+    ui.data_mut(|data| {
+        let cache = data.get_temp_mut_or_default::<FooterCounts>(Id::new("left_footer_counts"));
+        if cache.page == Some(page) && cache.doc.as_ref().is_some_and(|previous| Arc::ptr_eq(previous, doc)) {
+            return (cache.layers, cache.locked);
+        }
+        let mut stack = Vec::new();
+        if let Some(root) = doc.node(page) {
+            stack.extend(root.children.iter().copied().map(|id| (id, root.locked)));
+        }
+        let mut seen = BTreeSet::new();
+        let (mut layers, mut locked) = (0, 0);
+        while let Some((id, inherited_lock)) = stack.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            let Some(node) = doc.node(id) else { continue };
+            layers += 1;
+            let node_locked = inherited_lock || node.locked;
+            locked += usize::from(node_locked);
+            stack.extend(node.children.iter().copied().map(|child| (child, node_locked)));
+        }
+        *cache = FooterCounts { doc: Some(Arc::clone(doc)), page: Some(page), layers, locked };
+        (layers, locked)
+    })
 }
 
 fn pages(app: &mut FigApp, ui: &mut Ui) {
@@ -187,8 +353,14 @@ fn pages(app: &mut FigApp, ui: &mut Ui) {
     let w = ui.available_width();
     let (hr, _) = ui.allocate_exact_size(vec2(w, 40.0), Sense::hover());
     let tresp = ui.interact(Rect::from_min_size(hr.min, vec2(w - 40.0, 40.0)), ui.id().with("pages_toggle"), Sense::click());
-    a11y::toggle(&tresp, tr("Pages"), app.ui.pages_open);
-    ui.painter().text(pos2(hr.min.x + 16.0, hr.center().y), Align2::LEFT_CENTER, tr("Pages"), semibold(11.0), t.text);
+    a11y::disclosure(&tresp, tr("Pages"), app.ui.pages_open);
+    let chevron = if app.ui.pages_open { Icon::Chevron } else { Icon::ChevronRight };
+    icons::paint(ui.painter(), Rect::from_center_size(pos2(hr.min.x + 16.0, hr.center().y), vec2(12.0, 12.0)), chevron, t.icon_secondary);
+    ui.painter().text(pos2(hr.min.x + 30.0, hr.center().y), Align2::LEFT_CENTER, tr("Pages"), semibold(11.0), t.text);
+    let dragging_layer = ui.data(|d| d.get_temp::<NodeId>(layer_drag_id()).is_some());
+    if dragging_layer && ui.input(|i| i.pointer.hover_pos().is_some_and(|p| hr.contains(p))) {
+        app.ui.pages_open = true;
+    }
     if tresp.clicked() {
         app.ui.pages_open = !app.ui.pages_open;
     }
@@ -243,7 +415,7 @@ fn pages(app: &mut FigApp, ui: &mut Ui) {
     let page_key = (uid, cur);
     let scroll_to_cur = app.ui.pages_seen_page != Some(page_key);
     let mut current_row_rendered = false;
-    // A long list scrolls in its own area, so the layers keep their room below it.
+    let compact = ui.ctx().content_rect().width() < 680.0;
     let max_h = pages_list_height(app.ui.pages_height, ui.available_height());
     let mut moved = egui::ScrollArea::vertical().id_salt("pages_list").max_height(max_h).show(ui, |ui| {
         for (k, (id, name, divider)) in pages.iter().cloned().enumerate() {
@@ -300,6 +472,9 @@ fn pages(app: &mut FigApp, ui: &mut Ui) {
                 select = Some(id);
                 app.ui.pages_focus = Some(uid);
                 app.ui.layers_focus = false;
+                if compact {
+                    app.ui.left_tab = LeftTab::Pages;
+                }
             }
             if resp.double_clicked() && !crate::menus::dev_mode_refuses(app, "page.rename") {
                 app.ui.rename_page = Some((id, name.clone()));
@@ -362,15 +537,16 @@ fn pages(app: &mut FigApp, ui: &mut Ui) {
     {
         app.run("page.select", json!({"id": p}));
     }
-    // `inner_rect` is the room the list was given; a short list shrinks to its rows.
-    pages_edge(app, ui, moved.inner_rect.height().min(moved.content_size.y));
+    if compact {
+        pages_edge(app, ui, moved.inner_rect.height().min(moved.content_size.y));
+    }
 }
 
 /// The Pages list has the keyboard: a page row (or the add-page button) of the open file was
 /// clicked last, and the list is still on screen.
 pub(crate) fn pages_have_keyboard(app: &FigApp) -> bool {
     let Ok(ds) = app.session.ds() else { return false };
-    app.ui.pages_focus == Some(ds.uid) && app.ui.pages_open && !app.ui.left_collapsed && !ds.view.ui_hidden && app.ui.left_tab == LeftTab::File
+    app.ui.pages_focus == Some(ds.uid) && app.ui.pages_open && !app.ui.left_collapsed && !ds.view.ui_hidden && app.ui.left_tab != LeftTab::Assets
 }
 
 /// Delete `page` (no confirmation: Undo brings it back) and say so.
@@ -379,17 +555,13 @@ pub(crate) fn delete_page(app: &mut FigApp, page: NodeId) {
         app.toast(tr("Page deleted"));
     }
 }
-
-/// The pages list's height in a panel with `avail` below the Pages header: the height asked for
-/// (by default 40% of it), at least three rows, and leaving the layers their header and three rows.
+/// The pages list's height in a compact panel: at least three rows, leaving the layers their header and three rows.
 pub(crate) fn pages_list_height(asked: Option<f32>, avail: f32) -> f32 {
     let least = 3.0 * ROW;
-    let most = (avail - 40.0 - 3.0 * ROW).max(least);
+    let most = (avail - 40.0 - 3.0 * ROW - 8.0).max(least);
     asked.filter(|h| h.is_finite()).unwrap_or(avail * 0.4).clamp(least, most)
 }
-
-/// The line between the pages and the layers: dragging it sizes the pages list (`shown`: its
-/// height now), a double-click puts back the default. The main window keeps it in the preferences.
+/// The line between Pages and Layers in the compact stacked panel; dragging sizes Pages and double-click restores the default.
 fn pages_edge(app: &mut FigApp, ui: &mut Ui, shown: f32) {
     let t = Tokens::get(ui.ctx());
     let w = ui.available_width();
@@ -406,7 +578,6 @@ fn pages_edge(app: &mut FigApp, ui: &mut Ui, shown: f32) {
     let asked = if resp.double_clicked() {
         Some(None)
     } else if resp.dragged() {
-        // The edge stays under the pointer where it was grabbed.
         if resp.drag_started() {
             ui.data_mut(|d| d.insert_temp(id, shown));
         }
@@ -634,7 +805,7 @@ pub(crate) fn start_rename(app: &mut FigApp, ids: &[NodeId]) {
     }
     let rows = listed_rows(&doc, page, &app.ui.expanded, &app.ui.layer_filter.trim().to_lowercase());
     let Some(id) = rows.iter().map(|r| r.id).find(|r| ids.contains(r)) else { return };
-    app.ui.left_tab = LeftTab::File;
+    app.ui.left_tab = LeftTab::Layers;
     app.ui.left_collapsed = false;
     rename_layer(app, id);
 }
@@ -818,11 +989,11 @@ fn layers(app: &mut FigApp, ui: &mut Ui) {
         if let Some(i) = scroll_to {
             ui.scroll_to_rect(Rect::from_min_size(pos2(ui.max_rect().left(), top + i as f32 * pitch), vec2(w, ROW)), None);
         }
-        if rows.is_empty() {
+        if rows.is_empty() && !filter.is_empty() {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
-                let hint = if filter.is_empty() { tr("Add a frame (F) or a shape (R) to get started") } else { tr("No matching layers") };
+                let hint = tr("No matching layers");
                 ui.add(egui::Label::new(egui::RichText::new(hint).font(regular(11.0)).color(t.text_secondary)).wrap());
             });
         }
