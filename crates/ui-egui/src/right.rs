@@ -125,7 +125,7 @@ pub fn editor_header(app: &mut FigApp, ui: &mut Ui) {
     file_page_menu(app, &fresp, is_design);
     if show_status {
         let status_rect = Rect::from_min_size(pos2(file_menu.max.x + 4.0, top.center().y - 8.0), vec2(status_width, 16.0));
-        let status_resp = ui.interact(status_rect, ui.id().with("save_status"), Sense::hover()).tip(status_label.clone());
+        let status_resp = ui.interact(status_rect, ui.id().with("save_status"), Sense::hover()).tip(status_label);
         a11y::status(
             &status_resp,
             status_label,

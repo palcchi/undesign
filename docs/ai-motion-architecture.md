@@ -79,9 +79,22 @@ user configures a provider.
 
 The initial native adapter is deliberately limited:
 
-- The user supplies a full OpenAI-compatible Chat Completions URL, model ID, and API key. There is no
-  built-in provider, default model, model catalogue, provider-specific OAuth, or claim of universal
-  compatibility.
+- The user picks one of two adapters and supplies the model ID and API key; nothing is preselected.
+  **OpenAI-compatible** takes a full Chat Completions URL. **Anthropic** sends to the fixed
+  Messages endpoint (`https://api.anthropic.com/v1/messages`, `anthropic-version: 2026-10-21`,
+  `x-api-key`); switching adapters clears the model and endpoint. There is no built-in provider,
+  default model, model catalogue, provider-specific OAuth, or claim of universal compatibility.
+- Tool ids are sent as `document__inspect`-style names (dots become `__`) because provider function
+  names allow only letters, digits, `_` and `-`; replies are mapped back before validation.
+- Anthropic requests carry the page snapshot in `system`, so earlier thinking blocks would no longer
+  match their prefix; the adapter never replays them (text and tool-use blocks are kept). History
+  starts at the first user prompt, adjacent turns are merged, results without a call are dropped and
+  calls without a result get a "not run" result. A `refusal` stop reason, an error body or a tool
+  call cut off by `max_tokens` is reported as a failed request and nothing is proposed. For the
+  models that accept it (`claude-fable-5-1`, `claude-opus-5-5`, `claude-opus-5`,
+  `claude-sonnet-5-5`) the request adds `fallbacks: "default"` with the
+  `server-side-fallback-2026-07-01` beta header so a declined request is retried by the API on a
+  fallback model.
 - The Connect action stores settings in the current desktop process only. It does not probe the URL;
   the first network request happens only after the user presses Send. Responses are non-streamed.
 - The key is held in zeroizing process memory and is not written to `state.json`, preferences,

@@ -333,6 +333,9 @@ pub trait Services {
     fn agent_provider_model(&self) -> Option<&str> {
         None
     }
+    fn agent_provider_protocol(&self) -> agent_provider::AgentProviderProtocol {
+        agent_provider::AgentProviderProtocol::OpenAiCompatible
+    }
     fn connect_agent_provider(&mut self, _config: agent_provider::AgentProviderConfig) -> Result<(), String> {
         Err("Provider connections are unavailable on this platform.".to_string())
     }
