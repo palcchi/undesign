@@ -997,6 +997,7 @@ fn keyframe_inspector(app: &mut FigApp, ui: &mut Ui, composition: &Composition, 
     ui.label(egui::RichText::new(layer_name(app, track.target)).size(12.0).strong().color(t.text));
     ui.label(egui::RichText::new(tr(property_label(track.property))).size(11.0).color(t.text_secondary));
     ui.add_space(4.0);
+
     let Some((_, frame, value, interpolation)) = selected.filter(|(id, _, _, _)| *id == track_id) else {
         let frame = app.ui.motion_frame.min(composition.duration_frames);
         crate::widgets::note(ui, tr("Select a keyframe in the timeline to edit its value"), t.text_secondary);

@@ -997,7 +997,8 @@ impl FigApp {
     /// the answer arrives (the network wakes the window then); errors show as with [`run`](Self::run).
     /// [`Session::waiting_for`] tells the panels to show that it's on its way.
     pub fn run_background(&mut self, ctx: &egui::Context, id: &str, params: Value, done: Done) {
-        self.waiting.retain(|(c, _)| c != id);        let r = self.session.start_background(id, params);
+        self.waiting.retain(|(c, _)| c != id);
+        let r = self.session.start_background(id, params);
         self.handle_ui_requests();
         match r {
             Ok(Some(v)) => done(self, ctx, v),
@@ -1996,7 +1997,8 @@ impl FigApp {
         state["pendingOpens"] = json!(self.ui.pending_opens.len());
         state["missingFonts"] = json!(self.ui.missing_fonts.as_ref().map(missing_fonts::Shown::inspect));
         state["presentTabs"] = tabs::present_tabs_inspect(self);
-        state    }
+        state
+    }
 }
 
 /// The file types File ▸ Open and a drop on the home screen open.
