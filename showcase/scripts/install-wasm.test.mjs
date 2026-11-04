@@ -11,7 +11,7 @@ const testDirectory = dirname(fileURLToPath(import.meta.url));
 const showcaseDirectory = resolve(testDirectory, "..");
 const repositoryRoot = resolve(showcaseDirectory, "..");
 const installerSource = join(testDirectory, "install-wasm.mjs");
-const maxWasmBytes = 24 * 1024 * 1024;
+const maxWasmBytes = 28 * 1024 * 1024;
 
 const bootstrap = `import init, * as bindings from '/app/undesign-web-test.js';
 const wasm = await init({ module_or_path: '/app/undesign-web-test_bg.wasm' });
@@ -114,16 +114,16 @@ test("installer rejects missing or ambiguous inline bootstrap scripts before rep
   }
 });
 
-test("installer enforces the 24 MiB WASM cap before replacing installed assets", async () => {
+test("installer enforces the 28 MiB WASM cap before replacing installed assets", async () => {
   await withFixture({ wasmSize: maxWasmBytes + 1 }, async (fixture) => {
     const result = runInstaller(fixture);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /over the 25165824-byte WASM limit/);
+    assert.match(result.stderr, /over the 29360128-byte WASM limit/);
     assert.equal(await readFile(join(fixture.publicApp, "keep-on-validation-failure.txt"), "utf8"), "keep me");
   });
 });
 
-test("current installed WASM assets remain below 24 MiB", async () => {
+test("current installed WASM assets remain below 28 MiB", async () => {
   const publicApp = join(showcaseDirectory, "public", "app");
   const wasmFiles = (await readdir(publicApp)).filter((name) => /\.wasm$/i.test(name));
   assert.ok(wasmFiles.length > 0, "the repository should include its installed Trunk WASM bundle");

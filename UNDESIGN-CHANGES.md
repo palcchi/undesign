@@ -297,3 +297,11 @@ upstream revision so future syncs stay auditable.
 - `widgets.rs`, `theme.rs`: 24 px controls, radii 5 (inputs, buttons), 12 (panels, dialogs).
 - `frame_labels.rs`, `canvas.rs`: status badges drawn only where they fit over their frame.
 - Tests updated for the docked geometry.
+
+## 2026-11-04: Showcase runtime updated (change #20)
+
+- `showcase/public/app/`: the browser build of `6c90c75` (the GitHub Pages artifact of the Web
+  preview workflow, built by CI from this repository with the pinned craft-fonts), installed with
+  `showcase/scripts/install-wasm.mjs`; built without `agent-relay`, as before.
+- The installer's WASM cap goes from 24 MiB to 28 MiB (the bundle is 25.5 MB: the data section
+  grew 1.57 MB, the code section shrank); its tests follow.

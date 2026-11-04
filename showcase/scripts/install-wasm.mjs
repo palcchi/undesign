@@ -28,7 +28,8 @@ if (!sourceHtml.includes("</head>")) {
   process.exit(1);
 }
 
-const maxWasmBytes = Number(process.env.UNDESIGN_WASM_MAX_BYTES ?? "25165824");
+// 28 MiB: the browser build with the embedded Latin fonts is about 25.5 MB (2026-11-04).
+const maxWasmBytes = Number(process.env.UNDESIGN_WASM_MAX_BYTES ?? "29360128");
 if (!Number.isSafeInteger(maxWasmBytes) || maxWasmBytes < 1) {
   console.error("UNDESIGN_WASM_MAX_BYTES must be a positive safe integer.");
   process.exit(1);
