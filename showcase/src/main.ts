@@ -266,6 +266,11 @@ function buildAppShell(): void {
   if (new URLSearchParams(window.location.search).has("webgl")) {
     runtimeUrl.searchParams.set("webgl", "");
   }
+  // `/app/?example=<name>` opens that built-in example in the editor (plain names only).
+  const example = new URLSearchParams(window.location.search).get("example");
+  if (example !== null && /^[A-Za-z0-9-]{1,64}$/.test(example)) {
+    runtimeUrl.searchParams.set("example", example);
+  }
   const runtimePath = `${runtimeUrl.pathname}${runtimeUrl.search}`;
 
   const loadRuntime = (): void => {
