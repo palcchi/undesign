@@ -122,7 +122,8 @@ fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     assert_eq!((w.value(), w.numeric_value()), (Some("40"), Some(40.0)));
     assert_eq!(find(&nodes, Role::SpinButton, "Rotation").value(), Some("0°"));
     // Tabs and dropdowns.
-    assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 2, "left and right Design tabs");
+    // The left panel's Design tab; the right panel names its tab "Design workspace".
+    assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 1, "the left Design tab");
     assert!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).all(|n| n.is_selected() == Some(true)));
     assert_eq!(find(&nodes, Role::Tab, "Design workspace").is_selected(), Some(true));
     assert_eq!(find(&nodes, Role::Tab, "Prototype workspace").is_selected(), Some(false));
@@ -130,6 +131,7 @@ fn the_screen_reader_tree_names_tools_layers_fields_tabs_and_the_canvas() {
     assert_eq!(find(&nodes, Role::Tab, "Agent workspace").is_selected(), Some(false));
     assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
     assert!(nodes.iter().all(|n| n.role() != Role::Tab || n.label() != Some("Inspect workspace")), "Dev Mode remains a separate toolbar mode");
+    assert_eq!(find(&nodes, Role::Button, "Developer Mode").toggled(), Some(Toggled::False), "the toolbar toggle reaches Developer Mode");
     find(&nodes, Role::Button, "Agent");
     find(&nodes, Role::Button, "Chat");
     find(&nodes, Role::Button, "Comment");
@@ -165,7 +167,7 @@ fn expanding_the_pages_section_exposes_page_actions() {
 #[test]
 fn tablet_width_uses_desktop_sidebar_tabs_and_the_shared_header() {
     let nodes = tablet_tree();
-    assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 2);
+    assert_eq!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).count(), 1);
     assert!(nodes.iter().filter(|n| n.role() == Role::Tab && n.label() == Some("Design")).all(|n| n.is_selected() == Some(true)));
     assert_eq!(find(&nodes, Role::Tab, "Design workspace").is_selected(), Some(true));
     assert_eq!(find(&nodes, Role::Tab, "Prototype workspace").is_selected(), Some(false));
@@ -174,6 +176,7 @@ fn tablet_width_uses_desktop_sidebar_tabs_and_the_shared_header() {
     assert_eq!(find(&nodes, Role::Tab, "Assets").is_selected(), Some(false));
     assert!(nodes.iter().all(|n| !(n.role() == Role::Tab && matches!(n.label(), Some("Motion" | "Pages" | "Layers")))));
     assert!(nodes.iter().all(|n| n.role() != Role::Tab || n.label() != Some("Inspect workspace")), "Dev Mode remains a separate toolbar mode");
+    assert_eq!(find(&nodes, Role::Button, "Developer Mode").toggled(), Some(Toggled::False), "the toolbar toggle reaches Developer Mode");
     find(&nodes, Role::Button, "Agent");
     find(&nodes, Role::Button, "Chat");
     find(&nodes, Role::Button, "Comment");

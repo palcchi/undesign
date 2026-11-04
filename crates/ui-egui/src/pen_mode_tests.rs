@@ -29,19 +29,20 @@ fn layers(u: &Ui) -> usize {
     doc.node(u.app.session.page().unwrap()).unwrap().children.len()
 }
 
-/// The middle of the right-side workspace tab named `label`, found in the AccessKit tree.
+/// The middle of the mode control named `label`, found in the AccessKit tree.
 fn mode_button(u: &mut Ui, label: &str) -> Pos2 {
     u.ctx.enable_accesskit();
     u.frame(vec![]);
     let out = u.frame_output(vec![]);
     let nodes = out.platform_output.accesskit_update.expect("an AccessKit update").nodes;
-    let wanted = match label {
-        "Design" => "Design workspace",
-        "Motion" => "Motion workspace",
-        "Inspect" => "Inspect workspace",
-        _ => label,
+    // Developer Mode is the toggle beside the tools; the others are right-panel workspace tabs.
+    let (role, wanted) = match label {
+        "Design" => (Role::Tab, "Design workspace"),
+        "Motion" => (Role::Tab, "Motion workspace"),
+        "Inspect" => (Role::Button, "Developer Mode"),
+        _ => (Role::Tab, label),
     };
-    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == Role::Tab && n.label() == Some(wanted)).expect(wanted);
+    let n = nodes.iter().map(|(_, n)| n).find(|n| n.role() == role && n.label() == Some(wanted)).expect(wanted);
     let b = n.bounds().expect("bounds");
     pos2(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32)
 }

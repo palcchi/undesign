@@ -139,8 +139,8 @@ pub(crate) fn palette_pill_rect(app: &FigApp) -> Rect {
     Rect::from_min_size(pos2(row.min.x - scroll, row.min.y), vec2(pill_w, row.height()))
 }
 
-/// The main toolbar pill's width: six tool groups plus Assets (boards retain their auxiliary
-/// controls). Both ends have 8 px of padding.
+/// The main toolbar pill's width: six tool groups plus Assets and the Developer Mode toggle (boards
+/// retain their auxiliary controls). Both ends have 8 px of padding.
 fn main_width(groups: &[Group], board: bool) -> f32 {
     let end = if board { TOOL_CELL + 8.0 } else { 8.0 };
     let before_tail = 8.0;
@@ -149,7 +149,7 @@ fn main_width(groups: &[Group], board: bool) -> f32 {
 
 fn main_tool_width(groups: &[Group], board: bool) -> f32 {
     let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
-    let side_buttons = if board { 3.0 } else { 1.0 };
+    let side_buttons = if board { 3.0 } else { 2.0 };
     groups.len() as f32 * (TOOL_CELL + 4.0) + carets + side_buttons * (TOOL_CELL + 4.0)
 }
 
@@ -300,6 +300,17 @@ fn side_buttons(app: &mut FigApp, ui: &mut Ui, mut x: f32, cy: f32, t: &Tokens, 
             } else {
                 app.run("view.assets", json!({}));
             }
+        }
+        x += TOOL_CELL + 4.0;
+    }
+    if !board {
+        // Developer Mode is a mode of its own (inspect only), so it is a toggle beside the tools
+        // rather than a fifth workspace tab; Shift+D and the menus run the same command.
+        let r = Rect::from_center_size(pos2(x + TOOL_CELL / 2.0, cy), vec2(TOOL_CELL, TOOL_CELL));
+        let on = app.ui.right_tab == crate::RightTab::Inspect;
+        let tip = crate::shortcuts::tip(tr("Developer Mode"), "view.devMode");
+        if tool_cell(ui, t, r, "devmode", Icon::Code, on, tip).clicked() {
+            app.run("view.devMode", json!({}));
         }
         x += TOOL_CELL + 4.0;
     }
@@ -658,7 +669,7 @@ mod tests {
     /// files and on boards: the pill reads centred.
     #[test]
     fn pill_content_is_centred() {
-        for (groups, board, side_buttons, tail) in [(GROUPS, false, 1.0, 0.0), (BOARD_GROUPS, true, 3.0, TOOL_CELL)] {
+        for (groups, board, side_buttons, tail) in [(GROUPS, false, 2.0, 0.0), (BOARD_GROUPS, true, 3.0, TOOL_CELL)] {
             let carets = groups.iter().filter(|g| g.has_flyout()).count() as f32 * 10.0;
             let before_tail = 8.0;
             let content = 8.0 + groups.len() as f32 * (TOOL_CELL + 4.0) + carets + side_buttons * (TOOL_CELL + 4.0) + before_tail + tail;

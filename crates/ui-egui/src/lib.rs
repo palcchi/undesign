@@ -1947,7 +1947,7 @@ impl FigApp {
             // The docked Motion timeline spans the full width below the side panels, so it claims
             // its strip before they do.
             if !hidden && self.ui.motion_timeline {
-                motion_dock_panel(self, ui, "motion_timeline", 232.0, 160.0, card());
+                motion_dock_panel(self, ui, "motion_timeline", 280.0, 160.0, card());
             }
             if !hidden {
                 egui::Panel::left("left_rail")

@@ -97,7 +97,7 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
     y += 12.0;
     let items = [(Icon::Styles, tr("Variables"), None)];
     for (icon, label, tab) in items {
-        let ir = Rect::from_center_size(pos2(r.center().x, y + 22.0), vec2(36.0, 36.0));
+        let ir = Rect::from_center_size(pos2(r.center().x, y + 16.0), vec2(36.0, 28.0));
         let hit = Rect::from_min_max(pos2(r.min.x, y), pos2(r.max.x, y + 48.0));
         let resp = ui.interact(hit, ui.id().with(("rail", label)), Sense::click()).tip(label);
         let active = tab.is_some_and(|_| !app.ui.left_collapsed && !app.ui.versions.open);
@@ -110,6 +110,7 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
             ui.painter().rect_filled(ir, CornerRadius::same(6), t.hover);
         }
         icons::paint(ui.painter(), Rect::from_center_size(ir.center(), vec2(16.0, 16.0)), icon, if active { t.accent_text } else { t.icon });
+        rail_label(ui, &t, r, y, label, active);
         if resp.clicked() {
             match tab {
                 Some(tb) => {
@@ -138,7 +139,7 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
     ui.painter().line_segment([pos2(r.min.x + 18.0, y), pos2(r.max.x - 18.0, y)], Stroke::new(1.0, t.border));
     y += 12.0;
     for (label, action) in [(tr("Agent"), "agent"), (tr("Chat"), "chat")] {
-        let ir = Rect::from_center_size(pos2(r.center().x, y + 22.0), vec2(36.0, 36.0));
+        let ir = Rect::from_center_size(pos2(r.center().x, y + 16.0), vec2(36.0, 28.0));
         let hit = Rect::from_min_max(pos2(r.min.x, y), pos2(r.max.x, y + 48.0));
         let resp = ui.interact(hit, ui.id().with(("rail_action", action)), Sense::click()).tip(label);
         let active = (action == "agent" && app.ui.right_tab == crate::RightTab::Agent) || (action == "chat" && app.ui.chat_open);
@@ -147,12 +148,12 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
         } else if resp.hovered() || resp.has_focus() {
             ui.painter().rect_filled(ir, CornerRadius::same(6), t.hover);
         }
+        let glyph = Rect::from_center_size(ir.center(), vec2(18.0, 18.0));
         match action {
-            "agent" => {
-                crate::app_glyphs::paint(ui.painter(), ir.shrink(8.0), crate::app_glyphs::Glyph::Agent, if active { t.accent_text } else { t.icon })
-            }
-            _ => icons::paint(ui.painter(), ir.shrink(8.0), Icon::Comment, t.icon),
+            "agent" => crate::app_glyphs::paint(ui.painter(), glyph, crate::app_glyphs::Glyph::Agent, if active { t.accent_text } else { t.icon }),
+            _ => icons::paint(ui.painter(), glyph, Icon::Comment, if active { t.accent_text } else { t.icon }),
         }
+        rail_label(ui, &t, r, y, label, active);
         if resp.clicked() {
             match action {
                 "agent" => {
@@ -169,6 +170,13 @@ pub fn rail(app: &mut FigApp, ui: &mut Ui) {
         }
         y += 52.0;
     }
+}
+
+/// The name under a rail icon: the Agent and Chat glyphs are both speech shapes, so the words
+/// tell them apart at a glance (the Home rail labels its items the same way).
+fn rail_label(ui: &Ui, t: &Tokens, rail: Rect, y: f32, label: &str, active: bool) {
+    let shown = crate::widgets::elide_font(ui, label, rail.width() - 6.0, regular(9.5));
+    ui.painter().text(pos2(rail.center().x, y + 39.0), Align2::CENTER_CENTER, shown, regular(9.5), if active { t.text } else { t.text_secondary });
 }
 
 const LEFT_FOOTER_HEIGHT: f32 = 36.0;

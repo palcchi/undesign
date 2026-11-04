@@ -520,14 +520,20 @@ fn interface_size(app: &mut FigApp, ui: &mut egui::Ui, chosen: f64) {
             }
             // Spatial focus can jump to a control behind the popup when the menu overlaps the
             // Preferences window. Once an item is focused, walk the menu's own rows instead.
-            if step != 0
-                && let Some(index) = rows.iter().position(|id| Some(*id) == focused)
-            {
-                let next = index.saturating_add_signed(step).min(rows.len() - 1);
-                ui.memory_mut(|memory| {
-                    memory.request_focus(rows[next]);
-                    memory.move_focus(egui::FocusDirection::None);
-                });
+            if step != 0 {
+                // From the drop-down itself the first arrow enters the menu at its first (or,
+                // going up, last) size rather than leaving it to spatial focus.
+                let next = match rows.iter().position(|id| Some(*id) == focused) {
+                    Some(index) => index.saturating_add_signed(step).min(rows.len().saturating_sub(1)),
+                    None if step > 0 => 0,
+                    None => rows.len().saturating_sub(1),
+                };
+                if let Some(id) = rows.get(next).copied() {
+                    ui.memory_mut(|memory| {
+                        memory.request_focus(id);
+                        memory.move_focus(egui::FocusDirection::None);
+                    });
+                }
             }
         });
     });

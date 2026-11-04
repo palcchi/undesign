@@ -53,7 +53,7 @@ pub struct Home {
 }
 
 const RAIL: f32 = 64.0;
-const SIDEBAR: f32 = 248.0;
+const SIDEBAR: f32 = 216.0;
 const NAV: f32 = RAIL + SIDEBAR;
 const CARD_W: f32 = 248.0;
 const GAP: f32 = 16.0;
@@ -148,7 +148,7 @@ pub fn show(app: &mut FigApp, ui: &mut Ui) {
         let main = Rect::from_min_max(pos2(left.max.x, rect.min.y), rect.max);
         ui.scope_builder(egui::UiBuilder::new().max_rect(main), |ui| {
             egui::ScrollArea::vertical().id_salt("home").auto_shrink([false, false]).show(ui, |ui| {
-                egui::Frame::NONE.inner_margin(egui::Margin::symmetric(32, 28)).show(ui, |ui| {
+                egui::Frame::NONE.inner_margin(egui::Margin::symmetric(40, 24)).show(ui, |ui| {
                     ui.spacing_mut().item_spacing = vec2(GAP, 0.0);
                     if app.ui.home_view.file_query.trim().is_empty() {
                         recents(app, ui, &t);
@@ -205,7 +205,7 @@ fn sidebar(app: &mut FigApp, ui: &mut Ui, t: &Tokens, left: Rect) {
     }
 
     let mut y = panel.min.y + 20.0;
-    ui.painter().text(pos2(panel.min.x + 20.0, y + 8.0), Align2::LEFT_CENTER, tr("Folders"), semibold(15.0), t.text);
+    ui.painter().text(pos2(panel.min.x + 20.0, y + 8.0), Align2::LEFT_CENTER, tr("Recent files"), semibold(15.0), t.text);
     y += 36.0;
     let search = Rect::from_min_size(pos2(panel.min.x + 12.0, y), vec2(SIDEBAR - 24.0, widgets::FIELD_H));
     ui.scope_builder(egui::UiBuilder::new().max_rect(search), |ui| {
@@ -230,7 +230,7 @@ fn folder_tree(app: &mut FigApp, ui: &mut Ui, t: &Tokens, paths: &[String], orig
         let Some(parent) = Path::new(path).parent().filter(|p| !p.as_os_str().is_empty()) else { continue };
         *folders.entry(parent.display().to_string()).or_default() += 1;
     }
-    ui.painter().text(origin, Align2::LEFT_TOP, tr("On this device"), semibold(11.0), t.text_secondary);
+    ui.painter().text(origin, Align2::LEFT_TOP, tr("Folders"), semibold(12.0), t.text_secondary);
     let mut y = origin.y + 28.0;
     for (folder, count) in folders {
         let name = Path::new(&folder).file_name().and_then(|n| n.to_str()).unwrap_or(&folder);
@@ -315,8 +315,9 @@ fn subheading(ui: &mut Ui, t: &Tokens, text: &str) {
     ui.add_space(12.0);
 }
 
-/// A compact workspace action. The primary action is filled; secondary actions stay quiet.
-fn action_button(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, primary: bool) -> bool {
+/// A compact workspace action. The primary action is filled; secondary actions stay quiet. `sub`
+/// says what the action does and shows on hover (with the title when the title is cut short).
+fn action_button(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, sub: &str, primary: bool) -> bool {
     let width = (ui.available_width().min(176.0)).max(132.0);
     let (r, mut resp) = ui.allocate_exact_size(vec2(width, 36.0), Sense::click());
     a11y::button(&resp, title);
@@ -337,22 +338,20 @@ fn action_button(ui: &mut Ui, t: &Tokens, icon: Icon, title: &str, primary: bool
         icons::paint(ui.painter(), ir, icon, ink);
     }
     let label = widgets::elide_font(ui, title, r.width() - 42.0, semibold(11.0));
-    if label != title {
-        resp = resp.on_hover_text(title);
-    }
+    resp = if label != title { resp.on_hover_text(format!("{title}\n{sub}")) } else { resp.on_hover_text(sub) };
     ui.painter().text(pos2(r.min.x + 34.0, r.center().y), Align2::LEFT_CENTER, label, semibold(11.0), ink);
     focus_ring(ui, t, r, &resp, 7);
     resp.clicked()
 }
 
 fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
-    heading(ui, t, tr("Workspace"));
+    heading(ui, t, tr("Recents"));
     let (mut new_file, mut new_board, mut import_file, mut join_team) = (false, false, false, false);
     ui.horizontal_wrapped(|ui| {
-        new_file = action_button(ui, t, Icon::PenNib, tr("New design"), true);
-        new_board = action_button(ui, t, Icon::Board, tr("New board"), false);
-        import_file = action_button(ui, t, Icon::Page, tr("Import file"), false);
-        join_team = action_button(ui, t, Icon::Online, tr("Join team"), false);
+        new_file = action_button(ui, t, Icon::PenNib, tr("New design"), tr("Start from a blank canvas"), true);
+        new_board = action_button(ui, t, Icon::Board, tr("New board"), tr("Sticky notes, shapes and connectors"), false);
+        import_file = action_button(ui, t, Icon::Page, tr("Import file"), tr("Bring in a local design"), false);
+        join_team = action_button(ui, t, Icon::Online, tr("Join team"), tr("Enter a code or invite link"), false);
     });
     if new_file || new_board {
         app.run(if new_board { "file.newBoard" } else { "file.new" }, json!({}));
@@ -365,7 +364,7 @@ fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
         app.ui.home_view.join_code_focus = true;
     }
     // Join a file someone shared: the join field, and what the join is doing.
-    subheading(ui, t, tr("Join a workspace"));
+    subheading(ui, t, tr("Join with a code"));
     ui.scope(|ui| {
         ui.set_max_width(540.0);
         let focus = std::mem::take(&mut app.ui.home_view.join_code_focus);

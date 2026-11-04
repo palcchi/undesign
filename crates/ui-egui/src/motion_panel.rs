@@ -157,23 +157,31 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     let Some(composition) = selected_composition(app) else { return };
     advance_playback(app, ui, &composition);
     ui.add_space(8.0);
-    composition_combo(app, ui, "motion-composition", ui.available_width());
-    meta_row(ui, &composition);
-    ui.add_space(8.0);
+    egui::Frame::NONE.inner_margin(egui::Margin::symmetric(crate::widgets::PAD as i8, 0)).show(ui, |ui| {
+        composition_combo(app, ui, "motion-composition", ui.available_width());
+        ui.add_space(4.0);
+        meta_row(ui, &composition, &t);
+    });
+    ui.add_space(4.0);
     track_list(app, ui, &composition, &t);
     ui.add_space(8.0);
     keyframe_inspector(app, ui, &composition, &t);
 }
 
 /// A compact, editable track list in the Motion inspector. Track enablement is a real engine
-/// command, and selecting a row makes its keyframes the active editing target.
+/// command, and selecting a row makes its keyframes the active editing target. Rows keep the
+/// inspector's side padding; long names end with an ellipsis and show in full on hover.
 fn track_list(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens) {
-    ui.horizontal(|ui| {
-        crate::widgets::section_header(ui, tr("Tracks"), &[], false);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(egui::RichText::new(track_count_label(composition.tracks.len())).size(10.0).color(t.text_secondary));
-        });
-    });
+    let pad = crate::widgets::PAD;
+    let (head, _) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::hover());
+    ui.painter().text(pos2(head.min.x + pad, head.center().y), Align2::LEFT_CENTER, tr("Tracks"), crate::theme::semibold(11.0), t.text);
+    ui.painter().text(
+        pos2(head.max.x - pad, head.center().y),
+        Align2::RIGHT_CENTER,
+        track_count_label(composition.tracks.len()),
+        regular(10.5),
+        t.text_secondary,
+    );
     if composition.tracks.is_empty() {
         crate::widgets::note(ui, tr("Add a track from the timeline to animate a layer"), t.text_secondary);
         return;
@@ -181,20 +189,49 @@ fn track_list(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Toke
     for track in &composition.tracks {
         let selected = app.ui.motion_active_track == Some(track.id) || app.ui.motion_selected.is_some_and(|(id, _)| id == track.id);
         let label = format!("{} · {}", layer_name(app, track.target), tr(property_label(track.property)));
-        ui.horizontal(|ui| {
-            let mut enabled = track.enabled;
-            if ui.checkbox(&mut enabled, "").changed() {
-                app.run("motion.track.set_enabled", json!({"compositionId": composition.id, "trackId": track.id, "enabled": enabled}));
-            }
-            let response = ui.selectable_label(selected, label);
-            if response.clicked() {
-                app.ui.motion_active_track = Some(track.id);
-                app.ui.motion_selected = None;
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(egui::RichText::new(track.keyframes.len().to_string()).size(10.0).color(t.text_secondary));
-            });
-        });
+        let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::hover());
+        let toggle_r = Rect::from_center_size(pos2(row.min.x + pad + 7.0, row.center().y), vec2(14.0, 14.0));
+        let toggle = ui.interact(toggle_r.expand(5.0), ui.id().with(("motion-track-enabled", track.id)), Sense::click());
+        crate::a11y::toggle(&toggle, &label, track.enabled);
+        let select_r = Rect::from_min_max(pos2(toggle_r.max.x + 6.0, row.min.y + 2.0), pos2(row.max.x - pad + 6.0, row.max.y - 2.0));
+        let count = track.keyframes.len().to_string();
+        let mut select = ui.interact(select_r, ui.id().with(("motion-track-row", track.id)), Sense::click());
+        crate::a11y::button(&select, &label);
+        if selected {
+            ui.painter().rect_filled(select_r, egui::CornerRadius::same(6), t.selected_row);
+        } else if select.hovered() || select.has_focus() {
+            ui.painter().rect_filled(select_r, egui::CornerRadius::same(6), t.hover);
+        }
+        if select.has_focus() || toggle.has_focus() {
+            let ring = if toggle.has_focus() { toggle_r.expand(3.0) } else { select_r };
+            ui.painter().rect_stroke(ring, egui::CornerRadius::same(6), Stroke::new(1.0, motion_state_accent(t)), egui::StrokeKind::Inside);
+        }
+        ui.painter().rect_stroke(toggle_r, egui::CornerRadius::same(4), Stroke::new(1.0, t.border_strong), egui::StrokeKind::Inside);
+        if track.enabled {
+            ui.painter().rect_filled(toggle_r, egui::CornerRadius::same(4), t.text);
+            crate::icons::paint(ui.painter(), toggle_r.shrink(1.0), crate::icons::Icon::Check, t.panel);
+        }
+        let count_w = ui.painter().layout_no_wrap(count.clone(), regular(10.5), t.text_secondary).size().x;
+        let text_w = (select_r.width() - count_w - 22.0).max(24.0);
+        let shown = crate::widgets::elide_font(ui, &label, text_w, regular(11.0));
+        ui.painter().text(
+            pos2(select_r.min.x + 6.0, row.center().y),
+            Align2::LEFT_CENTER,
+            &shown,
+            regular(11.0),
+            if track.enabled { t.text } else { t.text_secondary },
+        );
+        ui.painter().text(pos2(row.max.x - pad, row.center().y), Align2::RIGHT_CENTER, count, regular(10.5), t.text_secondary);
+        if shown != label {
+            select = select.on_hover_text(&label);
+        }
+        if toggle.clicked() {
+            app.run("motion.track.set_enabled", json!({"compositionId": composition.id, "trackId": track.id, "enabled": !track.enabled}));
+        }
+        if select.clicked() {
+            app.ui.motion_active_track = Some(track.id);
+            app.ui.motion_selected = None;
+        }
     }
 }
 
@@ -205,23 +242,26 @@ pub fn dock(app: &mut FigApp, ui: &mut Ui) {
     let composition = selected_composition(app);
     let collapsed = app.ui.motion_timeline_collapsed;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tr("Timeline")).size(12.0).strong().color(t.text));
+        ui.set_min_height(28.0);
+        ui.label(egui::RichText::new(tr("Timeline")).font(crate::theme::semibold(12.0)).color(t.text));
         if let Some(composition) = &composition {
-            ui.separator();
-            let combo_width = (ui.available_width() - 160.0).clamp(88.0, 190.0);
+            ui.add_space(4.0);
+            let combo_width = (ui.available_width() - 260.0).clamp(88.0, 200.0);
             composition_combo(app, ui, "motion-composition-dock", combo_width);
-            if ui.available_width() > 280.0 {
-                ui.separator();
+            if ui.available_width() > 320.0 {
+                ui.add_space(4.0);
                 let meta =
                     format!("{} × {} · {} fps · {:.1}s", composition.width, composition.height, composition.fps, composition.duration_seconds());
-                ui.label(egui::RichText::new(meta).color(t.text_secondary));
+                ui.label(egui::RichText::new(meta).font(regular(11.0)).color(t.text_secondary));
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if crate::widgets::icon_button(ui, crate::icons::Icon::Close, tr("Close")) {
                 app.run("motion.timeline", json!({"on": false}));
             }
-            if crate::widgets::button(ui, if collapsed { tr("Expand") } else { tr("Collapse panel") }, false, true).clicked() {
+            let (icon, tip) =
+                if collapsed { (crate::icons::Icon::ChevronUp, tr("Expand")) } else { (crate::icons::Icon::Chevron, tr("Collapse panel")) };
+            if crate::widgets::icon_button(ui, icon, tip) {
                 app.ui.motion_timeline_collapsed = !collapsed;
             }
         });
@@ -229,19 +269,41 @@ pub fn dock(app: &mut FigApp, ui: &mut Ui) {
     if collapsed {
         return;
     }
-    ui.add_space(4.0);
+    ui.add_space(2.0);
     crate::widgets::separator(ui);
-    ui.add_space(4.0);
+    ui.add_space(2.0);
     let Some(composition) = composition else {
         empty_state(app, ui, &t);
         return;
     };
     advance_playback(app, ui, &composition);
-    transport(app, ui, &composition, &t);
-    ui.add_space(4.0);
+    let fit_ppf = fit_ppf(ui.available_width(), &composition);
+    transport(app, ui, &composition, &t, fit_ppf);
+    ui.add_space(2.0);
     egui::ScrollArea::vertical().id_salt("motion-dock-scroll").show(ui, |ui| {
         timeline(app, ui, &composition, &t, "motion-dock-timeline");
     });
+}
+
+/// Pixels per frame that fit the whole composition into `width` beside the label column.
+fn fit_ppf(width: f32, composition: &Composition) -> f32 {
+    let lane_x0 = label_column_width(width) + 16.0;
+    (width - lane_x0 - 24.0).max(40.0) / composition.duration_frames.max(1) as f32
+}
+
+/// A 24 px text button for the dense timeline toolbar.
+fn small_button(ui: &mut Ui, label: &str, enabled: bool) -> egui::Response {
+    let t = Tokens::get(ui.ctx());
+    let galley = ui.painter().layout_no_wrap(label.to_string(), regular(11.0), t.text);
+    let sense = if enabled { Sense::click() } else { Sense::hover() };
+    let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 16.0, 24.0), sense);
+    crate::a11y::button(&resp, label);
+    if enabled && (resp.hovered() || resp.has_focus()) {
+        ui.painter().rect_filled(rect, egui::CornerRadius::same(6), t.hover);
+    }
+    ui.painter().rect_stroke(rect, egui::CornerRadius::same(6), Stroke::new(1.0, t.border_strong), egui::StrokeKind::Inside);
+    ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, regular(11.0), if enabled { t.text } else { t.text_tertiary });
+    resp
 }
 
 /// The compositions on the open document, if any.
@@ -308,14 +370,9 @@ fn composition_combo(app: &mut FigApp, ui: &mut Ui, salt: &str, width: f32) {
 }
 
 /// One line of composition facts (size, frame rate, duration).
-fn meta_row(ui: &mut Ui, composition: &Composition) {
-    ui.horizontal(|ui| {
-        ui.label(format!("{} × {}", composition.width, composition.height));
-        ui.separator();
-        ui.label(format!("{} fps", composition.fps));
-        ui.separator();
-        ui.label(format!("{:.1}s", composition.duration_seconds()));
-    });
+fn meta_row(ui: &mut Ui, composition: &Composition, t: &Tokens) {
+    let meta = format!("{} × {} · {} fps · {:.1}s", composition.width, composition.height, composition.fps, composition.duration_seconds());
+    ui.label(egui::RichText::new(meta).font(regular(11.0)).color(t.text_secondary));
 }
 
 /// Frame-accurate advance at the composition's fps; loops for directing.
@@ -336,14 +393,18 @@ fn advance_playback(app: &mut FigApp, ui: &mut Ui, composition: &Composition) {
     ui.ctx().request_repaint();
 }
 
-/// Transport: jump to start/end, previous/next keyframe, play/pause, and the CTI readout.
-fn transport(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens) {
+/// The timeline toolbar: transport (start, previous key, play, next key, end), the current time,
+/// Add keyframe and the track count, with zoom at the far end. One row, so the lanes keep the
+/// dock's height.
+fn transport(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens, fit_ppf: f32) {
     let frame = app.ui.motion_frame.min(composition.duration_frames);
     ui.horizontal(|ui| {
-        if crate::widgets::icon_button(ui, crate::icons::Icon::SkipBack, "Go to start") {
+        ui.set_min_height(28.0);
+        ui.spacing_mut().item_spacing.x = 4.0;
+        if crate::widgets::icon_button(ui, crate::icons::Icon::SkipBack, tr("Go to start")) {
             app.ui.motion_frame = 0;
         }
-        if crate::widgets::icon_button(ui, crate::icons::Icon::PrevKey, "Previous keyframe")
+        if crate::widgets::icon_button(ui, crate::icons::Icon::PrevKey, tr("Previous keyframe"))
             && let Some(at) = neighbor_key(composition, frame, -1)
         {
             app.ui.motion_frame = at;
@@ -352,42 +413,49 @@ fn transport(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Token
         if crate::widgets::icon_button(
             ui,
             if playing { crate::icons::Icon::Pause } else { crate::icons::Icon::Play },
-            if playing { "Pause" } else { "Play" },
+            if playing { tr("Pause") } else { tr("Play") },
         ) {
             app.ui.motion_playing = !playing;
             app.ui.motion_play_acc = 0.0;
             app.ui.motion_play_last = 0.0;
         }
-        if crate::widgets::icon_button(ui, crate::icons::Icon::NextKey, "Next keyframe")
+        if crate::widgets::icon_button(ui, crate::icons::Icon::NextKey, tr("Next keyframe"))
             && let Some(at) = neighbor_key(composition, frame, 1)
         {
             app.ui.motion_frame = at;
         }
-        if crate::widgets::icon_button(ui, crate::icons::Icon::SkipFwd, "Go to end") {
+        if crate::widgets::icon_button(ui, crate::icons::Icon::SkipFwd, tr("Go to end")) {
             app.ui.motion_frame = composition.duration_frames;
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let secs = f64::from(frame) / f64::from(composition.fps.max(1));
-            ui.label(egui::RichText::new(format!("{frame}f·{secs:.2}s")).color(t.text_secondary));
-        });
+        ui.add_space(8.0);
+        let secs = f64::from(frame) / f64::from(composition.fps.max(1));
+        ui.label(egui::RichText::new(format!("{frame}f · {secs:.2}s")).font(crate::theme::semibold(11.0)).color(t.text));
+        ui.add_space(12.0);
+        let can_add = can_add_keyframe(app, composition);
+        if small_button(ui, tr("Add keyframe"), can_add).clicked() && can_add {
+            add_keyframe_at_playhead(app, composition);
+        }
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new(track_count_label(composition.tracks.len())).font(regular(10.5)).color(t.text_secondary));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| zoom(app, ui, fit_ppf));
     });
 }
 
 /// Zoom controls: out, fit, in.
+/// Laid out right to left at the end of the toolbar, so it reads "Zoom − Fit +".
 fn zoom(app: &mut FigApp, ui: &mut Ui, fit_ppf: f32) {
-    ui.horizontal(|ui| {
-        ui.label(tr("Zoom"));
-        let base = app.ui.motion_ppf.unwrap_or(fit_ppf);
-        if crate::widgets::icon_button(ui, crate::icons::Icon::Minus, tr("Zoom out")) {
-            app.ui.motion_ppf = Some((base / 1.25).clamp(0.25, 64.0));
-        }
-        if crate::widgets::button(ui, tr("Fit"), false, true).clicked() {
-            app.ui.motion_ppf = None;
-        }
-        if crate::widgets::icon_button(ui, crate::icons::Icon::Plus, tr("Zoom in")) {
-            app.ui.motion_ppf = Some((base * 1.25).clamp(0.25, 64.0));
-        }
-    });
+    let base = app.ui.motion_ppf.unwrap_or(fit_ppf);
+    if crate::widgets::icon_button(ui, crate::icons::Icon::Plus, tr("Zoom in")) {
+        app.ui.motion_ppf = Some((base * 1.25).clamp(0.25, 64.0));
+    }
+    if small_button(ui, tr("Fit"), true).clicked() {
+        app.ui.motion_ppf = None;
+    }
+    if crate::widgets::icon_button(ui, crate::icons::Icon::Minus, tr("Zoom out")) {
+        app.ui.motion_ppf = Some((base / 1.25).clamp(0.25, 64.0));
+    }
+    let secondary = Tokens::get(ui.ctx()).text_secondary;
+    ui.label(egui::RichText::new(tr("Zoom")).font(regular(11.0)).color(secondary));
 }
 
 /// Every animatable layer in page order, with its depth. Track targets outside the page trail at
@@ -443,24 +511,15 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
         );
         return;
     }
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(egui::RichText::new(track_count_label(composition.tracks.len())).size(10.0).color(t.text_secondary));
-            let can_add = can_add_keyframe(app, composition);
-            if crate::widgets::button(ui, tr("Add keyframe"), false, can_add).clicked() {
-                add_keyframe_at_playhead(app, composition);
-            }
-        });
-    });
     let label_width = label_column_width(ui.available_width());
     let lane_x0 = label_width + 16.0;
-    let fit_ppf = (ui.available_width() - lane_x0 - 24.0).max(40.0) / composition.duration_frames.max(1) as f32;
-    zoom(app, ui, fit_ppf);
+    let fit_ppf = fit_ppf(ui.available_width(), composition);
     let ppf = app.ui.motion_ppf.unwrap_or(fit_ppf).clamp(0.25, 64.0);
     let x_of = |frame: f32| lane_x0 + frame * ppf;
     let frame_of = |x: f32| ((x - lane_x0) / ppf.max(0.01)).clamp(0.0, composition.duration_frames as f32);
     // Rows: each layer plus its active properties and one property chooser when twirled open.
     let mut rows: Vec<(RowRef, f32)> = Vec::new();
+    let selection = app.session.selection();
     for (target, depth) in &layers {
         rows.push((RowRef::Layer { target: *target, depth: *depth }, LAYER_H));
         if !app.ui.motion_closed.contains(target) {
@@ -469,7 +528,11 @@ fn timeline(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Tokens
                     .into_iter()
                     .map(|(property, track)| (RowRef::Prop { target: *target, property, track }, PROP_H)),
             );
-            if !available_properties(composition, *target).is_empty() {
+            // The chooser shows on layers that are already animated or selected on the canvas, so
+            // a page of still layers doesn't push the animated lanes out of the dock.
+            let animated = composition.tracks.iter().any(|track| track.target == *target);
+            let selected = selection.contains(target);
+            if (animated || selected) && !available_properties(composition, *target).is_empty() {
                 rows.push((RowRef::AddProperty { target: *target }, PROP_H));
             }
         }
