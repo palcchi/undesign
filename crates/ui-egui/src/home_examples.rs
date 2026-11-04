@@ -17,6 +17,8 @@ pub struct Example {
     pub file: &'static str,
     pub title: &'static str,
     pub about: &'static str,
+    /// A Motion sample: it opens in the Motion workspace with the timeline showing.
+    pub motion: bool,
     bytes: &'static [u8],
 }
 
@@ -25,6 +27,31 @@ impl Example {
     pub fn bytes(&self) -> &'static [u8] {
         self.bytes
     }
+
+    /// The name a link uses for it: the file name without `.undesign` (`undesign-intro`).
+    pub fn name(&self) -> &'static str {
+        self.file.strip_suffix(".undesign").unwrap_or(self.file)
+    }
+}
+
+/// Open the example called `name` (see [`Example::name`]) as a new unsaved copy and leave Home; a
+/// Motion example opens in the Motion workspace with the timeline showing, playing when `play` (and
+/// the system doesn't ask for reduced motion). False for an unknown name or a file that won't open.
+pub fn open(app: &mut FigApp, name: &str, play: bool) -> bool {
+    let Some(example) = EXAMPLES.iter().find(|e| e.name() == name) else { return false };
+    let data = base64::engine::general_purpose::STANDARD.encode(example.bytes);
+    if app.run_user("file.open", json!({"data": data, "name": example.file})).is_none() {
+        return false;
+    }
+    app.ui.home = false;
+    if example.motion {
+        app.ui.right_tab = crate::RightTab::Motion;
+        app.ui.compact_panel = crate::CompactPanel::Motion;
+        app.ui.motion_timeline = true;
+        app.ui.motion_frame = 0;
+        app.ui.motion_playing = play && !app.reduce_motion();
+    }
+    true
 }
 
 /// Motion first: the samples a demo usually starts from.
@@ -33,42 +60,49 @@ pub const EXAMPLES: &[Example] = &[
         file: "undesign-intro.undesign",
         title: tr_noop("Undesign intro"),
         about: tr_noop("Motion: the mark, the wordmark and four feature chips animate in over 3 s"),
+        motion: true,
         bytes: include_bytes!("../../../examples/undesign-intro.undesign"),
     },
     Example {
         file: "daybreak-motion-study.undesign",
         title: tr_noop("Daybreak motion study"),
         about: tr_noop("Motion: a weather screen's glass panels, sun and forecast on a 4 s timeline"),
+        motion: true,
         bytes: include_bytes!("../../../examples/daybreak-motion-study.undesign"),
     },
     Example {
         file: "ridgeline-app.undesign",
         title: tr_noop("Ridgeline app"),
         about: tr_noop("Auto layout screens built from components, light and dark from one set of variables"),
+        motion: false,
         bytes: include_bytes!("../../../examples/ridgeline-app.undesign"),
     },
     Example {
         file: "ridgeline-onboarding.undesign",
         title: tr_noop("Ridgeline onboarding"),
         about: tr_noop("A prototype: connections, transitions, back actions and a flow"),
+        motion: false,
         bytes: include_bytes!("../../../examples/ridgeline-onboarding.undesign"),
     },
     Example {
         file: "ridgeline-design-system.undesign",
         title: tr_noop("Ridgeline design system"),
         about: tr_noop("Component sets, variant properties and the Assets panel"),
+        motion: false,
         bytes: include_bytes!("../../../examples/ridgeline-design-system.undesign"),
     },
     Example {
         file: "ridgeline-studio-dashboard.undesign",
         title: tr_noop("Ridgeline Studio dashboard"),
         about: tr_noop("A 12-column layout grid, paint, text and effect styles, charts made of shapes"),
+        motion: false,
         bytes: include_bytes!("../../../examples/ridgeline-studio-dashboard.undesign"),
     },
     Example {
         file: "glass-and-vectors.undesign",
         title: tr_noop("Glass and vectors"),
         about: tr_noop("Background blur, editable booleans and variable-width strokes"),
+        motion: false,
         bytes: include_bytes!("../../../examples/glass-and-vectors.undesign"),
     },
 ];
@@ -162,9 +196,6 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
         ui.add_space(gap);
     }
     if let Some(example) = open {
-        let data = base64::engine::general_purpose::STANDARD.encode(example.bytes);
-        if app.run_user("file.open", json!({"data": data, "name": example.file})).is_some() {
-            app.ui.home = false;
-        }
+        self::open(app, example.name(), false);
     }
 }

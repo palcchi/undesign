@@ -25,7 +25,11 @@
 </p>
 
 <p align="center">
-  <b>Try it in your browser:</b> <a href="https://palcchi.github.io/undesign/">palcchi.github.io/undesign</a>. Home ▸ Examples opens every sample file below, Motion included.
+  <b>Try it in your browser, nothing to install:</b><br>
+  <a href="https://palcchi.github.io/undesign/?example=undesign-intro"><b>▶ Motion demo</b></a> (opens the Undesign intro and plays it) ·
+  <a href="https://palcchi.github.io/undesign/?example=ridgeline-app"><b>Design demo</b></a> ·
+  <a href="https://palcchi.github.io/undesign/?example=ridgeline-onboarding"><b>Prototype demo</b></a> ·
+  <a href="https://palcchi.github.io/undesign/">the app</a> (Home ▸ Examples lists every sample)
 </p>
 
 <br>
@@ -99,17 +103,19 @@
 ## Examples
 
 Every file in [`examples/`](examples) is also built into the app: **Home ▸ Examples** opens a new copy
-of it, on the desktop and in the browser, and the original stays as it is.
+of it, on the desktop and in the browser, and the original stays as it is. A link with
+`?example=<name>` opens one straight away in the browser; the Motion samples open in the Motion
+workspace and play.
 
-| Example | What it shows |
-|---|---|
-| [Undesign intro](examples/undesign-intro.undesign) | **Motion**: the Undesign mark, wordmark and four feature chips animate in over 3 s (16 tracks, eased keyframes) |
-| [Daybreak motion study](examples/daybreak-motion-study.undesign) | **Motion**: a weather screen's glass panels, sun and forecast on a 4 s timeline |
-| [Ridgeline app](examples/ridgeline-app.undesign) | Auto layout screens built from components, light and dark from one set of colour variables, Dev Mode annotations |
-| [Ridgeline onboarding](examples/ridgeline-onboarding.undesign) | A prototype: connections, transitions, back actions and a flow |
-| [Ridgeline design system](examples/ridgeline-design-system.undesign) | Component sets, variant properties and the Assets panel |
-| [Ridgeline Studio dashboard](examples/ridgeline-studio-dashboard.undesign) | A 12-column layout grid, paint, text, effect and grid styles, charts made of shapes |
-| [Glass and vectors](examples/glass-and-vectors.undesign) | Glass and background blur, editable booleans, variable-width strokes |
+| Example | What it shows | In the browser |
+|---|---|---|
+| [Undesign intro](examples/undesign-intro.undesign) | **Motion**: the Undesign mark, wordmark and four feature chips animate in over 3 s (16 tracks, eased keyframes) | [Open](https://palcchi.github.io/undesign/?example=undesign-intro) |
+| [Daybreak motion study](examples/daybreak-motion-study.undesign) | **Motion**: a weather screen's glass panels, sun and forecast on a 4 s timeline | [Open](https://palcchi.github.io/undesign/?example=daybreak-motion-study) |
+| [Ridgeline app](examples/ridgeline-app.undesign) | Auto layout screens built from components, light and dark from one set of colour variables, Dev Mode annotations | [Open](https://palcchi.github.io/undesign/?example=ridgeline-app) |
+| [Ridgeline onboarding](examples/ridgeline-onboarding.undesign) | A prototype: connections, transitions, back actions and a flow | [Open](https://palcchi.github.io/undesign/?example=ridgeline-onboarding) |
+| [Ridgeline design system](examples/ridgeline-design-system.undesign) | Component sets, variant properties and the Assets panel | [Open](https://palcchi.github.io/undesign/?example=ridgeline-design-system) |
+| [Ridgeline Studio dashboard](examples/ridgeline-studio-dashboard.undesign) | A 12-column layout grid, paint, text, effect and grid styles, charts made of shapes | [Open](https://palcchi.github.io/undesign/?example=ridgeline-studio-dashboard) |
+| [Glass and vectors](examples/glass-and-vectors.undesign) | Glass and background blur, editable booleans, variable-width strokes | [Open](https://palcchi.github.io/undesign/?example=glass-and-vectors) |
 
 ## Made in Undesign
 

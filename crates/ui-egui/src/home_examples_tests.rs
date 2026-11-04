@@ -51,3 +51,30 @@ fn a_card_on_the_home_screen_opens_its_example() {
     assert_eq!(u.app.session.ds().unwrap().doc.name, "Undesign intro");
     assert!(u.app.session.ds().unwrap().path.is_none());
 }
+
+#[test]
+fn a_link_opens_a_motion_example_in_the_motion_workspace_playing() {
+    let mut app = crate::FigApp::new(Session::empty(), Box::new(crate::NoServices));
+    app.ui.home = true;
+    assert!(crate::home_examples::open(&mut app, "undesign-intro", true));
+    assert!(!app.ui.home);
+    assert_eq!(app.ui.right_tab, crate::RightTab::Motion);
+    assert!(app.ui.motion_timeline, "the timeline shows");
+    assert_eq!(app.ui.motion_playing, !app.reduce_motion(), "it plays unless motion is reduced");
+    // A design example opens in Design; an unknown name opens nothing.
+    let mut app = crate::FigApp::new(Session::empty(), Box::new(crate::NoServices));
+    assert!(crate::home_examples::open(&mut app, "ridgeline-app", true));
+    assert_eq!(app.ui.right_tab, crate::RightTab::Design);
+    assert!(!app.ui.motion_playing);
+    let docs = app.session.docs.len();
+    assert!(!crate::home_examples::open(&mut app, "no-such-example", true));
+    assert_eq!(app.session.docs.len(), docs);
+}
+
+#[test]
+fn every_example_has_a_plain_link_name() {
+    for example in EXAMPLES {
+        let name = example.name();
+        assert!(!name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'), "{name}");
+    }
+}

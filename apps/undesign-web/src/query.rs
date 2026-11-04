@@ -1,4 +1,4 @@
-//! The page's URL: the invite link its fragment names.
+//! The page's URL: the invite link its fragment names, and the built-in example its query names.
 
 /// The invite link in `#join=<link>` (`fragment` is `location.hash`, with or without its `#`), still
 /// escaped. The fragment, unlike the query, never leaves the browser, so the link's secret stays out
@@ -12,4 +12,15 @@ pub fn join_link(fragment: &str) -> Option<&str> {
     let fragment = fragment.strip_prefix('#').unwrap_or(fragment);
     let start = if fragment.starts_with("join=") { 0 } else { fragment.find("&join=")? + 1 };
     fragment.get(start + "join=".len()..).filter(|link| !link.is_empty() && link.len() <= MAX)
+}
+
+/// The built-in example in `?example=<name>` (`search` is `location.search`, with or without its
+/// `?`): a link that opens a demo straight away. Names are short and plain (letters, digits and
+/// `-`); anything else is ignored.
+pub fn example(search: &str) -> Option<&str> {
+    let search = search.strip_prefix('?').unwrap_or(search);
+    search
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("example="))
+        .filter(|name| !name.is_empty() && name.len() <= 64 && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))
 }

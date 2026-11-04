@@ -83,6 +83,9 @@ pub fn start() {
                     if let Some(link) = crate::query::join_link(&hash) {
                         let link = js_sys::decode_uri_component(link).ok().and_then(|s| s.as_string()).unwrap_or_else(|| link.to_string());
                         undesign_ui_egui::live::open_invite(&mut fig, &link);
+                    } else if let Some(name) = crate::query::example(&query()) {
+                        // `?example=<name>`: open that built-in example (a Motion one plays).
+                        undesign_ui_egui::home_examples::open(&mut fig, name, true);
                     }
                     Ok(Box::new(WebShell { fig, ready: false }))
                 }),

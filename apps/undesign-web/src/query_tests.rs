@@ -1,6 +1,6 @@
-//! `#join=` in the page's URL.
+//! `#join=` and `?example=` in the page's URL.
 
-use crate::query::join_link;
+use crate::query::{example, join_link};
 
 #[test]
 fn join_takes_the_rest_of_the_fragment() {
@@ -26,4 +26,17 @@ fn an_overlong_link_is_ignored() {
     let long = format!("#join=undesign://join?host=h&file=f&token={}", "a".repeat(7000));
     assert_eq!(join_link(&long), None);
     assert_eq!(join_link(&format!("#join={}", "é".repeat(4000))), None, "length counts bytes");
+}
+
+#[test]
+fn example_names_a_built_in_demo() {
+    assert_eq!(example("?example=undesign-intro"), Some("undesign-intro"));
+    assert_eq!(example("example=daybreak-motion-study"), Some("daybreak-motion-study"), "no leading ?");
+    assert_eq!(example("?webgl&example=ridgeline-app"), Some("ridgeline-app"), "after other entries");
+    assert_eq!(example(""), None);
+    assert_eq!(example("?example="), None);
+    assert_eq!(example("?example=../secret"), None, "plain names only");
+    assert_eq!(example("?example=a%20b"), None);
+    assert_eq!(example(&format!("?example={}", "a".repeat(65))), None, "short names only");
+    assert_eq!(example("?xexample=undesign-intro"), None, "only the whole entry name");
 }
