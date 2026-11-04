@@ -354,6 +354,8 @@ fn ruler_prefers_seconds_at_normal_zoom_and_frames_when_zoomed_in() {
     assert_eq!(crate::motion_panel::ruler_label_step(2.0, 30), 30, "normal zoom labels seconds");
     assert_eq!(crate::motion_panel::ruler_label_step(0.5, 30), 150, "distant zoom uses five-second intervals");
     assert_eq!(crate::motion_panel::ruler_label_step(64.0, 30), 1, "close zoom labels individual frames");
+}
+
 /// A rectangle with one eased opacity keyframe ready to edit.
 fn keyframed_opacity() -> (FigApp, NodeId, u64, u64, Interpolation) {
     let mut app = app();

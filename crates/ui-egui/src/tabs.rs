@@ -13,7 +13,7 @@ use crate::present::{PresentTab, Presenter};
 use crate::theme::{Tokens, regular};
 use crate::{FigApp, TitleBar};
 
-pub const HEIGHT: f32 = 56.0;
+pub const HEIGHT: f32 = 40.0;
 const MIN_TAB_WIDTH: f32 = 96.0;
 const OVERFLOW_WIDTH: f32 = 32.0;
 const OPEN_TIME: f64 = 0.18;
@@ -103,23 +103,22 @@ pub fn tab_bar(app: &mut FigApp, ui: &mut Ui) {
         let rect = ui.max_rect();
         let buttons_w = if app.ui.title_bar == TitleBar::Custom { window_buttons(app, ui, rect) } else { 0.0 };
         let mut x = rect.min.x + if app.ui.title_bar == TitleBar::Inset { 76.0 } else { 8.0 };
-        // Brand and home entry: the document workspace starts after a clear, stable divider.
-        let hr = Rect::from_min_size(pos2(x, rect.min.y), vec2(216.0, HEIGHT));
+        // Home.
+        let hr = Rect::from_min_size(pos2(x, rect.min.y), vec2(44.0, HEIGHT));
         let hresp = ui.interact(hr, ui.id().with("home"), Sense::click()).tip(tr("Home"));
         let home_active = (app.ui.home || !app.has_files()) && app.ui.present.is_none();
         crate::a11y::tab(&hresp, tr("Home"), home_active);
-        if hresp.hovered() {
-            ui.painter().rect_filled(hr.shrink2(vec2(4.0, 5.0)), CornerRadius::same(8), t.hover);
+        if home_active {
+            ui.painter().rect_filled(hr, CornerRadius::ZERO, t.tab_active);
+        } else if hresp.hovered() {
+            ui.painter().rect_filled(hr, CornerRadius::ZERO, t.hover);
         }
-        let mark = Rect::from_center_size(pos2(hr.min.x + 28.0, hr.center().y), vec2(24.0, 24.0));
-        ui.painter().rect_filled(mark, CornerRadius::same(7), t.text);
-        ui.painter().text(mark.center(), Align2::CENTER_CENTER, "U", egui::FontId::proportional(14.0), t.panel);
-        ui.painter().text(pos2(hr.min.x + 50.0, hr.center().y), Align2::LEFT_CENTER, "Undesign", egui::FontId::proportional(14.0), t.text);
+        icons::paint(ui.painter(), Rect::from_center_size(hr.center(), vec2(16.0, 16.0)), Icon::Home, t.icon);
         if hresp.clicked() {
             pause_present(app);
             app.ui.home = true;
         }
-        x += 216.0;
+        x += 44.0;
         ui.painter().line_segment([pos2(x, rect.min.y), pos2(x, rect.max.y)], Stroke::new(1.0, t.border));
         let document_tabs: Vec<usize> = app.session.docs.iter().enumerate().filter_map(|(i, d)| app.shows(d.uid).then_some(i)).collect();
         let now = ui.input(|input| input.time);
@@ -142,7 +141,7 @@ pub fn tab_bar(app: &mut FigApp, ui: &mut Ui) {
             })
             .collect();
         // Leave the new-tab button, theme toggle, window controls and a draggable gap free.
-        let room = (rect.max.x - buttons_w - 360.0 - x - 34.0).max(0.0);
+        let room = (rect.max.x - buttons_w - 70.0 - x - 34.0).max(0.0);
         let present_pref: Vec<f32> = app.ui.presents.iter().map(present_tab_width).collect();
         let present_on = app.ui.present.as_ref().and(app.ui.present_active);
         let active_present = present_on.and_then(|id| app.ui.presents.iter().position(|p| p.id == id));
@@ -350,9 +349,6 @@ pub fn tab_bar(app: &mut FigApp, ui: &mut Ui) {
             let cmd = if app.ui.dark { "view.themeLight" } else { "view.themeDark" };
             app.run(cmd, json!({}));
         }
-        // Document actions belong to the global header, not the inspector. Keep a dedicated
-        // reserved region so file tabs cannot overlap undo/redo, Present, collaborators or Share.
-        crate::right::header_actions(app, ui, rect, buttons_w);
         // Only the free space drags the window. A full-bar drag target steals tab drags.
         if app.ui.title_bar != TitleBar::Native && x + 34.0 < theme_r.min.x {
             let free = Rect::from_min_max(pos2(x + 34.0, rect.min.y), pos2(theme_r.min.x, rect.max.y));
