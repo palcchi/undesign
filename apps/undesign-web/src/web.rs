@@ -145,6 +145,9 @@ impl Services for WebServices {
         }
         held
     }
+    fn agent_provider_availability(&self) -> undesign_ui_egui::agent_provider::AgentProviderAvailability {
+        undesign_ui_egui::agent_provider::AgentProviderAvailability::BrowserRelayRequired
+    }
 }
 
 /// The file picked in the browser's file picker (`accept`: the extensions it offers), with its

@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~26 points and ~162–292 h away (one developer; ~33–67 h wall-clock with 5 developers)
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-11-01 · **Change:** minor (recent UI revamp, localization catch-up and Figma-look pass retained; Motion Studio first slice adds undoable composition/track/keyframe commands and an initial Motion tab; AI Assistant architecture is documented as the next product track; earlier changes are in the revision history below) · **Target:** Figma Design (desktop app 126.10.7)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-11-02 · **Change:** minor (recent UI revamp, localization catch-up and Figma-look pass retained; Motion Studio first slice adds undoable composition/track/keyframe commands and an initial Motion tab; AI Assistant Design skill contract specified, with provider transport still unimplemented; earlier changes are in the revision history below) · **Target:** Figma Design (desktop app 126.10.7)
 
 Undesign is a clean-room, open-source, pure-Rust reimplementation of the Figma design workflow,
 native on macOS, Windows, Linux and FreeBSD and in the browser, fully drivable by scripts through
@@ -134,6 +134,7 @@ Ranked; detail and milestones in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Progress log
 
+- **2026-11-02** · AI Assistant Design and Motion skill contracts plus typed backend: the catalog embeds per-skill instructions, bounds page context and tool arguments, prepares proposals, and applies approved edits as one undoable batch. No provider setup or model transport is connected, so no AI request can be sent; no shared/default provider is used. Readiness unchanged.
 - **2026-11-01** · Interface restyle (M7): floating side-panel cards, chunkier control radii, pill segmented controls and buttons, round toolbar chips, Motion tab in the same language (layout unchanged; queued next: onboarding + homescreen, Drive realtime, AI chat UI). Numbers unchanged.
 - **2026-11-01** · Motion Studio playback slice (M14.3): play/pause with frame-accurate advance and looping, a time readout, and a render-only canvas preview while the Motion tab is active; sampled values apply like manual edits (new centre-preserving scale helper in geom), with no undo entries and no dirty document. Selection outlines and hit-testing stay on base values. Numbers unchanged.
 - **2026-11-01** · Motion Studio first slice: registered undoable commands create/delete compositions, add/remove property tracks, set/remove keyframes and inspect motion data. The right panel now has an initial Motion tab for composition setup, track creation, playhead scrubbing and numeric keyframe entry. Engine command tests pass in Ubuntu 22.04; playback/render evaluation, graph editing, effects and export remain. AI provider transport and chat UI remain planned. Numbers unchanged.

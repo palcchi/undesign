@@ -20,6 +20,8 @@ pub struct Desktop {
     language: Option<String>,
     /// Recovery copies of unsaved files (written at once after a panic).
     recovery: crate::recovery::Shared,
+    /// Provider credentials live only in this process and are cleared when the app session ends.
+    agent_provider: Option<undesign_ui_egui::agent_provider::AgentProviderConfig>,
 }
 
 pub fn config_dir() -> Option<PathBuf> {
@@ -54,7 +56,7 @@ impl Desktop {
         let reduce_motion = Arc::new(AtomicBool::new(false));
         let flag = reduce_motion.clone();
         std::thread::spawn(move || flag.store(system_reduce_motion(), Ordering::Relaxed));
-        Self { clipboard: arboard::Clipboard::new().ok(), dir, prefs, reduce_motion, language: system_language(), recovery }
+        Self { clipboard: arboard::Clipboard::new().ok(), dir, prefs, reduce_motion, language: system_language(), recovery, agent_provider: None }
     }
 }
 
@@ -326,6 +328,33 @@ impl Services for Desktop {
     }
     fn gamepad_held(&mut self) -> u32 {
         crate::gamepad::held()
+    }
+    fn agent_provider_availability(&self) -> undesign_ui_egui::agent_provider::AgentProviderAvailability {
+        crate::agent_provider::availability()
+    }
+    fn agent_provider_connected(&self) -> bool {
+        self.agent_provider.is_some()
+    }
+    fn agent_provider_model(&self) -> Option<&str> {
+        self.agent_provider.as_ref().map(undesign_ui_egui::agent_provider::AgentProviderConfig::model)
+    }
+    fn connect_agent_provider(&mut self, config: undesign_ui_egui::agent_provider::AgentProviderConfig) -> Result<(), String> {
+        if crate::agent_provider::availability() != undesign_ui_egui::agent_provider::AgentProviderAvailability::NativeOpenAiCompatible {
+            return Err("The native OpenAI-compatible transport is unavailable on this system.".to_string());
+        }
+        crate::agent_provider::validate_config(&config)?;
+        self.agent_provider = Some(config);
+        Ok(())
+    }
+    fn disconnect_agent_provider(&mut self) {
+        self.agent_provider = None;
+    }
+    fn request_agent_completion(
+        &mut self,
+        request: Value,
+    ) -> Result<undesign_ui_egui::agent_provider::AgentProviderTask, String> {
+        let config = self.agent_provider.as_ref().ok_or_else(|| "Connect an OpenAI-compatible provider in this session first.".to_string())?;
+        crate::agent_provider::start_request(config, request)
     }
     fn system_language(&self) -> Option<String> {
         self.language.clone()

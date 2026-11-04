@@ -1,5 +1,7 @@
 //! Undesign's code-drawn icon set, adapted from FigCraft's original glyph artwork (MIT OR
-//! Apache-2.0). The Undesign `Logo` glyph is original; no third-party icon sets are used.
+//! Apache-2.0). The `Toolbar*` glyphs are redrawn in code from owner-supplied reference screenshots
+//! (authorised by the owner for that change); the Undesign `Logo` is original. No icon files or
+//! third-party icon sets are embedded.
 //!
 //! At 16 px, stroke centre-lines sit on pixel centres and fill edges on whole pixels. Stroke
 //! weight scales proportionally with larger glyphs; smaller ones are hinted so straight strokes
@@ -25,6 +27,24 @@ macro_rules! icons {
 
 icons! {
     Move,
+    /// Select: an outlined pointer arrow.
+    ToolbarSelect,
+    ToolbarFrame,
+    ToolbarShape,
+    ToolbarPen,
+    ToolbarText,
+    ToolbarComment,
+    ToolbarComponents,
+    /// Actions: a pair of curly braces.
+    ToolbarActions,
+    /// Draw: a looping scribble.
+    ToolbarDraw,
+    /// Design: a ruler corner with a pointer.
+    ToolbarDesign,
+    /// Developer mode: a diamond holding two chevrons.
+    ToolbarDev,
+    /// Code: angle brackets around a slash.
+    ToolbarCode,
     Scale,
     Hand,
     Frame,
@@ -211,6 +231,28 @@ icons! {
     Stamp,
     /// A measurement: a dimension line with arrowheads between two end ticks.
     Measure,
+}
+
+/// A Catmull-Rom curve through `knots`, sampled as a polyline.
+fn smooth(knots: &[(f32, f32)]) -> Vec<(f32, f32)> {
+    let n = knots.len();
+    let mut out = Vec::new();
+    for i in 0..n.saturating_sub(1) {
+        let at = |k: usize| knots[k.min(n - 1)];
+        let (p0, p1, p2, p3) = (at(i.saturating_sub(1)), at(i), at(i + 1), at(i + 2));
+        for s in 0..8 {
+            let t = s as f32 / 8.0;
+            let (t2, t3) = (t * t, t * t * t);
+            let f = |a: f32, b: f32, c: f32, d: f32| {
+                0.5 * (2.0 * b + (c - a) * t + (2.0 * a - 5.0 * b + 4.0 * c - d) * t2 + (3.0 * b - a - 3.0 * c + d) * t3)
+            };
+            out.push((f(p0.0, p1.0, p2.0, p3.0), f(p0.1, p1.1, p2.1, p3.1)));
+        }
+    }
+    if let Some(&last) = knots.last() {
+        out.push(last);
+    }
+    out
 }
 
 /// Points along a circular arc from angle `a0` to `a1` (radians, y down: increasing is clockwise).
@@ -523,6 +565,76 @@ fn draw(p: &P, icon: Icon) {
             p.poly(&[(6.6, 11.2), (8.0, 12.8), (9.4, 11.2)], false);
             p.poly(&[(4.8, 6.6), (3.2, 8.0), (4.8, 9.4)], false);
             p.poly(&[(11.2, 6.6), (12.8, 8.0), (11.2, 9.4)], false);
+        }
+        ToolbarSelect => {
+            p.path(&[(3.0, 2.5), (7.2, 13.0), (8.8, 8.8), (14.0, 6.7)], true);
+        }
+        ToolbarFrame => {
+            // A hash: two verticals crossing two horizontals that run past them.
+            p.line(5.5, 2.5, 5.5, 13.5);
+            p.line(10.5, 2.5, 10.5, 13.5);
+            p.line(2.5, 5.5, 13.5, 5.5);
+            p.line(2.5, 10.5, 13.5, 10.5);
+        }
+        ToolbarShape => p.rect(3.0, 3.0, 13.0, 13.0, 1.3),
+        ToolbarPen => {
+            // A diagonal pen body with a flat tip at the top left and a band near the other end.
+            p.path(&[(3.2, 2.7), (4.8, 2.9), (13.2, 11.3), (11.4, 13.2), (3.1, 4.6)], true);
+            p.path(&[(11.1, 9.2), (9.3, 11.05)], false);
+        }
+        ToolbarText => {
+            // A serif T: the bar's ends and the stem's foot are slab serifs.
+            p.line(2.7, 3.3, 13.3, 3.3);
+            p.line(2.7, 3.3, 2.7, 4.6);
+            p.line(13.3, 3.3, 13.3, 4.6);
+            p.line(8.0, 3.3, 8.0, 12.7);
+            p.line(6.3, 12.7, 9.7, 12.7);
+        }
+        ToolbarComment => {
+            // A round bubble whose lower-left corner is square.
+            let mut pts: Vec<(f32, f32)> = arc_pts(8.4, 8.2, 5.6, -PI, FRAC_PI_2).collect();
+            pts.push((3.9, 13.8));
+            pts.push((2.8, 12.7));
+            p.path(&pts, true);
+        }
+        ToolbarActions => {
+            let brace = [(6.8, 2.6), (5.4, 2.6), (4.6, 3.4), (4.6, 6.6), (3.2, 8.0), (4.6, 9.4), (4.6, 12.6), (5.4, 13.4), (6.8, 13.4)];
+            p.path(&brace, false);
+            let mirrored: Vec<(f32, f32)> = brace.iter().map(|&(x, y)| (16.0 - x, y)).collect();
+            p.path(&mirrored, false);
+        }
+        ToolbarDraw => {
+            // A looping scribble through hand-placed knots, smoothed into one curve.
+            let knots =
+                [(2.8, 11.8), (5.2, 5.6), (7.4, 3.2), (9.0, 4.6), (7.0, 9.6), (5.8, 12.6), (8.4, 10.4), (11.2, 6.4), (13.0, 7.2), (11.0, 12.4)];
+            p.path(&smooth(&knots), false);
+        }
+        ToolbarDesign => {
+            // A ruler's corner, ticks on both bars, and a small pointer at the lower right.
+            p.path(&[(2.8, 2.8), (10.2, 2.8), (10.2, 5.2), (5.2, 5.2), (5.2, 13.2), (2.8, 13.2)], true);
+            p.line(2.8, 7.6, 4.0, 7.6);
+            p.line(2.8, 10.4, 4.0, 10.4);
+            p.line(7.0, 2.8, 7.0, 4.0);
+            p.line(8.8, 2.8, 8.8, 4.0);
+            p.path(&[(8.6, 8.4), (13.4, 10.4), (11.2, 11.2), (10.4, 13.4)], true);
+        }
+        ToolbarDev => {
+            p.path(&[(8.0, 1.8), (14.2, 8.0), (8.0, 14.2), (1.8, 8.0)], true);
+            p.path(&[(6.0, 6.2), (7.8, 8.0), (6.0, 9.8)], false);
+            p.path(&[(8.6, 6.2), (10.4, 8.0), (8.6, 9.8)], false);
+        }
+        ToolbarCode => {
+            p.path(&[(5.4, 4.8), (2.2, 8.0), (5.4, 11.2)], false);
+            p.path(&[(10.6, 4.8), (13.8, 8.0), (10.6, 11.2)], false);
+            p.path(&[(9.2, 3.4), (6.8, 12.6)], false);
+        }
+        ToolbarComponents => {
+            // A diamond, a circle, a rounded square and a plus, one per quadrant.
+            p.path(&[(4.8, 2.4), (7.2, 4.8), (4.8, 7.2), (2.4, 4.8)], true);
+            p.circle(11.2, 4.6, 2.1);
+            p.rect(2.8, 9.4, 6.6, 13.2, 0.8);
+            p.line(11.2, 9.0, 11.2, 13.6);
+            p.line(8.9, 11.3, 13.5, 11.3);
         }
         Scale => {
             p.rect(2.5, 8.5, 7.5, 13.5, 1.0);
@@ -1495,7 +1607,6 @@ mod tests {
                 Shape::Circle(c) => out.push(c.center),
                 Shape::Rect(r) => out.extend([r.rect.min, r.rect.max]),
                 Shape::Mesh(m) => out.extend(m.vertices.iter().map(|v| v.pos)),
-                Shape::ConvexPolygon(p) => out.extend(&p.points),
                 _ => {}
             }
         }
@@ -1518,19 +1629,24 @@ mod tests {
         }
     }
 
-    /// Frame and Text stay a grid unit inside the box, so their long hinted strokes don't
-    /// outweigh the outlines beside them in the toolbar (#737).
+    /// Frame and Text stay a grid unit inside the box; round caps keep their endpoints soft (#737).
     #[test]
     fn frame_and_text_marks_are_inset() {
         for icon in [Icon::Frame, Icon::Text] {
-            let pts: Vec<Pos2> = shapes_at_32(icon)
-                .iter()
-                .flat_map(|s| match s {
-                    Shape::LineSegment { points, .. } => points.to_vec(),
-                    other => panic!("{icon:?} draws straight strokes only: {other:?}"),
-                })
-                .collect();
+            let mut pts = Vec::new();
+            let mut round_caps = 0;
+            for shape in shapes_at_32(icon) {
+                match shape {
+                    Shape::LineSegment { points, .. } => pts.extend(points),
+                    Shape::Circle(circle) if circle.stroke.width == 0.0 && circle.radius > 0.0 => {
+                        pts.push(circle.center);
+                        round_caps += 1;
+                    }
+                    other => panic!("{icon:?} draws line strokes with round caps only: {other:?}"),
+                }
+            }
             assert!(!pts.is_empty());
+            assert!(round_caps > 0, "{icon:?} has the rounded ends of the toolbar glyph style");
             for p in pts {
                 // Grid units 3..13, two points each.
                 assert!((6.0..=26.0).contains(&p.x) && (6.0..=26.0).contains(&p.y), "{icon:?} reaches {p:?}");

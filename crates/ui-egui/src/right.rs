@@ -1,4 +1,4 @@
-//! The right panel: Design, Prototype and Inspect tabs.
+//! The right panel: Design, Prototype, Motion, Agent and Inspect views.
 
 use egui::{Align2, Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use serde_json::{Value, json};
@@ -120,41 +120,53 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
             ui.close();
         }
     });
-    // Tabs row.
-    let (tabs, _) = ui.allocate_exact_size(vec2(w, 40.0), Sense::hover());
+    // A compact, evenly divided tab strip; the labels remain visible at the panel's minimum width.
+    let (tabs, _) = ui.allocate_exact_size(vec2(w, 36.0), Sense::hover());
     ui.painter().line_segment([tabs.left_top(), tabs.right_top()], Stroke::new(1.0, t.border));
-    let mut x = tabs.min.x + 8.0;
-    for (tab, label) in [(RightTab::Design, tr("Design")), (RightTab::Prototype, tr("Prototype")), (RightTab::Motion, tr("Motion"))] {
-        let galley = ui.painter().layout_no_wrap(label.into(), semibold(11.0), t.text);
-        let r = Rect::from_min_size(pos2(x, tabs.center().y - 12.0), vec2(galley.size().x + 16.0, 24.0));
-        let resp = ui.interact(r, ui.id().with(("rtab", label)), Sense::click());
-        let active = app.ui.right_tab == tab;
+    let labels =
+        [(RightTab::Design, tr("Design")), (RightTab::Prototype, tr("Prototype")), (RightTab::Motion, tr("Motion")), (RightTab::Agent, tr("Agent"))];
+    let tab_w = (w - 18.0) / 4.0;
+    for (i, (tab, label)) in labels.iter().enumerate() {
+        let galley = ui.painter().layout_no_wrap((*label).into(), semibold(10.0), t.text);
+        let r = Rect::from_min_size(pos2(tabs.min.x + 8.0 + i as f32 * tab_w, tabs.center().y - 14.0), vec2(tab_w, 28.0));
+        let resp = ui.interact(r, ui.id().with(("rtab", *label)), Sense::click());
+        let active = app.ui.right_tab == *tab;
         a11y::tab(&resp, label, active);
         if active {
-            ui.painter().rect_filled(r, CornerRadius::same(5), t.hover);
+            ui.painter().rect_filled(r, CornerRadius::same(8), t.selected_row);
+            let marker = Rect::from_center_size(pos2(r.center().x, r.max.y - 1.0), vec2(12.0, 2.0));
+            ui.painter().rect_filled(marker, CornerRadius::same(1), t.accent);
+        } else if resp.hovered() {
+            ui.painter().rect_filled(r, CornerRadius::same(8), t.hover);
         }
-        ui.painter().galley(pos2(r.min.x + 8.0, r.center().y - galley.size().y / 2.0), galley, if active { t.text } else { t.text_secondary });
+        let clip = ui.painter().with_clip_rect(r.shrink2(vec2(3.0, 0.0)));
+        clip.galley(
+            pos2(r.center().x - galley.size().x / 2.0, r.center().y - galley.size().y / 2.0),
+            galley,
+            if active { t.accent_text } else { t.text_secondary },
+        );
         if resp.clicked() {
-            if tab == RightTab::Prototype && app.ui.right_tab != tab {
+            if *tab == RightTab::Prototype && app.ui.right_tab != *tab {
                 crate::proto_panel::open_editor(ui.ctx(), None);
             }
-            app.ui.right_tab = tab;
+            app.ui.right_tab = *tab;
         }
-        x = r.max.x + 2.0;
     }
-    // Zoom menu.
+    ui.painter().line_segment([tabs.left_bottom(), tabs.right_bottom()], Stroke::new(1.0, t.border));
+    // Zoom has its own row so all four property tabs retain a stable hit target.
+    let (zoom_row, _) = ui.allocate_exact_size(vec2(w, 34.0), Sense::hover());
+    let zoom_label = ui.painter().layout_no_wrap(tr("Zoom").to_string(), regular(10.5), t.text_secondary);
+    ui.painter().galley(pos2(zoom_row.min.x + 10.0, zoom_row.center().y - zoom_label.size().y / 2.0), zoom_label, t.text_secondary);
     let zoom = app.session.ds().map(|d| d.view.zoom).unwrap_or(1.0);
-    let zr = Rect::from_min_size(pos2(tabs.max.x - 64.0, tabs.center().y - 12.0), vec2(56.0, 24.0));
+    let zr = Rect::from_min_size(pos2(zoom_row.max.x - 76.0, zoom_row.center().y - 12.0), vec2(64.0, 24.0));
     let zresp = ui.interact(zr, ui.id().with("zoommenu"), Sense::click());
     // The value is only spelled out while a screen reader reads the tree.
     let value = if a11y::active(&zresp.ctx) { format!("{}%", (zoom * 100.0).round()) } else { String::new() };
     a11y::combo(&zresp, tr("Zoom"), &value, a11y::menu_open(&zresp));
-    if zresp.hovered() {
-        ui.painter().rect_filled(zr, CornerRadius::same(5), t.hover);
-    }
-    // The readout carries the accent, as Figma's blue zoom does.
-    ui.painter()
-        .text(pos2(zr.min.x + 6.0, zr.center().y), Align2::LEFT_CENTER, format!("{}%", (zoom * 100.0).round()), regular(11.0), t.accent_text);
+    ui.painter().rect_filled(zr, CornerRadius::same(8), if zresp.hovered() { t.hover } else { t.field });
+    ui.painter().rect_stroke(zr, CornerRadius::same(8), Stroke::new(1.0, t.control_border), egui::StrokeKind::Inside);
+    // The zoom readout carries the same accent as selected tabs and controls.
+    ui.painter().text(pos2(zr.min.x + 6.0, zr.center().y), Align2::LEFT_CENTER, format!("{}%", (zoom * 100.0).round()), regular(11.0), t.accent_text);
     icons::paint(ui.painter(), Rect::from_center_size(pos2(zr.max.x - 9.0, zr.center().y), vec2(10.0, 10.0)), Icon::Chevron, t.icon_secondary);
     menu_popup(&zresp).width(200.0).show(|ui| {
         for (label, cmd) in [
@@ -194,10 +206,10 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
             }
         }
     });
-    ui.painter().line_segment([tabs.left_bottom(), tabs.right_bottom()], Stroke::new(1.0, t.border));
+    ui.painter().line_segment([zoom_row.left_bottom(), zoom_row.right_bottom()], Stroke::new(1.0, t.border));
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
-        if app.session.tool.tool == undesign_engine::ToolId::Comment {
+        if app.session.tool.tool == undesign_engine::ToolId::Comment && app.ui.right_tab != RightTab::Agent {
             crate::comments::panel(app, ui);
             ui.add_space(80.0);
             return;
@@ -207,7 +219,12 @@ pub fn right_panel(app: &mut FigApp, ui: &mut Ui) {
             RightTab::Design if app.session.tool.tool == undesign_engine::ToolId::Frame => crate::frame_presets::panel(app, ui),
             RightTab::Design => design(app, ui),
             RightTab::Prototype => crate::proto_panel::prototype(app, ui),
-            RightTab::Motion => crate::motion_panel::panel(app, ui),
+            RightTab::Motion => {
+                egui::Frame::NONE.inner_margin(egui::Margin::symmetric(12, 0)).show(ui, |ui| crate::motion_panel::panel(app, ui));
+            }
+            RightTab::Agent => {
+                egui::Frame::NONE.inner_margin(egui::Margin::symmetric(12, 0)).show(ui, |ui| crate::agent_ui::panel(app, ui));
+            }
             RightTab::Inspect => inspect(app, ui),
         }
         ui.add_space(80.0);

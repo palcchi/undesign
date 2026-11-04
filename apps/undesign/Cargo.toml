@@ -28,6 +28,8 @@ rfd = { workspace = true }
 arboard = { workspace = true, features = ["image-data", "wayland-data-control"] }
 webbrowser = { workspace = true }
 image = { workspace = true }
+url = "2.5"
+zeroize = "1.9"
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 
 # The system's reduce-motion setting (UISettings.AnimationsEnabled), interface language

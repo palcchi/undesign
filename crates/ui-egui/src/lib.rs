@@ -6,6 +6,9 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod a11y;
+pub mod agent;
+pub mod agent_provider;
+pub mod agent_ui;
 pub mod assets_panel;
 pub mod bidi;
 pub mod board_bar;
@@ -167,6 +170,8 @@ mod menu_input_tests;
 #[cfg(test)]
 mod missing_fonts_tests;
 #[cfg(test)]
+mod motion_timeline_tests;
+#[cfg(test)]
 mod online_tests;
 #[cfg(test)]
 mod open_issues_tests;
@@ -316,6 +321,24 @@ pub trait Services {
     fn gamepad_held(&mut self) -> u32 {
         0
     }
+    /// Provider transports are opt-in per host. The browser stays unavailable until a secure relay exists.
+    fn agent_provider_availability(&self) -> agent_provider::AgentProviderAvailability {
+        agent_provider::AgentProviderAvailability::Unsupported
+    }
+    fn agent_provider_connected(&self) -> bool {
+        false
+    }
+    fn agent_provider_model(&self) -> Option<&str> {
+        None
+    }
+    fn connect_agent_provider(&mut self, _config: agent_provider::AgentProviderConfig) -> Result<(), String> {
+        Err("Provider connections are unavailable on this platform.".to_string())
+    }
+    fn disconnect_agent_provider(&mut self) {}
+    /// Send one Chat Completions request after the user has connected a provider and pressed Send.
+    fn request_agent_completion(&mut self, _request: Value) -> Result<agent_provider::AgentProviderTask, String> {
+        Err("Connect an OpenAI-compatible provider in this session first.".to_string())
+    }
 }
 
 pub type DialogFuture = Pin<Box<dyn Future<Output = Option<PathBuf>>>>;
@@ -420,6 +443,7 @@ pub enum RightTab {
     Prototype,
     Inspect,
     Motion,
+    Agent,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -482,6 +506,8 @@ pub(crate) fn repaint_in(ctx: &egui::Context, secs: f64) {
 pub const LEFT_PANEL: std::ops::RangeInclusive<f32> = 200.0..=480.0;
 pub const RIGHT_PANEL: std::ops::RangeInclusive<f32> = 240.0..=480.0;
 pub const PANEL_DEFAULT: f32 = 240.0;
+/// Corner radius of the floating panels and the Motion dock.
+const CARD_RADIUS: u8 = 12;
 pub const CANVAS_MIN: f32 = 160.0;
 
 /// The widths the side panels are drawn at in `avail` points (the window less the icon rail), from
@@ -819,6 +845,8 @@ impl Default for UiState {
 pub struct FigApp {
     pub session: Session,
     pub ui: UiState,
+    /// Session-only Agent state. It is not part of preferences or document state.
+    pub agent_panel: agent_ui::AgentPanelState,
     pub canvas: canvas::CanvasState,
     pub services: Box<dyn Services>,
     worker: Option<render_worker::Worker>,
@@ -866,6 +894,7 @@ impl FigApp {
         Self {
             ui: UiState { left_width, right_width, pages_height, ..UiState::default() },
             session,
+            agent_panel: agent_ui::AgentPanelState::default(),
             canvas: canvas::CanvasState::default(),
             services,
             worker: None,
@@ -1654,6 +1683,9 @@ impl FigApp {
         self.sync_dev_mode();
         self.end_pen_outside_design();
         tabs::relink_presents(self);
+        // The floating cards leave a margin nothing else paints; without this the backend's
+        // near-black clear colour shows through it.
+        ui.painter().rect_filled(ctx.content_rect(), 0.0, t.canvas);
         tabs::tab_bar(self, ui);
         if self.ui.present.is_some() {
             // A close request can arrive while the presenter fills the window. Let its unsaved
@@ -1700,35 +1732,51 @@ impl FigApp {
             egui::Frame::NONE
                 .fill(t.panel)
                 .stroke(egui::Stroke::new(1.0, t.border))
-                .corner_radius(egui::CornerRadius::same(12))
+                .corner_radius(egui::CornerRadius::same(CARD_RADIUS))
                 .outer_margin(egui::Margin::same(8))
-                .shadow(egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: t.shadow })
+                .shadow(egui::epaint::Shadow { offset: [0, 2], blur: 12, spread: 0, color: t.shadow })
         };
         if left_open {
             edges.push(("left", ui.available_rect_before_wrap().min.x + left_w - gap, left_w, 1.0));
-            egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card())
-                .show(ui, |ui| {
-                    let label = match self.ui.left_tab {
-                        _ if self.ui.versions.open => i18n::tr("Version history"),
-                        LeftTab::File => i18n::tr("Layers"),
-                        LeftTab::Assets => i18n::tr("Assets"),
-                    };
-                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
-                    layers::left_panel(self, ui)
-                });
+            egui::Panel::left("left_panel").resizable(false).exact_size(left_w).frame(card()).show(ui, |ui| {
+                let label = match self.ui.left_tab {
+                    _ if self.ui.versions.open => i18n::tr("Version history"),
+                    LeftTab::File => i18n::tr("Layers"),
+                    LeftTab::Assets => i18n::tr("Assets"),
+                };
+                a11y::region(&mut self.ui.nav, ui, a11y::Region::Layers, egui::accesskit::Role::Pane, label);
+                layers::left_panel(self, ui)
+            });
         }
         if right_open {
             edges.push(("right", ui.available_rect_before_wrap().max.x - right_w + gap, right_w, -1.0));
-            egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card())
+            egui::Panel::right("right_panel").resizable(false).exact_size(right_w).frame(card()).show(ui, |ui| {
+                let label = match self.ui.right_tab {
+                    RightTab::Design => i18n::tr("Design"),
+                    RightTab::Prototype => i18n::tr("Prototype"),
+                    RightTab::Inspect => i18n::tr("Developer Mode"),
+                    RightTab::Motion => i18n::tr("Motion"),
+                    RightTab::Agent => i18n::tr("Agent"),
+                };
+                a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
+                right::right_panel(self, ui)
+            });
+        }
+        if self.ui.right_tab == RightTab::Motion && !hidden {
+            egui::Panel::bottom("motion_timeline_dock")
+                .exact_size(228.0)
+                .resizable(false)
+                .frame(
+                    egui::Frame::NONE
+                        .fill(t.panel)
+                        .stroke(egui::Stroke::new(1.0, t.border))
+                        .corner_radius(egui::CornerRadius::same(CARD_RADIUS))
+                        .outer_margin(egui::Margin::same(8))
+                        .shadow(egui::epaint::Shadow { offset: [0, 2], blur: 12, spread: 0, color: t.shadow }),
+                )
                 .show(ui, |ui| {
-                    let label = match self.ui.right_tab {
-                        RightTab::Design => i18n::tr("Design"),
-                        RightTab::Prototype => i18n::tr("Prototype"),
-                        RightTab::Inspect => i18n::tr("Dev Mode"),
-                        RightTab::Motion => i18n::tr("Motion"),
-                    };
-                    a11y::region(&mut self.ui.nav, ui, a11y::Region::Properties, egui::accesskit::Role::Pane, label);
-                    right::right_panel(self, ui)
+                    a11y::container(ui, egui::accesskit::Role::Pane, i18n::tr("Motion timeline"));
+                    motion_panel::timeline_dock(self, ui);
                 });
         }
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |ui| {

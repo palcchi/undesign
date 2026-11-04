@@ -138,6 +138,49 @@ pub fn specs() -> Vec<CommandSpec> {
             }
             Ok(json!({"frame": frame, "trackId": track_id}))
         }),
+        spec!("motion.keyframe.move", "Move keyframe", "{compositionId, trackId, fromFrame, toFrame}", true, |s, p| {
+            let cmd = "motion.keyframe.move";
+            let composition_id = required_u64(cmd, p, "compositionId")?;
+            let track_id = required_u64(cmd, p, "trackId")?;
+            let from_frame = required_u32(cmd, p, "fromFrame")?;
+            let to_frame = required_u32(cmd, p, "toFrame")?;
+            let doc = s.doc_mut()?;
+            let composition = doc.motion.compositions.iter_mut().find(|c| c.id == composition_id).ok_or_else(|| bad(cmd, "no such composition"))?;
+            let track = composition.tracks.iter_mut().find(|t| t.id == track_id).ok_or_else(|| bad(cmd, "no such track"))?;
+            let index = track.keyframes.iter().position(|k| k.frame == from_frame).ok_or_else(|| bad(cmd, "no keyframe at the source frame"))?;
+            if from_frame == to_frame {
+                return Ok(json!({"fromFrame": from_frame, "toFrame": to_frame, "trackId": track_id}));
+            }
+            if track.keyframes.iter().any(|k| k.frame == to_frame) {
+                return Err(bad(cmd, "a keyframe already exists at the destination frame"));
+            }
+            let mut keyframe = track.keyframes.remove(index);
+            keyframe.frame = to_frame;
+            track.keyframes.push(keyframe);
+            track.keyframes.sort_by_key(|k| k.frame);
+            composition.validate().map_err(|e| motion_error(cmd, e))?;
+            Ok(json!({"fromFrame": from_frame, "toFrame": to_frame, "trackId": track_id}))
+        }),
+        spec!("motion.keyframe.duplicate", "Duplicate keyframe", "{compositionId, trackId, fromFrame, toFrame}", true, |s, p| {
+            let cmd = "motion.keyframe.duplicate";
+            let composition_id = required_u64(cmd, p, "compositionId")?;
+            let track_id = required_u64(cmd, p, "trackId")?;
+            let from_frame = required_u32(cmd, p, "fromFrame")?;
+            let to_frame = required_u32(cmd, p, "toFrame")?;
+            let doc = s.doc_mut()?;
+            let composition = doc.motion.compositions.iter_mut().find(|c| c.id == composition_id).ok_or_else(|| bad(cmd, "no such composition"))?;
+            let track = composition.tracks.iter_mut().find(|t| t.id == track_id).ok_or_else(|| bad(cmd, "no such track"))?;
+            let mut keyframe =
+                track.keyframes.iter().find(|k| k.frame == from_frame).copied().ok_or_else(|| bad(cmd, "no keyframe at the source frame"))?;
+            if track.keyframes.iter().any(|k| k.frame == to_frame) {
+                return Err(bad(cmd, "a keyframe already exists at the destination frame"));
+            }
+            keyframe.frame = to_frame;
+            track.keyframes.push(keyframe);
+            track.keyframes.sort_by_key(|k| k.frame);
+            composition.validate().map_err(|e| motion_error(cmd, e))?;
+            Ok(json!({"fromFrame": from_frame, "toFrame": to_frame, "trackId": track_id}))
+        }),
         spec!("motion.inspect", "Inspect motion composition", "{compositionId?}", false, |s, p| {
             let doc = s.doc()?;
             let Some(id) = p.get("compositionId").and_then(Value::as_u64) else {
@@ -242,6 +285,225 @@ mod tests {
         let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
         assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![0, 30]);
         assert!(session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":61,"value":0.0})).is_err());
+    }
+
+    #[test]
+    fn moving_keyframe_preserves_data_and_is_undoable() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":10,"value":0.25})).unwrap();
+        session
+            .execute(
+                "motion.keyframe.set",
+                &json!({
+                    "compositionId":composition_id,
+                    "trackId":track_id,
+                    "frame":30,
+                    "value":0.75,
+                    "interpolation":{"type":"cubicBezier","x1":0.2,"y1":0.3,"x2":0.8,"y2":0.9}
+                }),
+            )
+            .unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":50,"value":1.0})).unwrap();
+        let source = session.doc().unwrap().motion.compositions[0].tracks[0].keyframes[1];
+        let undo_before = session.undo_depth().0;
+
+        session.execute("motion.keyframe.move", &json!({"compositionId":composition_id,"trackId":track_id,"fromFrame":30,"toFrame":40})).unwrap();
+        let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
+        assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![10, 40, 50]);
+        assert_eq!(keyframes[1], Keyframe { frame: 40, ..source });
+        assert_eq!(session.undo_depth().0, undo_before + 1);
+
+        assert!(session.undo().unwrap());
+        let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
+        assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![10, 30, 50]);
+        assert_eq!(keyframes[1], source);
+        assert!(session.redo().unwrap());
+        let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
+        assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![10, 40, 50]);
+        assert_eq!(keyframes[1], Keyframe { frame: 40, ..source });
+    }
+
+    #[test]
+    fn moving_keyframe_rejects_missing_or_occupied_frames_and_out_of_range_destinations() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":10,"value":0.25})).unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":30,"value":0.75})).unwrap();
+        let before = session.doc().unwrap().motion.clone();
+        let undo_before = session.undo_depth().0;
+
+        for (from_frame, to_frame) in [(20, 40), (10, 30), (10, 61)] {
+            assert!(
+                session
+                    .execute(
+                        "motion.keyframe.move",
+                        &json!({"compositionId":composition_id,"trackId":track_id,"fromFrame":from_frame,"toFrame":to_frame})
+                    )
+                    .is_err()
+            );
+            assert_eq!(session.doc().unwrap().motion, before);
+            assert_eq!(session.undo_depth().0, undo_before);
+        }
+    }
+
+    #[test]
+    fn duplicating_keyframe_preserves_data_and_is_undoable() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":10,"value":0.25})).unwrap();
+        session
+            .execute(
+                "motion.keyframe.set",
+                &json!({
+                    "compositionId":composition_id,
+                    "trackId":track_id,
+                    "frame":30,
+                    "value":0.75,
+                    "interpolation":{"type":"cubicBezier","x1":0.2,"y1":0.3,"x2":0.8,"y2":0.9}
+                }),
+            )
+            .unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":50,"value":1.0})).unwrap();
+        let source = session.doc().unwrap().motion.compositions[0].tracks[0].keyframes[1];
+        let undo_before = session.undo_depth().0;
+
+        session
+            .execute("motion.keyframe.duplicate", &json!({"compositionId":composition_id,"trackId":track_id,"fromFrame":30,"toFrame":40}))
+            .unwrap();
+        let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
+        assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![10, 30, 40, 50]);
+        assert_eq!(keyframes[1], source, "the source keyframe remains unchanged");
+        assert_eq!(keyframes[2], Keyframe { frame: 40, ..source });
+        assert_eq!(session.undo_depth().0, undo_before + 1);
+
+        assert!(session.undo().unwrap());
+        let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
+        assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![10, 30, 50]);
+        assert_eq!(keyframes[1], source);
+        assert!(session.redo().unwrap());
+        let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
+        assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![10, 30, 40, 50]);
+        assert_eq!(keyframes[2], Keyframe { frame: 40, ..source });
+    }
+
+    #[test]
+    fn duplicating_keyframe_rejects_missing_or_occupied_frames_and_out_of_range_destinations() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":10,"value":0.25})).unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":30,"value":0.75})).unwrap();
+        let before = session.doc().unwrap().motion.clone();
+        let undo_before = session.undo_depth().0;
+
+        for (from_frame, to_frame) in [(20, 40), (10, 30), (10, 10), (10, 61)] {
+            assert!(
+                session
+                    .execute(
+                        "motion.keyframe.duplicate",
+                        &json!({"compositionId":composition_id,"trackId":track_id,"fromFrame":from_frame,"toFrame":to_frame})
+                    )
+                    .is_err()
+            );
+            assert_eq!(session.doc().unwrap().motion, before);
+            assert_eq!(session.undo_depth().0, undo_before);
+        }
+    }
+
+    #[test]
+    fn duplicating_keyframe_rejects_missing_or_malformed_parameters() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":10,"value":0.25})).unwrap();
+        let before = session.doc().unwrap().motion.clone();
+        let undo_before = session.undo_depth().0;
+        let valid = json!({"compositionId":composition_id,"trackId":track_id,"fromFrame":10,"toFrame":20});
+
+        for key in ["compositionId", "trackId", "fromFrame", "toFrame"] {
+            let mut params = valid.clone();
+            params.as_object_mut().unwrap().remove(key);
+            assert!(session.execute("motion.keyframe.duplicate", &params).is_err(), "missing {key}");
+        }
+        for (key, value) in [("compositionId", json!(-1)), ("trackId", json!("not-an-id")), ("fromFrame", json!(-1)), ("toFrame", json!(u64::MAX))] {
+            let mut params = valid.clone();
+            params[key] = value;
+            assert!(session.execute("motion.keyframe.duplicate", &params).is_err(), "malformed {key}");
+        }
+
+        assert_eq!(session.doc().unwrap().motion, before);
+        assert_eq!(session.undo_depth().0, undo_before);
+    }
+
+    #[test]
+    fn duplicating_keyframe_rejects_unknown_composition_or_track_ids() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session.execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":10,"value":0.25})).unwrap();
+        let before = session.doc().unwrap().motion.clone();
+        let undo_before = session.undo_depth().0;
+
+        for params in [
+            json!({"compositionId":composition_id + 1,"trackId":track_id,"fromFrame":10,"toFrame":20}),
+            json!({"compositionId":composition_id,"trackId":track_id + 1,"fromFrame":10,"toFrame":20}),
+        ] {
+            assert!(session.execute("motion.keyframe.duplicate", &params).is_err());
+            assert_eq!(session.doc().unwrap().motion, before);
+            assert_eq!(session.undo_depth().0, undo_before);
+        }
+    }
+
+    #[test]
+    fn duplicating_keyframe_supports_boundary_and_backward_frames_and_preserves_step() {
+        let mut session = Session::new();
+        let frame = session.page().unwrap();
+        let created = session.execute("motion.composition.create", &json!({"durationFrames":60})).unwrap();
+        let composition_id = created["compositionId"].as_u64().unwrap();
+        let track = session.execute("motion.track.add", &json!({"compositionId":composition_id,"target":frame.0,"property":"opacity"})).unwrap();
+        let track_id = track["trackId"].as_u64().unwrap();
+        session
+            .execute("motion.keyframe.set", &json!({"compositionId":composition_id,"trackId":track_id,"frame":0,"value":0.25,"interpolation":"step"}))
+            .unwrap();
+        let source = session.doc().unwrap().motion.compositions[0].tracks[0].keyframes[0];
+
+        let result = session
+            .execute("motion.keyframe.duplicate", &json!({"compositionId":composition_id,"trackId":track_id,"fromFrame":0,"toFrame":60}))
+            .unwrap();
+        assert_eq!(result, json!({"fromFrame":0,"toFrame":60,"trackId":track_id}));
+        let at_duration = session.doc().unwrap().motion.compositions[0].tracks[0].keyframes[1];
+        assert_eq!(at_duration, Keyframe { frame: 60, ..source });
+
+        let result = session
+            .execute("motion.keyframe.duplicate", &json!({"compositionId":composition_id,"trackId":track_id,"fromFrame":60,"toFrame":5}))
+            .unwrap();
+        assert_eq!(result, json!({"fromFrame":60,"toFrame":5,"trackId":track_id}));
+        let keyframes = &session.doc().unwrap().motion.compositions[0].tracks[0].keyframes;
+        assert_eq!(keyframes.iter().map(|k| k.frame).collect::<Vec<_>>(), vec![0, 5, 60]);
+        assert_eq!(keyframes[1], Keyframe { frame: 5, ..source });
+        assert_eq!(keyframes[2], at_duration);
     }
 
     #[test]
