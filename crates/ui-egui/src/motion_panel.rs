@@ -255,9 +255,9 @@ fn empty_state(app: &mut FigApp, ui: &mut Ui, t: &Tokens) -> bool {
     if !compositions(app).is_empty() {
         return false;
     }
-    ui.label(egui::RichText::new("No compositions yet").color(t.text_secondary));
+    ui.label(egui::RichText::new(tr("No compositions yet")).color(t.text_secondary));
     ui.add_space(8.0);
-    if crate::widgets::button(ui, "＋  Create composition", true, true).clicked()
+    if crate::widgets::button(ui, tr("Create composition"), true, true).clicked()
         && let Some(result) = app.run("motion.composition.create", json!({"name":"Main","width":1920,"height":1080,"fps":30,"durationFrames":300}))
     {
         app.ui.motion_composition = result.get("compositionId").and_then(serde_json::Value::as_u64);
@@ -376,15 +376,15 @@ fn transport(app: &mut FigApp, ui: &mut Ui, composition: &Composition, t: &Token
 /// Zoom controls: out, fit, in.
 fn zoom(app: &mut FigApp, ui: &mut Ui, fit_ppf: f32) {
     ui.horizontal(|ui| {
-        ui.label("Zoom");
+        ui.label(tr("Zoom"));
         let base = app.ui.motion_ppf.unwrap_or(fit_ppf);
-        if crate::widgets::icon_button(ui, crate::icons::Icon::Minus, "Zoom out") {
+        if crate::widgets::icon_button(ui, crate::icons::Icon::Minus, tr("Zoom out")) {
             app.ui.motion_ppf = Some((base / 1.25).clamp(0.25, 64.0));
         }
-        if crate::widgets::button(ui, "Fit", false, true).clicked() {
+        if crate::widgets::button(ui, tr("Fit"), false, true).clicked() {
             app.ui.motion_ppf = None;
         }
-        if crate::widgets::icon_button(ui, crate::icons::Icon::Plus, "Zoom in") {
+        if crate::widgets::icon_button(ui, crate::icons::Icon::Plus, tr("Zoom in")) {
             app.ui.motion_ppf = Some((base * 1.25).clamp(0.25, 64.0));
         }
     });
