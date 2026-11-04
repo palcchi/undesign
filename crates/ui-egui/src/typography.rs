@@ -116,7 +116,7 @@ fn path_row(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId], ids: 
     let Some(paths) = paths else {
         let other = sel.iter().find(|i| !ids.contains(i)).and_then(|i| doc.node(*i));
         if ids.len() == 1 && sel.len() == 2 && other.is_some_and(|n| undesign_doc::geometry::stroke_geometry(n).is_some()) {
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 if widgets::button(ui, tr("Put text on path"), false, true).clicked() {
                     app.run("text.onPath", json!({ "ids": sel }));
                 }
@@ -126,7 +126,7 @@ fn path_row(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId], ids: 
     };
     let start = paths.first().map(|p| p.0).filter(|s| paths.iter().all(|p| p.0 == *s));
     let flip = paths.iter().all(|p| p.1);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let lead = Lead::Icon(Icon::Pen, tr("Start on path"));
         match widgets::number_field(ui, Id::new("ty_path_start"), lead, start.map(|s| s * 100.0), "%", 96.0, 1.0) {
             Some(FieldEdit::Set(v)) => {
@@ -177,7 +177,7 @@ fn font_rows(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], styles: &[TextStyle]
     // Font family.
     let family = uniform(styles, |s| s.font_family.clone());
     let fstyle = uniform(styles, |s| s.font_style.clone());
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let w = ui.available_width();
         let resp = font_dropdown(app, ui, ids, "fontFamily", family.as_deref(), w, editing);
         menu_popup(&resp).width(w.max(240.0)).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
@@ -199,7 +199,7 @@ fn font_rows(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], styles: &[TextStyle]
 
     // Style + size.
     let half = (ui.available_width() - PAD * 2.0 - 8.0) / 2.0;
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let resp = font_dropdown(app, ui, ids, "fontStyle", fstyle.as_deref(), half, editing);
         let fam = family.clone();
         menu_popup(&resp).width(200.0).show(|ui| {
@@ -261,7 +261,7 @@ fn font_rows(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], styles: &[TextStyle]
     });
 
     // Line height + letter spacing.
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let lh = uniform(styles, |s| s.line_height);
         let lh_label = lh.map(|l| l.label()).unwrap_or_else(|| tr(MIXED).into());
         let field = SpacingField { field: "lineHeight", id: Id::new("ty_lh"), glyph: LeadGlyph::LineHeight, tip: tr("Line height") };
@@ -294,7 +294,7 @@ fn paragraph_rows(
     // Paragraph spacing + resizing.
     let ps = common(doc, ids, |n| n.kind.text().map(|t| t.paragraph_spacing.to_bits())).flatten().map(f64::from_bits);
     let resize = common(doc, ids, |n| n.kind.text().map(|t| t.auto_resize)).flatten();
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let ps_label = ps.map(trim_num).unwrap_or_else(|| tr(MIXED).into());
         let field =
             SpacingField { field: "paragraphSpacing", id: Id::new("ty_ps"), glyph: LeadGlyph::ParagraphSpacing, tip: tr("Paragraph spacing") };
@@ -319,7 +319,7 @@ fn paragraph_rows(
 
     // Alignment + Type settings.
     let align = common(doc, ids, |n| n.kind.text().map(|t| (t.align_h, t.align_v))).flatten();
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let items = [
             (Icon::TextAlignLeft, tr("Align left")),
             (Icon::TextAlignCenter, tr("Align center")),

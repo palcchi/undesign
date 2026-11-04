@@ -368,7 +368,7 @@ pub fn playground_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: Nod
         let (Some(name), Some(kind)) = (p["name"].as_str(), p["type"].as_str()) else { continue };
         let value = &p["value"];
         match kind {
-            "variant" => row(ui, 32.0, |ui| {
+            "variant" => row(ui, crate::widgets::ROW_H, |ui| {
                 widgets::label(ui, name, t.text_secondary);
                 let resp = widgets::dropdown(ui, value.as_str().unwrap_or(""), ui.available_width().max(60.0), None);
                 crate::a11y::combo(&resp, name, value.as_str().unwrap_or(""), crate::a11y::menu_open(&resp));
@@ -387,7 +387,7 @@ pub fn playground_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: Nod
                     set = Some((name.to_string(), json!(!on)));
                 }
             }),
-            "text" => row(ui, 32.0, |ui| {
+            "text" => row(ui, crate::widgets::ROW_H, |ui| {
                 widgets::label(ui, name, t.text_secondary);
                 let cur = value.as_str().unwrap_or("");
                 let field = Id::new(("playground_text", id, name));
@@ -397,7 +397,7 @@ pub fn playground_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: Nod
                     set = Some((name.to_string(), json!(new.chars().take(10_000).collect::<String>())));
                 }
             }),
-            "instanceSwap" => row(ui, 32.0, |ui| {
+            "instanceSwap" => row(ui, crate::widgets::ROW_H, |ui| {
                 widgets::label(ui, name, t.text_secondary);
                 let preferred: Vec<NodeId> = p["preferred"].as_array().into_iter().flatten().filter_map(undesign_engine::params::id_of).collect();
                 let w = ui.available_width().max(60.0);
@@ -469,7 +469,7 @@ pub fn connect_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: NodeId
     let mut edit: Option<(&str, String)> = None;
     widgets::sublabels(ui, tr("Import path"), Some(tr("Name")));
     let col = widgets::col_width(ui.available_width());
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         if let Some(v) = widgets::text_field(ui, Id::new(("code_connect_import", owner, lang.id())), &link.import_path, col, tr("Import path")) {
             edit = Some(("importPath", v));
@@ -546,14 +546,14 @@ pub fn status(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
     widgets::separator(ui);
     widgets::sublabels(ui, tr("Status"), None);
     let w = ui.available_width() - PAD * 2.0;
-    row(ui, 32.0, |ui| crate::section_panel::status_dropdown(app, ui, doc, sel, w));
+    row(ui, crate::widgets::ROW_H, |ui| crate::section_panel::status_dropdown(app, ui, doc, sel, w));
     if let [id] = sel {
         let changed = doc.node(*id).is_some_and(|n| n.dev_status == DevStatus::ReadyForDev && n.dev_changed);
         let ds = app.session.ds().ok();
         let focused = ds.and_then(undesign_engine::DocState::focused) == Some(*id);
         // Unchanged since it was marked (or not ready for dev): compared with the newest saved version.
         let newest = ds.and_then(|d| d.versions.last()).map(|v| v.id.clone()).filter(|_| !changed);
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             if !focused && widgets::button(ui, tr("Focus view"), false, true).on_hover_text(tr("Show only this on the canvas")).clicked() {
                 app.run("dev.focus", json!({"id": id}));
@@ -650,7 +650,7 @@ pub fn dev_resources_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: 
             widgets::sublabels(ui, tr("Name"), Some(tr("Link")));
             let col = widgets::col_width(ui.available_width());
             let mut edit = None;
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 if let Some(v) = widgets::text_field(ui, Id::new(("devres_name", id, i)), name, col, tr("Name")) {
                     edit = Some(json!({"id": id, "index": i, "name": v}));
@@ -704,7 +704,7 @@ pub fn dev_resources_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: 
     if adding {
         let w = ui.available_width() - PAD * 2.0;
         let mut added = None;
-        row(ui, 32.0, |ui| added = widgets::text_field(ui, Id::new(("devres_new", id)), "", w, tr("Paste a link (https://…)")));
+        row(ui, crate::widgets::ROW_H, |ui| added = widgets::text_field(ui, Id::new(("devres_new", id)), "", w, tr("Paste a link (https://…)")));
         if let Some(url) = added.filter(|u| !u.trim().is_empty())
             && app.run("devResource.add", json!({"id": id, "url": url})).is_some()
         {
@@ -760,7 +760,7 @@ pub fn measurements_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: 
     if let Some(id) = first {
         let around = doc.node(id).and_then(|n| n.parent).and_then(|p| doc.node(p)).is_some_and(|p| !p.is_page());
         let w = ui.available_width() - PAD * 2.0;
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let resp = widgets::dropdown(ui, tr("Add measurement"), w, Some(Icon::Measure))
                 .on_hover_text(tr("Keep a measurement on the canvas for developers"));
             menu_popup(&resp).show(|ui| {
@@ -859,7 +859,7 @@ pub fn categories_section(app: &mut FigApp, ui: &mut Ui) {
     let add = widgets::section_header(ui, tr("Annotations"), &[(Icon::Plus, tr("Add a category"))], false).is_some();
     let w = ui.available_width() - PAD * 2.0;
     let filter = app.ui.dev.categories.clone();
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let lead = match &filter {
             CategoryFilter::Only(id) => annotations::categories(&doc).iter().find(|c| c.id == *id).map(|c| DropLead::Dot(doc_c32(ui.ctx(), c.color))),
             _ => Some(DropLead::Icon(Icon::Comment)),
@@ -968,7 +968,7 @@ pub fn ready_list(app: &mut FigApp, ui: &mut Ui) {
     widgets::separator(ui);
     widgets::section_header(ui, tr("Ready for dev"), &[], app.ui.dev.ready.is_empty());
     let w = ui.available_width() - PAD * 2.0;
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let resp = widgets::dropdown(ui, FILTERS.get(filter).map_or("", |f| tr(f.2)), w, Some(Icon::Code));
         menu_popup(&resp).show(|ui| {
             for (i, (_, _, label)) in FILTERS.iter().enumerate() {

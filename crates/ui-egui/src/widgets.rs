@@ -10,7 +10,8 @@ use crate::i18n::tr;
 use crate::icons::{self, Icon};
 use crate::theme::{Tokens, regular, semibold};
 
-pub const ROW_H: f32 = 32.0;
+/// A property row: one 24 px control with 2 px above and below.
+pub const ROW_H: f32 = 28.0;
 /// Controls in the panels are 24 px tall in 32 px rows: the dense layout of a design tool.
 pub const FIELD_H: f32 = 24.0;
 pub const LABELLED_FIELD_H: f32 = 24.0;
@@ -834,7 +835,7 @@ pub fn disclosure(ui: &mut Ui, label: &str, open: bool) -> bool {
 pub fn section_header(ui: &mut Ui, title: &str, buttons: &[(Icon, &str)], dim: bool) -> Option<usize> {
     let t = Tokens::get(ui.ctx());
     let w = ui.available_width();
-    let (rect, _) = ui.allocate_exact_size(vec2(w, 40.0), Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(vec2(w, 36.0), Sense::hover());
     ui.painter().text(
         pos2(rect.min.x + PAD, rect.center().y),
         Align2::LEFT_CENTER,
@@ -1158,7 +1159,7 @@ pub fn note(ui: &mut Ui, text: &str, color: Color32) {
 pub fn sublabels(ui: &mut Ui, a: &str, b: Option<&str>) {
     let t = Tokens::get(ui.ctx());
     let w = ui.available_width();
-    let (r, _) = ui.allocate_exact_size(vec2(w, 18.0), Sense::hover());
+    let (r, _) = ui.allocate_exact_size(vec2(w, 16.0), Sense::hover());
     let col = col_width(w);
     // Each label fits its column on one line (long translations end with an ellipsis, in full on hover).
     let a_w = if b.is_some() { col } else { w - PAD * 2.0 };

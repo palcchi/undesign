@@ -709,7 +709,7 @@ fn page_section(app: &mut FigApp, ui: &mut Ui, doc: &Document) {
     widgets::section_header(ui, tr("Page"), &[], false);
     let mut open_picker = false;
     let mut new_hex = None;
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let p = Paint::solid(bg);
         if widgets::swatch(ui, &p, 20.0).clicked() {
             open_picker = true;
@@ -729,7 +729,7 @@ fn page_section(app: &mut FigApp, ui: &mut Ui, doc: &Document) {
     }
     widgets::separator(ui);
     widgets::section_header(ui, tr("Color profile"), &[], false);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let resp = widgets::dropdown(ui, doc.color_profile.label(), 140.0, None);
         menu_popup(&resp).show(|ui| {
             for p in undesign_color::ColorProfile::ALL {
@@ -746,7 +746,7 @@ fn page_section(app: &mut FigApp, ui: &mut Ui, doc: &Document) {
     // Local variables & styles.
     let vars = doc.variables.variables.iter().filter(|v| !undesign_engine::library::is_remote_variable(doc, &v.id)).count();
     widgets::section_header(ui, tr("Local variables"), &[], vars == 0);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let r = widgets::dropdown(ui, &trf("Open variables ({count})", &[("count", &vars)]), 200.0, Some(Icon::Styles));
         if r.clicked() {
             app.ui.preferences = false;
@@ -901,7 +901,7 @@ fn position_fields(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
     let ids = sel.to_vec();
     let col = widgets::col_width(ui.available_width());
     widgets::sublabels(ui, tr("Alignment"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let cmds = ["align.left", "align.hcenter", "align.right", "align.top", "align.vcenter", "align.bottom"];
         let tip = crate::shortcuts::tip;
         let items = [
@@ -947,7 +947,7 @@ fn position_fields(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
     let parent_al = sel.iter().all(|i| doc.node(*i).and_then(|n| n.parent).and_then(|p| doc.node(p)).is_some_and(|p| p.layout.is_some()));
     let absolute = common(doc, sel, |n| n.child_layout.absolute);
     widgets::sublabels(ui, tr("Position"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let e = widgets::number_field_mixed(ui, Id::new("pos_x"), Lead::Text("X"), x, "", col, 1.0);
         app.field_of(&ids, "x", e, x_of, |v| json!(v));
         let e = widgets::number_field_mixed(ui, Id::new("pos_y"), Lead::Text("Y"), y, "", col, 1.0);
@@ -969,7 +969,7 @@ fn position_fields(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
         }
     });
     widgets::sublabels(ui, tr("Rotation"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let e = widgets::number_field_mixed(ui, Id::new("pos_rot"), Lead::Icon(Icon::Angle, tr("Rotation")), rot, "°", col, 1.0);
         app.field_of(&ids, "rotation", e, rot_of, |v| json!(v));
         let items = [
@@ -990,7 +990,7 @@ fn position_fields(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
     if in_frame {
         let c = common(doc, sel, |n| n.constraints);
         widgets::sublabels(ui, tr("Constraints"), None);
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let h = c.map(|c| format!("{:?}", c.horizontal)).unwrap_or_else(|| "Mixed".into());
             let resp = widgets::dropdown(ui, tr(&pretty(&h)), col, None);
             menu_popup(&resp).show(|ui| {
@@ -1056,14 +1056,14 @@ fn arc_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) ->
         crate::variable_ui::number_field(app, ui, &ids, key, Id::new(("arc", key)), Lead::Icon(icon, name), value, suffix, col)
     };
     widgets::sublabels(ui, tr("Start"), Some(tr("Sweep")));
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let e = field(app, ui, "arcStart", Icon::ArcStart, tr("Arc start"), start, "°");
         app.field(&ids, "arcStart", e, |v| json!(v));
         let e = field(app, ui, "arcSweep", Icon::ArcSweep, tr("Arc sweep"), sweep, "%");
         app.field(&ids, "arcSweep", e, |v| json!(v.clamp(-100.0, 100.0) * 3.6));
     });
     widgets::sublabels(ui, tr("Ratio"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let e = field(app, ui, "arcInner", Icon::ArcRatio, tr("Arc ratio"), ratio, "%");
         app.field(&ids, "arcInner", e, |v| json!((v / 100.0).clamp(0.0, 0.99)));
     });
@@ -1094,7 +1094,7 @@ fn points_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId])
     widgets::section_header(ui, tr(if all_stars { "Star" } else { "Polygon" }), &[], false);
     let col = widgets::col_width(ui.available_width());
     widgets::sublabels(ui, tr("Count"), all_stars.then_some(tr("Ratio")));
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let e = widgets::number_field(ui, Id::new("pts_count"), Lead::Icon(Icon::Polygon, tr("Count")), count, "", col, 1.0);
         app.field(&ids, "pointCount", e, |v| json!(v.round().clamp(3.0, 120.0)));
         if all_stars {
@@ -1143,7 +1143,7 @@ fn appearance(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
     if sel.iter().all(|i| doc.node(*i).is_some_and(|n| n.is_mask)) {
         let mt = common(doc, sel, |n| n.mask_type);
         widgets::sublabels(ui, tr("Mask"), None);
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let resp = widgets::dropdown(ui, mt.map(|m| tr(m.label())).unwrap_or(tr("Mixed")), col * 2.0 + 8.0, Some(Icon::Mask));
             menu_popup(&resp).show(|ui| {
                 for m in MaskType::ALL {
@@ -1164,7 +1164,7 @@ fn appearance(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
     let smooth_ok = radius_ok && sel.iter().all(|i| doc.node(*i).is_some_and(|n| n.kind.has_corner_smoothing()));
     let r = common(doc, sel, |n| n.corners.uniform().map(|r| (r * 100.0).round() / 100.0));
     widgets::sublabels(ui, tr("Opacity"), radius_ok.then_some(tr("Corner radius")));
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let lead = Lead::Icon(Icon::Opacity, tr("Opacity"));
         let e = crate::variable_ui::number_field_mixed(app, ui, &ids, "opacity", Id::new("ap_op"), lead, op, "%", col);
         app.field_of(&ids, "opacity", e, op_of, |v| json!((v / 100.0).clamp(0.0, 1.0)));
@@ -1203,7 +1203,7 @@ fn appearance(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
         ];
         // Polygons and stars have one radius, so no field per corner.
         for pair in corners.chunks(2).filter(|_| indep_ok) {
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 for (key, name, icon, k) in pair {
                     let e = crate::variable_ui::number_field(
                         app,
@@ -1222,7 +1222,7 @@ fn appearance(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
         }
         let sm = common(doc, sel, |n| (n.corners.smoothing * 100.0).round());
         widgets::sublabels(ui, tr("Corner smoothing"), None);
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let e = widgets::number_field(ui, Id::new("smoothing"), Lead::None, sm, "%", col, 1.0);
             app.field(&ids, "cornerSmoothing", e, |v| json!((v / 100.0).clamp(0.0, 1.0)));
             if widgets::button(ui, tr("iOS"), false, true).on_hover_text(tr("Set corner smoothing to 60%")).clicked() {
@@ -1235,7 +1235,7 @@ fn appearance(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
         || blend.is_some_and(|b| !matches!(b, BlendMode::Normal | BlendMode::PassThrough));
     if show_blend {
         widgets::sublabels(ui, tr("Blend mode"), None);
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let label = blend.map(|b| tr(b.label())).unwrap_or(tr("Mixed"));
             let resp = widgets::dropdown(ui, label, col * 2.0 + 8.0, Some(Icon::Blend));
             menu_popup(&resp).width(200.0).show(|ui| {
@@ -1295,7 +1295,7 @@ fn variable_modes(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId])
             Some((_, lib)) => trf("{name} (from {library})", &[("name", &c.name), ("library", &lib)]),
             None => c.name.clone(),
         };
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let (rect, _) = ui.allocate_exact_size(vec2(name_w, FIELD_H), Sense::hover());
             let name = widgets::elide(ui, &c.name, name_w);
             ui.painter().text(pos2(rect.min.x, rect.center().y), Align2::LEFT_CENTER, &name, regular(11.0), t.text);
@@ -1350,7 +1350,7 @@ fn range_fill(app: &mut FigApp, ui: &mut Ui, doc: &Document, id: NodeId, start: 
         let first = it.next()?;
         it.all(|f| f == first).then_some(first)
     });
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let w = ui.available_width() - 28.0;
         let (r, _) = ui.allocate_exact_size(vec2(w, FIELD_H), Sense::hover());
         ui.painter().rect_filled(r, CornerRadius::same(5), t.field);
@@ -1445,7 +1445,7 @@ fn paints(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId], fills: 
         let weight = common(doc, sel, |n| n.stroke.weight);
         let align = common(doc, sel, |n| n.stroke.align);
         let half = (ui.available_width() - PAD * 2.0 - 8.0) / 2.0;
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let resp = widgets::dropdown(
                 ui,
                 match align {
@@ -1510,7 +1510,7 @@ fn paints(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId], fills: 
             let col = widgets::col_width(ui.available_width());
             let fields = ["T", "R", "B", "L"].into_iter().zip(undesign_engine::cmd::props::STROKE_SIDES);
             for first in [0, 2] {
-                row(ui, 32.0, |ui| {
+                row(ui, crate::widgets::ROW_H, |ui| {
                     for (k, (label, field)) in fields.clone().enumerate().skip(first).take(2) {
                         let v = sides.get(k).copied();
                         let e = crate::variable_ui::number_field(app, ui, &ids, field, Id::new(("stroke_side", k)), Lead::Text(label), v, "", col);
@@ -1563,7 +1563,7 @@ pub(crate) fn profile_art(painter: &egui::Painter, rect: Rect, profile: Option<&
 fn width_profile_row(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], profile: Option<Option<WidthProfile>>, half: f32) {
     let t = Tokens::get(ui.ctx());
     widgets::sublabels(ui, tr("Width profile"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let label = match &profile {
             None => tr("Mixed"),
             Some(None) => tr(WidthPreset::Uniform.label()),
@@ -1626,7 +1626,7 @@ fn brush_row(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], brush: Option<Option
     use undesign_pathops::brush::{PRESETS, preset};
     let t = Tokens::get(ui.ctx());
     widgets::sublabels(ui, tr("Brush"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let label = match &brush {
             None => tr("Mixed"),
             Some(b) => b.as_ref().and_then(|b| preset(&b.preset)).map_or(tr("None"), |p| tr(p.label)),
@@ -1676,14 +1676,14 @@ fn brush_row(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], brush: Option<Option
         serde_json::to_value(nb.sanitized()).unwrap_or_default()
     };
     widgets::sublabels(ui, tr("Spacing"), Some(tr("Scatter")));
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let e = widgets::number_field(ui, Id::new("brush_spacing"), Lead::Icon(Icon::Gap, tr("Brush spacing")), Some(b.spacing), "×", half, 0.1);
         app.field(ids, "brush", e, |v| with(&|nb| nb.spacing = v));
         let e = widgets::number_field(ui, Id::new("brush_scatter"), Lead::Icon(Icon::Dots, tr("Brush scatter")), Some(b.scatter), "×", half, 0.1);
         app.field(ids, "brush", e, |v| with(&|nb| nb.scatter = v));
     });
     widgets::sublabels(ui, tr("Size jitter"), Some(tr("Rotation jitter")));
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let e = widgets::number_field(
             ui,
             Id::new("brush_size_jitter"),
@@ -1715,7 +1715,7 @@ fn stroke_settings(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
     let dashes = st.as_ref().map(|s| s.dashes.clone());
     let weight = st.as_ref().map(|s| s.weight).unwrap_or(1.0).max(1.0);
     widgets::sublabels(ui, tr("Stroke style"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let dashed = dashes.as_ref().is_some_and(|d| !d.is_empty());
         let resp = widgets::dropdown(ui, if dashed { tr("Dash") } else { tr("Solid") }, half, None);
         menu_popup(&resp).show(|ui| {
@@ -1732,7 +1732,7 @@ fn stroke_settings(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
     if let Some(d) = dashes.filter(|d| !d.is_empty()) {
         let (dash, gap) = (d.first().copied().unwrap_or(4.0), d.get(1).copied().unwrap_or_else(|| d.first().copied().unwrap_or(4.0)));
         widgets::sublabels(ui, tr("Dash"), Some(tr("Gap")));
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let e = widgets::number_field(ui, Id::new("stroke_dash"), Lead::None, Some(dash), "", half, 1.0);
             app.field(&ids, "dashes", e, |v| json!([v.max(0.0), gap]));
             let e = widgets::number_field(ui, Id::new("stroke_gap"), Lead::None, Some(gap), "", half, 1.0);
@@ -1743,7 +1743,7 @@ fn stroke_settings(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
     brush_row(app, ui, &ids, st.as_ref().map(|s| s.brush.clone()), half * 2.0 + 8.0);
     let join = st.as_ref().map(|s| s.join);
     widgets::sublabels(ui, tr("Join|stroke"), (join == Some(StrokeJoin::Miter)).then_some(tr("Miter angle")));
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let resp = widgets::dropdown(ui, join.map(join_label).unwrap_or(tr("Mixed")), half, None);
         menu_popup(&resp).show(|ui| {
             for j in StrokeJoin::ALL {
@@ -1763,7 +1763,7 @@ fn stroke_settings(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]
     let open_paths = sel.iter().all(|i| doc.node(*i).is_some_and(|n| matches!(n.kind, NodeKind::Line | NodeKind::Vector { .. })));
     if open_paths {
         widgets::sublabels(ui, tr("Start point"), Some(tr("End point")));
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             for (key, cap) in [("startCap", st.as_ref().map(|s| s.cap_start)), ("endCap", st.as_ref().map(|s| s.cap_end))] {
                 let resp = widgets::dropdown(ui, cap.map(|c| tr(c.label())).unwrap_or(tr("Mixed")), half, None);
                 menu_popup(&resp).show(|ui| {
@@ -2055,13 +2055,13 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
         EffectKind::DropShadow(s) | EffectKind::InnerShadow(s) => {
             let inner = matches!(e.kind, EffectKind::InnerShadow(_));
             let mk = |s2: Shadow| Effect { kind: if inner { EffectKind::InnerShadow(s2) } else { EffectKind::DropShadow(s2) }, visible: e.visible };
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = fx_field(app, ui, ids, i, "offsetX", Lead::Text("X"), s.offset.0, half);
                 edit(app, ed, &|v| mk(Shadow { offset: (v, s.offset.1), ..s.clone() }));
                 let ed = fx_field(app, ui, ids, i, "offsetY", Lead::Text("Y"), s.offset.1, half);
                 edit(app, ed, &|v| mk(Shadow { offset: (s.offset.0, v), ..s.clone() }));
             });
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = fx_field(app, ui, ids, i, "radius", Lead::Text(tr("Blur")), s.radius, half);
                 edit(app, ed, &|v| mk(Shadow { radius: v.max(0.0), ..s.clone() }));
                 let ed = fx_field(app, ui, ids, i, "spread", Lead::Text(tr("Spread")), s.spread, half);
@@ -2069,13 +2069,13 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
             });
             // The colour: a bound variable's chip, else swatch, hex and alpha with a variable button.
             let color_field = format!("effects/{i}/color");
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 crate::variable_ui::bindable(app, ui, ids, &color_field, VariableType::Color, half * 2.0 + 8.0, |app, ui| {
                     fx_color(app, ui, ids, i, e, false, &edit_color)
                 });
             });
             if !inner {
-                row(ui, 32.0, |ui| {
+                row(ui, crate::widgets::ROW_H, |ui| {
                     if widgets::checkbox(ui, s.show_behind, tr("Show behind transparent areas")) {
                         set(app, mk(Shadow { show_behind: !s.show_behind, ..s.clone() }), None);
                     }
@@ -2090,7 +2090,7 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
                 }
                 e2
             };
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let resp = widgets::dropdown(ui, tr(b.blur_type.label()), half * 2.0 + 8.0, None);
                 menu_popup(&resp).show(|ui| {
                     for t in BlurType::ALL {
@@ -2101,7 +2101,7 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
                     }
                 });
             });
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 if b.is_progressive() {
                     // The ramp's start and end points are dragged on the canvas.
                     let ed = fx_field(app, ui, ids, i, "startRadius", Lead::Text(tr("Start")), b.start_radius, half);
@@ -2122,7 +2122,7 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
                     }
                 })
             };
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let resp = widgets::dropdown(ui, tr(nz.mode.label()), half * 2.0 + 8.0, None);
                 menu_popup(&resp).show(|ui| {
                     for m in NoiseMode::ALL {
@@ -2133,7 +2133,7 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
                     }
                 });
             });
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = widgets::number_field(ui, Id::new(("fx_ns", i)), Lead::Text(tr("Size")), Some(nz.size), "", half, 0.1);
                 edit(app, ed, &|v| {
                     with(&|n| {
@@ -2146,12 +2146,12 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
                 edit(app, ed, &|v| with(&|n| n.density = (v / 100.0).clamp(0.0, 1.0)));
             });
             match nz.mode {
-                NoiseMode::Mono => row(ui, 32.0, |ui| fx_color(app, ui, ids, i, e, false, &edit_color)),
+                NoiseMode::Mono => row(ui, crate::widgets::ROW_H, |ui| fx_color(app, ui, ids, i, e, false, &edit_color)),
                 NoiseMode::Duo => {
-                    row(ui, 32.0, |ui| fx_color(app, ui, ids, i, e, false, &edit_color));
-                    row(ui, 32.0, |ui| fx_color(app, ui, ids, i, e, true, &edit_color));
+                    row(ui, crate::widgets::ROW_H, |ui| fx_color(app, ui, ids, i, e, false, &edit_color));
+                    row(ui, crate::widgets::ROW_H, |ui| fx_color(app, ui, ids, i, e, true, &edit_color));
                 }
-                NoiseMode::Multi => row(ui, 32.0, |ui| {
+                NoiseMode::Multi => row(ui, crate::widgets::ROW_H, |ui| {
                     let op = Some((f64::from(nz.opacity) * 100.0).round());
                     let ed = widgets::number_field(ui, Id::new(("fx_no", i)), Lead::Text(tr("Opacity")), op, "%", half, 1.0);
                     edit(app, ed, &|v| with(&|n| n.opacity = (v / 100.0).clamp(0.0, 1.0) as f32));
@@ -2166,7 +2166,7 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
                     }
                 })
             };
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = widgets::number_field(ui, Id::new(("fx_ts", i)), Lead::Text(tr("Size")), Some(tx.size), "", half, 0.1);
                 edit(app, ed, &|v| {
                     with(&|t| {
@@ -2177,7 +2177,7 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
                 let ed = widgets::number_field(ui, Id::new(("fx_tr", i)), Lead::Text(tr("Radius")), Some(tx.radius), "", half, 1.0);
                 edit(app, ed, &|v| with(&|t| t.radius = v.max(0.0)));
             });
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 if widgets::checkbox(ui, tx.clip_to_shape, tr("Clip to shape")) {
                     set(app, with(&|t| t.clip_to_shape = !tx.clip_to_shape), None);
                 }
@@ -2193,25 +2193,25 @@ fn effect_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &
             };
             let pct = |v: f64| Some((v * 100.0).round());
             let unit = |v: f64| (v / 100.0).clamp(0.0, 1.0);
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = widgets::number_field(ui, Id::new(("fx_gl", i)), Lead::Text(tr("Light|glass")), Some(g.light_angle.round()), "°", half, 1.0);
                 edit(app, ed, &|v| with(&|gl| gl.light_angle = v.clamp(-180.0, 180.0)));
                 let ed = widgets::number_field(ui, Id::new(("fx_gi", i)), Lead::Text(tr("Intensity")), pct(g.light_intensity), "%", half, 1.0);
                 edit(app, ed, &|v| with(&|gl| gl.light_intensity = unit(v)));
             });
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = widgets::number_field(ui, Id::new(("fx_gr", i)), Lead::Text(tr("Refraction")), pct(g.refraction), "%", half, 1.0);
                 edit(app, ed, &|v| with(&|gl| gl.refraction = unit(v)));
                 let ed = widgets::number_field(ui, Id::new(("fx_gd", i)), Lead::Text(tr("Depth")), Some(g.depth), "", half, 1.0);
                 edit(app, ed, &|v| with(&|gl| gl.depth = v.clamp(1.0, 1000.0)));
             });
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = widgets::number_field(ui, Id::new(("fx_gs", i)), Lead::Text(tr("Dispersion")), pct(g.dispersion), "%", half, 1.0);
                 edit(app, ed, &|v| with(&|gl| gl.dispersion = unit(v)));
                 let ed = widgets::number_field(ui, Id::new(("fx_gf", i)), Lead::Text(tr("Frost")), Some(g.frost), "", half, 1.0);
                 edit(app, ed, &|v| with(&|gl| gl.frost = v.clamp(0.0, 1000.0)));
             });
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 let ed = widgets::number_field(ui, Id::new(("fx_gp", i)), Lead::Text(tr("Splay")), pct(g.splay), "%", half, 1.0);
                 edit(app, ed, &|v| with(&|gl| gl.splay = unit(v)));
             });
@@ -2354,11 +2354,11 @@ fn grid_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], list: &[LayoutGr
     let gutter = |x: &mut LayoutGrid, v: f64| x.gutter = v.max(0.0);
     if g.kind == GridKind::Grid {
         widgets::sublabels(ui, tr("Size"), None);
-        row(ui, 32.0, |ui| field(app, ui, "size", g.size, &size));
+        row(ui, crate::widgets::ROW_H, |ui| field(app, ui, "size", g.size, &size));
     } else {
         let cols = g.kind == GridKind::Columns;
         widgets::sublabels(ui, tr("Count"), Some(tr("Type")));
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             // 0 is Auto for fixed-size columns (rows); a stretched grid has at least one.
             let count = (!auto_count(g)).then(|| f64::from(g.count.max(1)));
             let key = format!("layoutGrids/{i}/count");
@@ -2402,7 +2402,7 @@ fn grid_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], list: &[LayoutGr
         match g.align {
             GridAlign::Stretch => {
                 widgets::sublabels(ui, span, Some(tr("Margin")));
-                row(ui, 32.0, |ui| {
+                row(ui, crate::widgets::ROW_H, |ui| {
                     // The frame, divided by the count: shown as Auto and not editable.
                     ui.add_enabled_ui(false, |ui| {
                         let auto = widgets::Empty::Text(tr("Auto"));
@@ -2411,29 +2411,29 @@ fn grid_settings(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], list: &[LayoutGr
                     field(app, ui, "offset", g.offset, &offset);
                 });
                 widgets::sublabels(ui, tr("Gutter"), None);
-                row(ui, 32.0, |ui| field(app, ui, "gutter", g.gutter, &gutter));
+                row(ui, crate::widgets::ROW_H, |ui| field(app, ui, "gutter", g.gutter, &gutter));
             }
             GridAlign::Center => {
                 widgets::sublabels(ui, span, Some(tr("Gutter")));
-                row(ui, 32.0, |ui| {
+                row(ui, crate::widgets::ROW_H, |ui| {
                     field(app, ui, "size", g.size, &size);
                     field(app, ui, "gutter", g.gutter, &gutter);
                 });
             }
             GridAlign::Min | GridAlign::Max => {
                 widgets::sublabels(ui, span, Some(tr("Offset")));
-                row(ui, 32.0, |ui| {
+                row(ui, crate::widgets::ROW_H, |ui| {
                     field(app, ui, "size", g.size, &size);
                     field(app, ui, "offset", g.offset, &offset);
                 });
                 widgets::sublabels(ui, tr("Gutter"), None);
-                row(ui, 32.0, |ui| field(app, ui, "gutter", g.gutter, &gutter));
+                row(ui, crate::widgets::ROW_H, |ui| field(app, ui, "gutter", g.gutter, &gutter));
             }
         }
     }
     // The colour: swatch, hex and alpha.
     widgets::sublabels(ui, tr("Color"), None);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let (sw, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
         widgets::paint_swatch(ui.painter(), sw, &Paint::solid(g.color));
         if let Some(h) = widgets::text_field(ui, Id::new(("grid_hex", i)), &g.color.to_hex(), 80.0, "")
@@ -2574,7 +2574,7 @@ fn inspect(app: &mut FigApp, ui: &mut Ui) {
     use undesign_engine::devinspect::ColorFormat;
     let fmt_id = Id::new("inspect_color_format");
     let fmt = ui.data(|d| d.get_temp::<usize>(fmt_id)).and_then(|i| ColorFormat::ALL.get(i).copied()).unwrap_or_default();
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         widgets::label(ui, tr("Color format"), t.text_secondary);
         let resp = widgets::dropdown(ui, fmt.label(), 72.0, None);
         menu_popup(&resp).show(|ui| {
@@ -2601,7 +2601,7 @@ fn inspect(app: &mut FigApp, ui: &mut Ui) {
     let rem_id = Id::new("inspect_rem");
     let web = lang.is_web();
     let rem = web && ui.data(|d| d.get_temp::<bool>(rem_id)).unwrap_or(false);
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let resp = widgets::dropdown(ui, lang.label(), 120.0, Some(Icon::Code));
         menu_popup(&resp).show(|ui| {
             for (i, l) in CodeLang::ALL.iter().enumerate() {
@@ -2635,7 +2635,7 @@ fn inspect(app: &mut FigApp, ui: &mut Ui) {
         });
     ui.add_space(8.0);
     let mut copy_clicked = copy;
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         copy_clicked |= ui.button(trf("Copy {value}", &[("value", &lang.label())])).clicked();
     });
     if copy_clicked {

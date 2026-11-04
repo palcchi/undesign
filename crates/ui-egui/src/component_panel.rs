@@ -67,7 +67,7 @@ fn combine_ui(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
     if !can_combine_variants(doc, sel) {
         return;
     }
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let label = crate::i18n::command("component.combineVariants", "Combine as variants");
         if widgets::dropdown(ui, &label, 160.0, Some(Icon::ComponentSet)).clicked() {
             app.run("component.combineVariants", json!({"ids": sel}));
@@ -154,7 +154,7 @@ fn slot_section(app: &mut FigApp, ui: &mut Ui, doc: &Document, slot: NodeId, nam
     row(ui, 36.0, |ui| {
         ui.label(egui::RichText::new(tr("Slot")).font(semibold(11.0)).color(t.text));
     });
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         prop_label(ui, name, Icon::Slot);
         let w = ui.available_width().max(60.0);
         slot_fill(app, ui, doc, slot, preferred, &comps, w);
@@ -317,7 +317,7 @@ fn properties_ui(app: &mut FigApp, ui: &mut Ui, doc: &Document, owner: NodeId) {
         if matches!(d, PropDef::Variant { .. }) {
             continue;
         }
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let (ir, _) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
             icons::paint(ui.painter(), ir, type_icon(d), COMPONENT);
             if let Some(nn) = widgets::text_field(ui, Id::new(("prop_name", owner, k.as_str())), k, 96.0, tr("Name")) {
@@ -385,7 +385,7 @@ fn properties_ui(app: &mut FigApp, ui: &mut Ui, doc: &Document, owner: NodeId) {
     }
     // A lone main component too: Add variant makes it a set of itself and the new variant.
     if can_add_variant(doc, owner) {
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             if widgets::dropdown(ui, tr("Add variant"), 120.0, Some(Icon::Plus)).clicked() {
                 app.run("component.addVariant", json!({"id": owner}));
             }
@@ -428,7 +428,7 @@ fn bind_ui(app: &mut FigApp, ui: &mut Ui, doc: &Document, n: &Node) {
             .map(|(k, _)| k)
             .collect();
         let bound = n.prop_refs.get(field).cloned();
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             let (ir, _) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
             let icon = match field {
                 "visible" => Icon::Eye,
@@ -579,7 +579,7 @@ fn instance_ui(app: &mut FigApp, ui: &mut Ui, doc: &Document, n: &Node) {
         });
     });
     // Main component with a swap menu, and "go to main".
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let w = (ui.available_width() - 32.0).max(80.0);
         let resp = widgets::dropdown(ui, &comp_name, w, Some(Icon::Instance)).on_hover_text(tr("Swap instance"));
         menu_popup(&resp).width(w.max(200.0)).show(|ui| {
@@ -626,7 +626,7 @@ fn instance_ui(app: &mut FigApp, ui: &mut Ui, doc: &Document, n: &Node) {
     }
     // A nested instance inside a main component can expose its properties on the main's instances.
     if nested_in_main(doc, id) {
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             if widgets::checkbox(ui, n.exposed, tr("Expose properties to instances")) {
                 app.run("component.exposeInstance", json!({"id": id, "exposed": !n.exposed}));
             }
@@ -663,7 +663,7 @@ fn instance_props(app: &mut FigApp, ui: &mut Ui, doc: &Document, n: &Node, comps
         let current = doc.node(*component).map(|c| variant_props(&c.name)).unwrap_or_default();
         for (k, vals) in variant_options(doc, set) {
             let cur = current.get(&k).cloned().unwrap_or_default();
-            row(ui, 32.0, |ui| {
+            row(ui, crate::widgets::ROW_H, |ui| {
                 prop_label(ui, &k, Icon::ComponentSet);
                 let w = ui.available_width().max(60.0);
                 // A string variable naming one of the values can choose it.
@@ -684,7 +684,7 @@ fn instance_props(app: &mut FigApp, ui: &mut Ui, doc: &Document, n: &Node, comps
     // Boolean, text and instance-swap properties.
     for (k, d) in prop_defs(doc, *component) {
         let v = props.get(&k).cloned().unwrap_or_else(|| undesign_engine::components::prop_default_value(&d));
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             prop_label(ui, &k, type_icon(&d));
             let w = ui.available_width().max(60.0);
             // Boolean and text values can come from a boolean or string variable.

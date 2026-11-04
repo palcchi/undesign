@@ -8,6 +8,7 @@ name = "Bahasa Indonesia"
 status = "draft — needs native review"
 
 [ui]
+"No recent files yet. Files you open or save show up here." = "Belum ada file terbaru. File yang Anda buka atau simpan akan muncul di sini."
 "Developer Mode" = "Mode Developer"
 
 "% of all commits" = "% dari semua commit"

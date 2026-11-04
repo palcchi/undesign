@@ -24,12 +24,12 @@ use crate::theme::{ACCENT, Tokens, regular, semibold};
 use crate::widgets;
 
 /// The gap between cards, across and down.
-pub const GAP: f32 = 32.0;
+pub const GAP: f32 = 20.0;
 /// The narrowest and widest a card gets (columns come and go to keep cards within these).
-pub const CARD_MIN: f32 = 260.0;
-pub const CARD_MAX: f32 = 360.0;
+pub const CARD_MIN: f32 = 200.0;
+pub const CARD_MAX: f32 = 260.0;
 /// The footer under a card's picture: its icon, name and time.
-const FOOTER_H: f32 = 58.0;
+const FOOTER_H: f32 = 52.0;
 /// A table row, and the table's header.
 const ROW_H: f32 = 44.0;
 const HEADER_H: f32 = 32.0;
@@ -345,6 +345,8 @@ pub struct Recents {
     /// the window gets the focus back.
     checked: f64,
     focused: bool,
+    /// Cards per row in the grid as last drawn (the arrow keys move by it; `ui.inspect` reports it).
+    columns: usize,
 }
 
 /// How often the dates of the recent files in view are read again (seconds).
@@ -558,8 +560,8 @@ pub(crate) fn listed(recents: &[String]) -> impl Iterator<Item = &String> {
     recents.iter().filter(|p| undesign_engine::file_access::allowed(p, undesign_engine::file_access::Access::Read))
 }
 
-/// The recent files for `ui.inspect`: `{view, sort, order, files: [{path, name, exists, picture,
-/// selected}]}` in the order shown (`picture`: `none`, `loading`, `picture`, `page` or
+/// The recent files for `ui.inspect`: `{view, sort, order, columns, files: [{path, name, exists,
+/// picture, selected}]}` in the order shown (`picture`: `none`, `loading`, `picture`, `page` or
 /// `placeholder`).
 pub fn inspect(app: &FigApp) -> Value {
     let prefs = &app.session.prefs;
@@ -569,6 +571,7 @@ pub fn inspect(app: &FigApp) -> Value {
         "sort": sort.key.id(),
         "order": if sort.descending { "desc" } else { "asc" },
         "files": app.ui.home_view.recents.inspect(prefs),
+        "columns": app.ui.home_view.recents.columns,
     })
 }
 
@@ -605,6 +608,10 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, t: &Tokens, query: &str) -> usize 
     let with_created = files.iter().any(|f| f.stat.is_some_and(|s| s.created.is_some()));
     let mut action = toolbar(ui, t, view, sort, with_created);
     ui.add_space(16.0);
+    if files.is_empty() {
+        ui.label(egui::RichText::new(tr("No recent files yet. Files you open or save show up here.")).font(regular(12.0)).color(t.text_secondary));
+        return 0;
+    }
     let chosen = match view {
         View::Grid => grid(ui, t, state, &files, now, time, reduce_motion),
         View::List => list(ui, t, state, &files, now, sort, with_created),
@@ -788,6 +795,7 @@ fn spoken(file: &Shown, now: u64) -> String {
 
 fn grid(ui: &mut Ui, t: &Tokens, recents: &mut Recents, files: &[Shown], now: u64, time: f64, reduce_motion: bool) -> Option<Action> {
     let (columns, card_w) = grid_columns(ui.available_width());
+    recents.columns = columns;
     let (picture_h, card_h) = card_heights(card_w);
     let mut action = None;
     let mut fading = false;

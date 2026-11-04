@@ -8,6 +8,7 @@
 name = "English"
 
 [ui]
+"No recent files yet. Files you open or save show up here." = "No recent files yet. Files you open or save show up here."
 "Developer Mode" = "Developer Mode"
 "Bring in a local design" = "Bring in a local design"
 "Enter a code or invite link" = "Enter a code or invite link"

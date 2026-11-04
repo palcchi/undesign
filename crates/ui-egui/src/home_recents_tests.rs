@@ -54,7 +54,7 @@ fn relative_times_at_each_boundary() {
 #[test]
 fn columns_follow_the_width() {
     for (width, columns) in
-        [(100.0, 1), (259.0, 1), (300.0, 1), (551.0, 1), (552.0, 2), (700.0, 2), (850.0, 3), (1120.0, 3), (1600.0, 5), (3000.0, 8)]
+        [(100.0, 1), (199.0, 1), (300.0, 1), (419.0, 1), (420.0, 2), (700.0, 3), (850.0, 3), (1120.0, 5), (1600.0, 6), (3000.0, 11)]
     {
         let (n, card) = grid_columns(width);
         assert_eq!(n, columns, "{width}");
@@ -67,9 +67,9 @@ fn columns_follow_the_width() {
     // Nonsense widths still give one column.
     assert_eq!(grid_columns(f32::NAN).0, 1);
     assert_eq!(grid_columns(-5.0).0, 1);
-    // A card's picture is 16:9 over a 58-point footer.
+    // A card's picture is 16:9 over a 52-point footer.
     let (picture, card) = crate::home_recents::card_heights(352.0);
-    assert_eq!((picture, card), (198.0, 256.0));
+    assert_eq!((picture, card), (198.0, 250.0));
 }
 
 fn shown(path: &str, modified: Option<u64>, created: Option<u64>) -> Shown {
@@ -295,7 +295,8 @@ fn cards_show_pictures_on_their_page_colour_with_name_and_time() {
 #[test]
 fn only_cards_in_view_read_their_pictures() {
     let (dir, mut paths) = files("visible");
-    // Twelve files: the last rows are below the window.
+    // Twelve files (all the home shows) under the Getting started tips: the last row is below the
+    // window.
     let bytes = std::fs::read(&paths[0]).unwrap();
     for i in 0..8 {
         let p = dir.join(format!("more{i}.undesign"));
@@ -304,7 +305,7 @@ fn only_cards_in_view_read_their_pictures() {
     }
     let mut s = Session::empty();
     s.prefs.recent_files = paths;
-    s.prefs.getting_started_dismissed = true;
+    s.prefs.getting_started_dismissed = false;
     s.prefs.home_sort = "name".into();
     s.prefs.home_order = "asc".into();
     let mut u = Ui::new(s);
@@ -315,7 +316,9 @@ fn only_cards_in_view_read_their_pictures() {
     assert_eq!(pictures.len(), 12);
     // A to Z: art.fig, empty.undesign, gone.undesign (missing: nothing to read) on the first row.
     assert_eq!(pictures.get(..3), Some(["picture", "page", "none"].as_slice()), "the first row is read: {pictures:?}");
-    assert!(pictures.iter().skip(9).all(|p| *p == "none"), "the last row is not: {pictures:?}");
+    let columns = r["columns"].as_u64().unwrap() as usize;
+    let last_row = (pictures.len() - 1) / columns * columns;
+    assert!(pictures.iter().skip(last_row).all(|p| *p == "none"), "the last row is not: {pictures:?}");
 }
 
 #[test]
@@ -338,45 +341,68 @@ fn a_click_selects_a_double_click_opens() {
 
 #[test]
 fn tab_reaches_the_cards_named_for_screen_readers_arrows_move_and_enter_opens() {
-    let (mut u, paths, _) = home("keys");
+    let (dir, mut paths) = files("keys");
+    // Enough files for two rows at any column count the window allows.
+    let bytes = std::fs::read(&paths[0]).unwrap();
+    for i in 0..10 {
+        let p = dir.join(format!("more{i}.undesign"));
+        std::fs::write(&p, &bytes).unwrap();
+        paths.push(p.to_string_lossy().into_owned());
+    }
+    let mut s = Session::empty();
+    s.prefs.recent_files = paths.clone();
+    s.prefs.getting_started_dismissed = true;
+    s.prefs.home_sort = "name".into();
+    s.prefs.home_order = "asc".into();
+    let mut u = Ui::new(s);
+    u.app.ui.home = true;
+    settle(&mut u);
     u.ctx.enable_accesskit();
     u.frame(vec![]);
     let nodes: Vec<_> = u.frame_output(vec![]).platform_output.accesskit_update.unwrap().nodes.into_iter().map(|(_, n)| n).collect();
     for name in ["art, Edited just now", "pic, Edited 3 hours ago", "gone, File not found"] {
         assert!(nodes.iter().any(|n| n.role() == Role::Button && n.label() == Some(name)), "no button named {name:?}");
     }
+    let r = recents(&u);
+    let columns = r["columns"].as_u64().unwrap() as usize;
+    let names: Vec<String> = r["files"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap().to_string()).collect();
+    assert!(columns >= 2 && names.len() > columns, "{columns} columns for {} files", names.len());
+    let has = |u: &Ui, i: usize| crate::a11y::focused_name(&u.ctx).starts_with(&format!("{}, ", names[i]));
     let mut reached = false;
     for _ in 0..40 {
         press(&mut u, Key::Tab);
-        if crate::a11y::focused_name(&u.ctx).starts_with("art, ") {
+        if has(&u, 0) {
             reached = true;
             break;
         }
     }
     assert!(reached, "Tab never reached the first card");
-    assert_eq!(file(&recents(&u), "art")["selected"], true, "the card with the keyboard is selected");
-    // Right: the next card; Down: the one below (three columns); Left and Up back.
+    assert_eq!(file(&recents(&u), &names[0])["selected"], true, "the card with the keyboard is selected");
+    // Right: the next card; at the row's end Right wraps to the next row; Up and Down move by a
+    // row; Left goes back across the row break.
     press(&mut u, Key::ArrowRight);
     u.frame(vec![]);
-    assert!(crate::a11y::focused_name(&u.ctx).starts_with("icon, "), "{}", crate::a11y::focused_name(&u.ctx));
-    assert_eq!(file(&recents(&u), "icon")["selected"], true);
-    assert_eq!(file(&recents(&u), "art")["selected"], false);
-    press(&mut u, Key::ArrowRight);
-    press(&mut u, Key::ArrowRight);
+    assert!(has(&u, 1), "{}", crate::a11y::focused_name(&u.ctx));
+    assert_eq!(file(&recents(&u), &names[1])["selected"], true);
+    assert_eq!(file(&recents(&u), &names[0])["selected"], false);
+    for _ in 1..columns {
+        press(&mut u, Key::ArrowRight);
+    }
     u.frame(vec![]);
-    assert!(crate::a11y::focused_name(&u.ctx).starts_with("empty, "), "Right wraps to the next row");
+    assert!(has(&u, columns), "Right wraps to the next row: {}", crate::a11y::focused_name(&u.ctx));
     press(&mut u, Key::ArrowUp);
     u.frame(vec![]);
-    assert!(crate::a11y::focused_name(&u.ctx).starts_with("art, "));
+    assert!(has(&u, 0), "{}", crate::a11y::focused_name(&u.ctx));
     press(&mut u, Key::ArrowDown);
     press(&mut u, Key::ArrowLeft);
     u.frame(vec![]);
-    assert!(crate::a11y::focused_name(&u.ctx).starts_with("pic, "), "{}", crate::a11y::focused_name(&u.ctx));
+    assert!(has(&u, columns - 1), "{}", crate::a11y::focused_name(&u.ctx));
     assert!(u.app.ui.home, "nothing opened yet");
     press(&mut u, Key::Enter);
     u.frame(vec![]);
     assert!(!u.app.ui.home);
-    assert_eq!(u.app.session.ds().unwrap().path.as_deref(), Some(paths[0].as_str()));
+    // Enter opened that card's file (an SVG opens as a new document named after it).
+    assert_eq!(u.app.session.ds().unwrap().doc.name, names[columns - 1]);
 }
 
 #[test]

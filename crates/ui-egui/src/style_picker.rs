@@ -209,7 +209,7 @@ pub fn chip(app: &mut FigApp, ui: &mut Ui, doc: &Document, ids: &[NodeId], slot:
         _ => return,
     };
     let mut open_it = false;
-    crate::right::row(ui, 32.0, |ui| {
+    crate::right::row(ui, crate::widgets::ROW_H, |ui| {
         let w = (ui.available_width() - 32.0).max(40.0);
         let (r, resp) = ui.allocate_exact_size(vec2(w, widgets::FIELD_H), Sense::click());
         if resp.hovered() {

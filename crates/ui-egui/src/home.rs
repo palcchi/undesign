@@ -390,8 +390,9 @@ fn recents(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
         ui.add_space(28.0);
         getting_started(app, ui, t);
     }
-    open_files(app, ui, t, "");
+    // The recent files (with their pictures) lead; the files already open in tabs follow.
     crate::home_recents::section(app, ui, t, "");
+    open_files(app, ui, t, "");
 }
 
 /// The Open files list: the documents whose name or path has `query` (lower case; all for ""), a
@@ -447,7 +448,8 @@ fn getting_started(app: &mut FigApp, ui: &mut Ui, t: &Tokens) {
     let rows = TIPS.len().div_ceil(columns);
     let (rect, _) = ui.allocate_exact_size(vec2(width, 52.0 + rows as f32 * cell_h + 8.0), Sense::hover());
     a11y::container_bounds(ui, rect);
-    ui.painter().rect_filled(rect, CornerRadius::same(8), t.field);
+    // An outlined panel rather than a grey slab: the tips are help, not the page's main content.
+    ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0, t.border), StrokeKind::Inside);
     ui.painter().text(rect.min + vec2(16.0, 24.0), Align2::LEFT_CENTER, tr("Getting started"), semibold(13.0), t.text);
     let close = Rect::from_min_size(pos2(rect.max.x - 36.0, rect.min.y + 12.0), vec2(24.0, 24.0));
     if widgets::icon_button_at(

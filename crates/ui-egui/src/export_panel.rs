@@ -65,7 +65,7 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
 /// format, advanced options and remove; a PDF's print settings under it. `text`: every layer in
 /// `ids` is a text layer.
 fn setting_row(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], i: usize, e: &ExportSetting, text: bool) {
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         // Tighter spacing so the advanced options and remove buttons fit beside the fields.
         ui.spacing_mut().item_spacing.x = 4.0;
         let (format_w, button, gap) = (54.0, 22.0, ui.spacing().item_spacing.x);

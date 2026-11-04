@@ -370,7 +370,7 @@ pub fn variable_button(ui: &mut Ui, rect: Rect, id: Id) -> bool {
 /// of their own (text content, visibility): `width` wide, at most the row. Nothing when unbound.
 pub fn bound_row(app: &mut FigApp, ui: &mut Ui, ids: &[NodeId], field: &str, kind: VariableType, lead: Lead, width: f32) {
     let Some(name) = app.session.doc().ok().and_then(|d| bound_name(d, ids, field)) else { return };
-    crate::right::row(ui, 32.0, |ui| {
+    crate::right::row(ui, crate::widgets::ROW_H, |ui| {
         let (rect, _) = ui.allocate_exact_size(vec2(width.min(ui.available_width()), widgets::FIELD_H), Sense::hover());
         let ev = widgets::bound_field(ui, Id::new(("bound_row", field)), lead, rect, &name);
         handle(app, ui, ids, field, kind, ev);

@@ -63,7 +63,7 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, doc: &Arc<Document>, ids: &[NodeId
         egui::ScrollArea::vertical().id_salt("selection_colors_rows").max_height(240.0).show_rows(ui, 32.0, colors.len(), |ui, range| {
             for group in &colors[range] {
                 ui.push_id((&group.targets, "selection_color"), |ui| {
-                    crate::right::row(ui, 32.0, |ui| {
+                    crate::right::row(ui, crate::widgets::ROW_H, |ui| {
                         let swatch = widgets::swatch(ui, &group.paint, 24.0).tip(tr("Edit colour"));
                         if swatch.clicked() {
                             open_picker(app, group.targets.clone());

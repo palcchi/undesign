@@ -58,7 +58,7 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
     let col = widgets::col_width(ui.available_width());
     if sections {
         widgets::sublabels(ui, tr("Section color"), None);
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
             let current = common(doc, sel, |n| n.fills.first().and_then(|p| p.solid_color()).map(|c| c.to_hex()));
             for (name, hex) in SECTION_COLORS {
@@ -84,10 +84,10 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
     }
     widgets::sublabels(ui, tr("Status"), None);
     let changed = sel.iter().any(|i| doc.node(*i).is_some_and(|n| n.dev_status == DevStatus::ReadyForDev && n.dev_changed));
-    row(ui, 32.0, |ui| status_dropdown(app, ui, doc, &ids, col * 2.0 + 8.0));
+    row(ui, crate::widgets::ROW_H, |ui| status_dropdown(app, ui, doc, &ids, col * 2.0 + 8.0));
     if changed {
         // Changed since marked ready: say why to resolve it (back to Ready for dev).
-        row(ui, 32.0, |ui| {
+        row(ui, crate::widgets::ROW_H, |ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             let id = egui::Id::new(("dev_reason", ids.first().copied()));
             let draft_id = id.with("draft");
@@ -114,7 +114,7 @@ pub fn section(app: &mut FigApp, ui: &mut Ui, doc: &Document, sel: &[NodeId]) {
             widgets::label(ui, &text, t.text_secondary);
         });
     }
-    row(ui, 32.0, |ui| {
+    row(ui, crate::widgets::ROW_H, |ui| {
         let fit = ui
             .add_sized(vec2(col * 2.0 + 8.0, widgets::FIELD_H), egui::Button::new(tr("Resize to fit")))
             .on_hover_text(crate::shortcuts::tip(tr("Fit to contents"), "object.resizeToFit"));
