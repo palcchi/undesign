@@ -84,6 +84,174 @@ fn key(u: &mut Ui, key: egui::Key) {
     ]);
 }
 
+fn pointer_button(u: &mut Ui, pos: egui::Pos2, button: egui::PointerButton, pressed: bool) {
+    u.frame(vec![Event::PointerMoved(pos), Event::PointerButton { pos, button, pressed, modifiers: egui::Modifiers::NONE }]);
+}
+
+fn right_click(u: &mut Ui, pos: egui::Pos2) {
+    pointer_button(u, pos, egui::PointerButton::Secondary, true);
+    pointer_button(u, pos, egui::PointerButton::Secondary, false);
+}
+
+fn new_rect(s: &mut Session, x: f64, y: f64, width: f64, height: f64) -> undesign_doc::NodeId {
+    let out = s.execute("shape.rectangle", &json!({"x": x, "y": y, "width": width, "height": height})).unwrap();
+    undesign_engine::params::id_of(&out["id"]).unwrap()
+}
+
+fn near(a: f64, b: f64) -> bool {
+    (a - b).abs() < 1e-5
+}
+
+#[test]
+fn pointer_zoom_and_wheel_pan_reach_the_view_through_egui() {
+    let mut u = Ui::new(Session::new());
+    let at = u.app.to_screen(100.0, 80.0);
+    assert!(u.app.canvas.rect.contains(at), "the pointer starts over the canvas");
+    let (zoom_before, anchor_before) = (u.app.session.ds().unwrap().view.zoom, u.app.to_page(at));
+
+    u.frame(vec![Event::PointerMoved(at), Event::Zoom(1.25)]);
+
+    let zoomed = &u.app.session.ds().unwrap().view;
+    assert!(near(zoomed.zoom, zoom_before * 1.25), "pinch zoom reaches the view: {}", zoomed.zoom);
+    let anchor_after = u.app.to_page(at);
+    assert!(
+        near(anchor_after.x, anchor_before.x) && near(anchor_after.y, anchor_before.y),
+        "zoom keeps the page point under the pointer: {anchor_before:?} -> {anchor_after:?}"
+    );
+
+    let (cx_before, cy_before) = (zoomed.cx, zoomed.cy);
+    u.frame(vec![
+        Event::PointerMoved(at),
+        Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: vec2(0.0, -64.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: egui::Modifiers::NONE,
+        },
+    ]);
+    let panned = &u.app.session.ds().unwrap().view;
+    assert!(!near(panned.cx, cx_before) || !near(panned.cy, cy_before), "plain wheel input pans the view");
+}
+
+#[test]
+fn middle_button_and_space_drags_pan_through_the_canvas() {
+    let mut u = Ui::new(Session::new());
+    let from = u.app.canvas.rect.center();
+    let delta = vec2(72.0, 36.0);
+    let to = from + delta;
+    assert!(u.app.canvas.rect.contains(to));
+    let before = u.app.session.ds().unwrap().view.clone();
+
+    pointer_button(&mut u, from, egui::PointerButton::Middle, true);
+    u.frame(vec![Event::PointerMoved(to)]);
+    let after_middle = &u.app.session.ds().unwrap().view;
+    assert!(near(after_middle.cx, before.cx - f64::from(delta.x) / before.zoom));
+    assert!(near(after_middle.cy, before.cy - f64::from(delta.y) / before.zoom));
+    pointer_button(&mut u, to, egui::PointerButton::Middle, false);
+
+    let from = u.app.canvas.rect.center();
+    let delta = vec2(-54.0, 42.0);
+    let to = from + delta;
+    let before = u.app.session.ds().unwrap().view.clone();
+    u.frame(vec![Event::Key { key: egui::Key::Space, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::NONE }]);
+    u.button(from, true);
+    u.frame(vec![Event::PointerMoved(to)]);
+    let after_space = &u.app.session.ds().unwrap().view;
+    assert!(near(after_space.cx, before.cx - f64::from(delta.x) / before.zoom));
+    assert!(near(after_space.cy, before.cy - f64::from(delta.y) / before.zoom));
+    u.button(to, false);
+    u.frame(vec![Event::Key { key: egui::Key::Space, physical_key: None, pressed: false, repeat: false, modifiers: egui::Modifiers::NONE }]);
+}
+
+#[test]
+fn canvas_corner_drag_resizes_a_selected_layer_as_one_undo_step() {
+    let mut s = Session::new();
+    let rect = new_rect(&mut s, 100.0, 100.0, 100.0, 50.0);
+    s.execute("select.set", &json!({"ids": [rect]})).unwrap();
+    let mut u = Ui::new(s);
+    let before_undo = u.app.session.undo_depth().0;
+    let from = u.app.to_screen(200.0, 150.0);
+    let to = u.app.to_screen(250.0, 175.0);
+    assert!(u.app.canvas.rect.contains(from) && u.app.canvas.rect.contains(to));
+
+    u.button(from, true);
+    u.frame(vec![Event::PointerMoved(to)]);
+    u.button(to, false);
+
+    let node = u.app.session.doc().unwrap().node(rect).unwrap();
+    assert!(near(node.width, 150.0) && near(node.height, 75.0), "the canvas corner handle resizes both axes: {}×{}", node.width, node.height);
+    assert!(u.app.session.ds().unwrap().interaction.is_none());
+    assert_eq!(u.app.session.undo_depth().0, before_undo + 1, "the drag is one undo step");
+    u.app.run("edit.undo", json!({}));
+    let restored = u.app.session.doc().unwrap().node(rect).unwrap();
+    assert!(near(restored.width, 100.0) && near(restored.height, 50.0), "undo restores the original bounds");
+}
+
+#[test]
+fn canvas_rotation_handle_drag_rotates_a_selected_layer_as_one_undo_step() {
+    let mut s = Session::new();
+    let rect = new_rect(&mut s, 100.0, 100.0, 100.0, 100.0);
+    s.execute("select.set", &json!({"ids": [rect]})).unwrap();
+    let mut u = Ui::new(s);
+    let before_undo = u.app.session.undo_depth().0;
+    let zoom = u.app.session.ds().unwrap().view.zoom;
+    let (cx, cy) = (150.0, 150.0);
+    let pad = 10.0 / zoom;
+    let (sx, sy) = (200.0 + pad, 100.0 - pad);
+    let (dx, dy) = (sx - cx, sy - cy);
+    let radius = dx.hypot(dy);
+    let angle = dy.atan2(dx) + 37.0_f64.to_radians();
+    let (tx, ty) = (cx + radius * angle.cos(), cy + radius * angle.sin());
+    let from = u.app.to_screen(sx, sy);
+    let to = u.app.to_screen(tx, ty);
+    assert!(u.app.canvas.rect.contains(from) && u.app.canvas.rect.contains(to));
+
+    u.button(from, true);
+    u.frame(vec![Event::PointerMoved(to)]);
+    u.button(to, false);
+
+    let node = u.app.session.doc().unwrap().node(rect).unwrap();
+    let rotation = undesign_geom::rotation_degrees(node.transform);
+    assert!((rotation.abs() - 37.0).abs() < 0.1, "the canvas rotation handle applies the pointer's 37° turn: {rotation}");
+    assert!(u.app.session.ds().unwrap().interaction.is_none());
+    assert_eq!(u.app.session.undo_depth().0, before_undo + 1, "the drag is one undo step");
+    u.app.run("edit.undo", json!({}));
+    let restored = u.app.session.doc().unwrap().node(rect).unwrap();
+    assert!(near(undesign_geom::rotation_degrees(restored.transform), 0.0), "undo restores the original rotation");
+}
+
+#[test]
+fn canvas_right_click_selects_the_layer_and_anchors_the_context_menu() {
+    let mut s = Session::new();
+    let selected = new_rect(&mut s, 20.0, 30.0, 80.0, 60.0);
+    let target = new_rect(&mut s, 200.0, 100.0, 100.0, 60.0);
+    s.execute("select.set", &json!({"ids": [selected]})).unwrap();
+    let mut u = Ui::new(s);
+    let on_layer = u.app.to_screen(250.0, 130.0);
+    assert!(u.app.canvas.rect.contains(on_layer));
+
+    right_click(&mut u, on_layer);
+
+    let (anchor, ids) = u.app.ui.context_menu.clone().expect("right-click opens the canvas context menu");
+    assert_eq!(ids, vec![target], "right-click selects the layer under the pointer");
+    assert!(
+        near(f64::from(anchor.x), f64::from(on_layer.x)) && near(f64::from(anchor.y), f64::from(on_layer.y)),
+        "menu is anchored at the clicked point: {anchor:?}"
+    );
+
+    // A blank-canvas context menu stays at the pointer and preserves the current selection.
+    u.app.ui.context_menu = None;
+    let blank = u.app.to_screen(450.0, 350.0);
+    assert!(u.app.canvas.rect.contains(blank));
+    right_click(&mut u, blank);
+    let (anchor, ids) = u.app.ui.context_menu.clone().expect("blank-canvas right-click opens the menu");
+    assert_eq!(ids, vec![target], "right-clicking blank canvas preserves the selection");
+    assert!(
+        near(f64::from(anchor.x), f64::from(blank.x)) && near(f64::from(anchor.y), f64::from(blank.y)),
+        "blank-canvas menu is anchored at the pointer: {anchor:?}"
+    );
+}
+
 #[test]
 fn a_drag_released_off_the_window_ends_where_the_pointer_was_last_seen_and_later_edits_stay() {
     // #278: a drag left open made a later text edit roll back the changes made since.
