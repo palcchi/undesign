@@ -706,5 +706,3 @@ mod layout_tests {
         assert!(motion.opening.is_empty(), "Reduce motion opens tabs at once");
     }
 }
-
-[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

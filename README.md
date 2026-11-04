@@ -299,5 +299,3 @@ there.
 ## Star history
 
 [![Star History Chart](https://api.star-history.com/svg?repos=palcchi/undesign&type=Date&legend=top-left)](https://www.star-history.com/?repos=palcchi%2Fundesign&type=date&legend=top-left)
-
-[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

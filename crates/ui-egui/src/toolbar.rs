@@ -681,5 +681,3 @@ mod tests {
         assert!(main_width(GROUPS, false) > 0.0);
     }
 }
-
-[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

@@ -47,5 +47,3 @@ Release builds embed fonts from the optional craft-fonts build input
 | BIZ UDPGothic, BIZ UDMincho, Shippori Mincho, Noto Sans Arabic | SIL Open Font License 1.1 | Google Fonts (see craft-fonts) |
 
 egui's default fonts (compiled into the `egui`/`epaint` crates) keep their own licences (OFL / Apache-2.0 / Ubuntu Font Licence); see those crates.
-
-[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

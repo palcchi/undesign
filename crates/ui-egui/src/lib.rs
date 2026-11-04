@@ -2224,5 +2224,3 @@ mod type_settings_tests;
 
 #[cfg(test)]
 mod typography_scrub_tests;
-
-[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

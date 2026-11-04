@@ -1170,5 +1170,3 @@ pub fn sublabels(ui: &mut Ui, a: &str, b: Option<&str>) {
 pub fn col_width(w: f32) -> f32 {
     ((w - PAD * 2.0 - 8.0 - 32.0) / 2.0).max(40.0)
 }
-
-[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]

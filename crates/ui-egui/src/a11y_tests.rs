@@ -528,5 +528,3 @@ fn the_align_buttons_are_off_for_a_layer_alone_on_the_page() {
     u.app.run("select.set", json!({"ids": [inner]}));
     assert!(!align_left(&tree(&mut u)), "one in a frame aligns to it");
 }
-
-[executed on device: 96e79c5bd353 (083994b8-796f-4a18-a665-4a53137e1e17)]
