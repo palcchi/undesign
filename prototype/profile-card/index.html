@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A creator profile card shown in two visual treatments, with working follow, save, and contact-preview controls.">
+    <title>Profile card | Undesign example</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#profiles">Skip to profile cards</a>
+
+    <header class="page-heading">
+      <div>
+        <h1>Profile card</h1>
+        <p>One profile, two visual treatments.</p>
+      </div>
+      <p class="interaction-hint">Try Follow, save, or Get in Touch.</p>
+    </header>
+
+    <main id="profiles">
+      <section class="comparison" aria-label="Profile card design variants">
+        <article class="profile-card profile-card--light" aria-labelledby="light-name">
+          <div class="cover" aria-hidden="true"></div>
+          <div class="avatar-wrap">
+            <span class="avatar" role="img" aria-label="Illustrated sample avatar">
+              <svg viewBox="0 0 104 104" aria-hidden="true" focusable="false">
+                <circle cx="52" cy="52" r="50" fill="#f5f2e7" />
+                <path d="M18 90c8-16 20-23 34-23s27 8 34 23" fill="#fffdf7" stroke="#172a53" stroke-width="3.5" stroke-linecap="round" />
+                <path d="M26 54c-5-20 3-37 19-44 15-7 34-1 40 14 4 9 3 20 0 31l-5 13H29z" fill="#172a53" />
+                <ellipse cx="52" cy="51" rx="23" ry="27" fill="#f3eedc" />
+                <path d="M30 45c2-14 11-23 24-23 10 0 18 5 23 14-8-3-13-2-17 2-4 3-8 3-12 1-5 5-10 7-18 6z" fill="#172a53" />
+                <path d="M29 43c-5 1-7 6-6 12 1 5 4 8 8 8M75 43c5 1 7 6 6 12-1 5-4 8-8 8" fill="none" stroke="#172a53" stroke-width="3" stroke-linecap="round" />
+                <circle cx="44" cy="53" r="2" fill="#172a53" />
+                <circle cx="60" cy="53" r="2" fill="#172a53" />
+                <path d="M49 63c2 2 5 2 7 0" fill="none" stroke="#172a53" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </span>
+          </div>
+
+          <div class="identity">
+            <div class="identity-copy">
+              <h2 id="light-name">Olivia Rhye</h2>
+              <p>@OliviaR_</p>
+            </div>
+            <div class="action-row">
+              <button class="follow-button follow-button--light" type="button" aria-pressed="false" data-follow>
+                Follow
+              </button>
+              <button class="bookmark-button bookmark-button--light" type="button" aria-label="Save Olivia Rhye's profile" aria-pressed="false" data-save>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10v15l-5-3.5-5 3.5z" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="rule" aria-hidden="true"></div>
+          <div class="stats" aria-label="Profile statistics">
+            <div class="stat">
+              <div class="stat-value">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9z" /></svg>
+                <strong>4.9</strong>
+              </div>
+              <span>Rating</span>
+            </div>
+            <div class="stat">
+              <div class="stat-value">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3.5h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path class="icon-cutout" d="M8 8h8M8 12h8M8 16h5" /></svg>
+                <strong>125</strong>
+              </div>
+              <span>Posts</span>
+            </div>
+            <div class="stat">
+              <div class="stat-value">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="7.5" r="4" /><path d="M4 20c.4-4.4 3.3-7 8-7s7.6 2.6 8 7z" /></svg>
+                <strong>12.4K</strong>
+              </div>
+              <span>Followers</span>
+            </div>
+          </div>
+
+          <button class="contact-button contact-button--light" type="button" data-contact>
+            <span class="contact-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 12h15M13 5l7 7-7 7" /></svg></span>
+            <span>Get in Touch</span>
+          </button>
+          <p class="variant-label">Light surface</p>
+        </article>
+
+        <article class="profile-card profile-card--green" aria-labelledby="green-name">
+          <div class="avatar-wrap avatar-wrap--green">
+            <span class="avatar" role="img" aria-label="Illustrated sample avatar">
+              <svg viewBox="0 0 104 104" aria-hidden="true" focusable="false">
+                <circle cx="52" cy="52" r="50" fill="#f5f2e7" />
+                <path d="M18 90c8-16 20-23 34-23s27 8 34 23" fill="#fffdf7" stroke="#172a53" stroke-width="3.5" stroke-linecap="round" />
+                <path d="M26 54c-5-20 3-37 19-44 15-7 34-1 40 14 4 9 3 20 0 31l-5 13H29z" fill="#172a53" />
+                <ellipse cx="52" cy="51" rx="23" ry="27" fill="#f3eedc" />
+                <path d="M30 45c2-14 11-23 24-23 10 0 18 5 23 14-8-3-13-2-17 2-4 3-8 3-12 1-5 5-10 7-18 6z" fill="#172a53" />
+                <path d="M29 43c-5 1-7 6-6 12 1 5 4 8 8 8M75 43c5 1 7 6 6 12-1 5-4 8-8 8" fill="none" stroke="#172a53" stroke-width="3" stroke-linecap="round" />
+                <circle cx="44" cy="53" r="2" fill="#172a53" />
+                <circle cx="60" cy="53" r="2" fill="#172a53" />
+                <path d="M49 63c2 2 5 2 7 0" fill="none" stroke="#172a53" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </span>
+          </div>
+
+          <div class="identity">
+            <div class="identity-copy">
+              <h2 id="green-name">Olivia Rhye</h2>
+              <p>@OliviaR_</p>
+            </div>
+            <div class="action-row">
+              <button class="follow-button follow-button--green" type="button" aria-pressed="false" data-follow>
+                Follow
+              </button>
+              <button class="bookmark-button bookmark-button--green" type="button" aria-label="Save Olivia Rhye's profile" aria-pressed="false" data-save>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10v15l-5-3.5-5 3.5z" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="stats" aria-label="Profile statistics">
+            <div class="stat">
+              <div class="stat-value">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9z" /></svg>
+                <strong>4.9</strong>
+              </div>
+              <span>Rating</span>
+            </div>
+            <div class="stat">
+              <div class="stat-value">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3.5h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path class="icon-cutout" d="M8 8h8M8 12h8M8 16h5" /></svg>
+                <strong>125</strong>
+              </div>
+              <span>Posts</span>
+            </div>
+            <div class="stat">
+              <div class="stat-value">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="7.5" r="4" /><path d="M4 20c.4-4.4 3.3-7 8-7s7.6 2.6 8 7z" /></svg>
+                <strong>12.4K</strong>
+              </div>
+              <span>Followers</span>
+            </div>
+          </div>
+
+          <button class="contact-button contact-button--green" type="button" data-contact>
+            <span class="contact-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 12h15M13 5l7 7-7 7" /></svg></span>
+            <span>Get in Touch</span>
+          </button>
+          <p class="variant-label">Green surface</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="page-note">Sample profile details follow the supplied reference. Contact is not connected in this preview.</footer>
+
+    <dialog class="contact-dialog" aria-labelledby="contact-title" aria-describedby="contact-description">
+      <div class="dialog-head">
+        <h2 id="contact-title">Get in Touch</h2>
+        <button class="dialog-close" type="button" aria-label="Close contact message">×</button>
+      </div>
+      <p id="contact-description">Contact details are not connected in this preview.</p>
+      <button class="dialog-done" type="button">Close</button>
+    </dialog>
+    <p class="screen-reader-only" id="status" role="status" aria-live="polite" aria-atomic="true"></p>
+  </body>
+</html>
