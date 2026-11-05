@@ -5,9 +5,9 @@
 <h1 align="center">Undesign</h1>
 
 <p align="center">
-  <b>Interface design and prototyping: open source, collaborative and built in pure Rust.</b><br>
-  Frames, auto layout, components and variants, vector networks, styles, variables and prototypes,<br>
-  in a native app that opens instantly and works offline. Open source, and yours.
+  <b>An open-source interface design and prototyping app, written in Rust.</b><br>
+  This repository includes a browser-based showcase of sample files and editor workflows.<br>
+  Explore the demo first; treat the app as an early alpha, not a finished production tool.
 </p>
 
 <p align="center">
@@ -21,48 +21,50 @@
 
 <p align="center">
   <img src="docs/images/ui-editor.png" alt="Undesign in its dark theme with the Ridgeline app example: three phone screens on the canvas (Home in light mode with a Ready for dev badge, a trail detail page and Home in dark mode), the Featured trail card instance selected, the file name and layers on the left, and on the right the Share and zoom controls above the Design panel with the instance's properties, position, auto layout and appearance" width="100%">
-  <br><sub><b>The editor</b>: file and layers on the left, document actions and properties on the right, tools at the bottom of the canvas · <code>examples/ridgeline-app.undesign</code></sub>
+  <br><sub><b>Editor preview</b>: a sample Ridgeline file open in the browser showcase, with its layers and design controls visible · <code>examples/ridgeline-app.undesign</code></sub>
 </p>
 
 <p align="center">
-  <b>Try it in your browser, nothing to install:</b><br>
-  <a href="https://palcchi.github.io/undesign/?example=undesign-intro"><b>▶ Motion demo</b></a> (opens the Undesign intro and plays it) ·
+  <b>Open a ready-to-explore sample in your browser:</b><br>
+  <a href="https://palcchi.github.io/undesign/?example=undesign-intro"><b>▶ Motion demo</b></a> (plays the Undesign intro sample) ·
   <a href="https://palcchi.github.io/undesign/?example=ridgeline-app"><b>Design demo</b></a> ·
   <a href="https://palcchi.github.io/undesign/?example=ridgeline-onboarding"><b>Prototype demo</b></a> ·
-  <a href="https://palcchi.github.io/undesign/">the app</a> (Home ▸ Examples lists every sample)
+  <a href="https://palcchi.github.io/undesign/">open the app</a> (choose any sample from Home ▸ Examples)
 </p>
 
 <br>
 
 <p align="center">
-  <a href="#a-look-around">A look around</a> ·
-  <a href="#examples">Examples</a> ·
-  <a href="#made-in-undesign">Made in Undesign</a> ·
-  <a href="#features">Features</a> ·
+  <a href="#a-look-around">Screens and workflows</a> ·
+  <a href="#examples">Browser examples</a> ·
+  <a href="#made-in-undesign">Sample artwork</a> ·
+  <a href="#features">What you can try</a> ·
   <a href="#scriptable-to-the-core">Automation</a> ·
-  <a href="#under-the-hood">Under the hood</a> ·
-  <a href="#get-started">Get started</a>
+  <a href="#under-the-hood">Implementation</a> ·
+  <a href="#get-started">Build it</a>
 </p>
 
 <br>
+
+<p>The images in this README are original project visuals. They show Undesign's interface and example designs; they are showcase material, while the linked browser sessions let you try the sample files yourself.</p>
 
 <table>
   <tr>
     <td width="25%" valign="top">
-      <h3>🎛️ Familiar by design</h3>
-      The toolbar, layers panel, Design panel, menus and shortcuts sit right where your hands expect them.
+      <h3>Design in one workspace</h3>
+      Work with frames, layers, reusable components, styles, variables and vector shapes in a native interface.
     </td>
     <td width="25%" valign="top">
-      <h3>⚡ Native and fast</h3>
-      A Rust engine with a persistent document model: edits touch only what changed, so creating a node in a 20,000-node file takes a fraction of a millisecond. No Electron, no web view.
+      <h3>Rust-powered editor</h3>
+      A persistent document model lets edits focus on changed data. The desktop app uses egui rather than Electron or an embedded web view.
     </td>
     <td width="25%" valign="top">
-      <h3>🔌 Offline and private</h3>
-      Your files are plain <code>.undesign</code> archives on your own disk. No account, no telemetry, and nothing leaves your computer unless you share a file (<a href="#privacy-and-online-sharing">what sharing sends where</a>). SVG, PNG, JPG, WebP and PDF in and out; <code>.fig</code> files open (best effort), and so do designs exported as the public REST API file JSON, with their prototypes and variables.
+      <h3>Local files by default</h3>
+      Projects are <code>.undesign</code> files on your device. The app has no account or telemetry; online sharing is optional and described in <a href="#privacy-and-online-sharing">the privacy notes</a>.
     </td>
     <td width="25%" valign="top">
-      <h3>⌨️ Script-ready</h3>
-      Every menu item, tool and drag is a command, so the same engine runs from the UI, the CLI or a JSON control channel.
+      <h3>Same engine, several ways</h3>
+      Use the interface, command-line tools or JSON control channel to work with the document model.
     </td>
   </tr>
 </table>
@@ -71,143 +73,132 @@
 
 ## A look around
 
+<p>These screenshots pair the editor with sample documents, so you can see what the browser examples are meant to demonstrate.</p>
+
 <table>
 <tr>
 <td width="50%" valign="top">
   <img src="docs/images/ui-motion.png" alt="The Undesign intro example in the Motion workspace: the canvas shows the U mark, the Undesign wordmark and the tagline part-way through their entrance with the first feature chip fading in, the Motion panel on the right lists sixteen property tracks, and the docked timeline below has the transport, the current time at frame 38, a ruler in seconds, the playhead and keyframe diamonds on the mark's rotation, scale and opacity lanes" width="100%">
-  <p align="center"><sub><b>Motion</b>: compositions, property tracks and keyframes on a docked timeline, previewed on the canvas · <code>examples/undesign-intro.undesign</code></sub></p>
+  <p align="center"><sub><b>Motion workspace</b>: preview an animated intro with property tracks and keyframes · <code>examples/undesign-intro.undesign</code></sub></p>
 </td>
 <td width="50%" valign="top">
   <img src="docs/images/ui-home.png" alt="The Home screen: New design, New board, Import file and Join team buttons, a join-with-a-code field, the Getting started tips, and an Examples section with picture cards for Undesign intro, Daybreak motion study, Ridgeline app, Ridgeline onboarding, Ridgeline design system, Ridgeline Studio dashboard and Glass and vectors" width="100%">
-  <p align="center"><sub><b>Home</b>: new files, joining a shared file, and the built-in examples (each opens as a new copy)</sub></p>
+  <p align="center"><sub><b>Home screen</b>: start a file, import one, or make a copy of a built-in example</sub></p>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
   <img src="docs/images/ui-prototype.png" alt="Four onboarding phone screens in the Prototype tab joined by connection curves; the Continue button on the second screen is selected and the Prototype panel shows its On click, Navigate to 3 Location interaction and its scroll behaviour" width="100%">
-  <p align="center"><sub><b>Prototyping</b>: connections, transitions and a flow · <code>examples/ridgeline-onboarding.undesign</code></sub></p>
+  <p align="center"><sub><b>Prototype view</b>: connect screens and test an interaction flow · <code>examples/ridgeline-onboarding.undesign</code></sub></p>
 </td>
 <td width="50%" valign="top">
   <img src="docs/images/ui-devmode.png" alt="Developer Mode on the Ridgeline home screen: a Ready for dev badge, a Development annotation callout on the trail card, red measurement lines from a selected trail row to its frame, and the Inspect panel listing the row's layout, auto layout, fills and effects" width="100%">
-  <p align="center"><sub><b>Developer Mode</b>: annotations, measurements and the Inspect panel, a toggle beside the tools · <code>examples/ridgeline-app.undesign</code></sub></p>
+  <p align="center"><sub><b>Developer Mode</b>: inspect measurements, annotations and implementation details in the sample · <code>examples/ridgeline-app.undesign</code></sub></p>
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top">
   <img src="docs/images/ui-agent.png" alt="The Agent tab beside the onboarding screens: Design and Motion skills, a Provider switch set to Anthropic with the fixed Messages endpoint, empty Model ID and API key fields, notes that the key stays in memory for the session and that no request is sent until Send, and a Connect button" width="100%">
-  <p align="center"><sub><b>Agent</b>: bring your own provider (OpenAI-compatible or Anthropic); every change is a proposal you approve, applied as one undo step</sub></p>
+  <p align="center"><sub><b>Optional Agent tab</b>: connect your own OpenAI-compatible or Anthropic provider; review each proposed change before it is applied</sub></p>
 </td>
 </tr>
 </table>
 
 ## Examples
 
-Every file in [`examples/`](examples) is also built into the app: **Home ▸ Examples** opens a new copy
-of it, on the desktop and in the browser, and the original stays as it is. A link with
-`?example=<name>` opens one straight away in the browser; the Motion samples open in the Motion
-workspace and play.
+The browser links below load built-in sample documents directly into the web app. Use **Home ▸ Examples** to open a fresh copy on desktop or web; your edits to that copy do not replace the bundled original. Motion examples open in the Motion workspace and start playing. The files are also listed in [`examples/`](examples).
 
-| Example | What it shows | In the browser |
+| Sample file | Demo focus | Open in browser |
 |---|---|---|
-| [Undesign intro](examples/undesign-intro.undesign) | **Motion**: the Undesign mark, wordmark and four feature chips animate in over 3 s (16 tracks, eased keyframes) | [Open](https://palcchi.github.io/undesign/?example=undesign-intro) |
-| [Daybreak motion study](examples/daybreak-motion-study.undesign) | **Motion**: a weather screen's glass panels, sun and forecast on a 4 s timeline | [Open](https://palcchi.github.io/undesign/?example=daybreak-motion-study) |
-| [Ridgeline app](examples/ridgeline-app.undesign) | Auto layout screens built from components, light and dark from one set of colour variables, Dev Mode annotations | [Open](https://palcchi.github.io/undesign/?example=ridgeline-app) |
-| [Ridgeline onboarding](examples/ridgeline-onboarding.undesign) | A prototype: connections, transitions, back actions and a flow | [Open](https://palcchi.github.io/undesign/?example=ridgeline-onboarding) |
-| [Ridgeline design system](examples/ridgeline-design-system.undesign) | Component sets, variant properties and the Assets panel | [Open](https://palcchi.github.io/undesign/?example=ridgeline-design-system) |
-| [Ridgeline Studio dashboard](examples/ridgeline-studio-dashboard.undesign) | A 12-column layout grid, paint, text, effect and grid styles, charts made of shapes | [Open](https://palcchi.github.io/undesign/?example=ridgeline-studio-dashboard) |
-| [Glass and vectors](examples/glass-and-vectors.undesign) | Glass and background blur, editable booleans, variable-width strokes | [Open](https://palcchi.github.io/undesign/?example=glass-and-vectors) |
+| [Undesign intro](examples/undesign-intro.undesign) | Animated logo and feature labels, arranged on a three-second timeline with 16 eased tracks | [Try the motion demo](https://palcchi.github.io/undesign/?example=undesign-intro) |
+| [Daybreak motion study](examples/daybreak-motion-study.undesign) | Weather-screen composition with translucent panels, a sun and forecast animation | [Try the motion demo](https://palcchi.github.io/undesign/?example=daybreak-motion-study) |
+| [Ridgeline app](examples/ridgeline-app.undesign) | Component-based mobile screens, light/dark colour variables and Dev Mode notes | [Try the design demo](https://palcchi.github.io/undesign/?example=ridgeline-app) |
+| [Ridgeline onboarding](examples/ridgeline-onboarding.undesign) | Linked screens, transitions, back actions and a navigable prototype flow | [Try the prototype demo](https://palcchi.github.io/undesign/?example=ridgeline-onboarding) |
+| [Ridgeline design system](examples/ridgeline-design-system.undesign) | Reusable component sets, variants and the Assets panel | [Open sample](https://palcchi.github.io/undesign/?example=ridgeline-design-system) |
+| [Ridgeline Studio dashboard](examples/ridgeline-studio-dashboard.undesign) | A 12-column dashboard layout with styles and charts drawn from shapes | [Open sample](https://palcchi.github.io/undesign/?example=ridgeline-studio-dashboard) |
+| [Glass and vectors](examples/glass-and-vectors.undesign) | Glass effects, editable boolean shapes and variable-width strokes | [Open sample](https://palcchi.github.io/undesign/?example=glass-and-vectors) |
 
 ## Made in Undesign
 
-Every design below was built entirely through Undesign's command API, the same one scripts use,
-and exported at 2x by Undesign's own renderer. The source files are in
-[`examples/`](examples).
+The compositions below are sample outputs made with Undesign's command API and exported at 2× with its renderer. Their editable source files are in [`examples/`](examples).
 
 <p align="center">
   <img src="docs/images/made-undesign-intro.png" alt="The Undesign intro frame: the green U mark beside the white Undesign wordmark on a near-black background, the line Design, prototype and animate interfaces. Open source, written in Rust., and four outlined chips reading Auto layout, Components, Motion timeline and Dev Mode" width="100%">
-  <br><sub><b>Undesign intro</b>: the last frame of its 3 s entrance, rendered by Undesign · <code>examples/undesign-intro.undesign</code></sub>
+  <br><sub><b>Undesign intro</b>: a still from the animated sample's final frame · <code>examples/undesign-intro.undesign</code></sub>
 </p>
 
 <table>
 <tr>
 <td width="33%" valign="top">
   <img src="docs/images/art-app-home.png" alt="Ridgeline home screen in light mode: a greeting, a search field, filter chips, a featured trail card with an illustrated mountain landscape, a list of nearby trails and a translucent tab bar" width="100%">
-  <p align="center"><sub><b>Home, light</b></sub></p>
+  <p align="center"><sub><b>Ridgeline home</b>: light theme</sub></p>
 </td>
 <td width="33%" valign="top">
   <img src="docs/images/art-app-trail.png" alt="Ridgeline trail detail screen: a dusk mountain illustration with glass buttons, a sheet with difficulty tags, the trail name, distance, elevation and duration stats, an elevation profile chart and a Start hike button" width="100%">
-  <p align="center"><sub><b>Trail detail</b></sub></p>
+  <p align="center"><sub><b>Trail detail</b>: route information and elevation profile</sub></p>
 </td>
 <td width="33%" valign="top">
   <img src="docs/images/art-app-home-dark.png" alt="The same Ridgeline home screen in dark mode, its colours switched by the Theme variable collection's Dark mode" width="100%">
-  <p align="center"><sub><b>Home, dark</b>: the same frame in the Dark mode</sub></p>
+  <p align="center"><sub><b>Ridgeline home</b>: dark theme via a variable mode</sub></p>
 </td>
 </tr>
 <tr>
 <td colspan="3" valign="top">
   <img src="docs/images/art-dashboard.png" alt="Ridgeline Studio dashboard: a dark navy sidebar with navigation, KPI cards for active hikers, check-ins, average rating and open incidents with sparklines, a hikes-per-day grouped bar chart with a tooltip, a difficulty donut chart, a top trails table with condition badges and a visitors area chart" width="100%">
-  <p align="center"><sub><b>Ridgeline Studio</b>: a desktop dashboard on a 12-column grid, every chart made of shapes and vectors</sub></p>
+  <p align="center"><sub><b>Ridgeline Studio</b>: a dashboard assembled on a 12-column grid</sub></p>
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top">
   <img src="docs/images/art-glass-weather.png" alt="A glass weather widget over blurred teal, violet, rose and orange colour fields: a frosted card for Lake Louise showing 14 degrees and partly cloudy with a gradient sun behind a boolean-union cloud, an hourly forecast row, and smaller glass cards for air quality, wind and humidity" width="100%">
-  <p align="center"><sub><b>Glass weather</b>: glass and background blur, layer-blurred colour fields, a boolean cloud</sub></p>
+  <p align="center"><sub><b>Glass weather</b>: layered blur, frosted surfaces and vector shapes</sub></p>
 </td>
 <td width="33%" valign="top">
   <img src="docs/images/art-vector-marks.png" alt="Three tiles on a cream background: a gradient mountain mark made by unioning two peaks and subtracting a sun, a knot of three excluded rings with an angular gradient, and a tapered gradient wave with a leaf and a glowing four-point star" width="100%">
-  <p align="center"><sub><b>Vector marks</b>: union, subtract and exclude, an angular gradient, a variable-width stroke</sub></p>
+  <p align="center"><sub><b>Vector marks</b>: boolean operations, gradients and variable-width strokes</sub></p>
 </td>
 </tr>
 <tr>
 <td colspan="3" valign="top">
   <img src="docs/images/art-ds-colour.png" alt="Ridgeline UI colour ramps: six swatches each of Pine greens, Sunset oranges and Slate greys, each labelled with its name and hex value" width="100%">
-  <p align="center"><sub><b>Ridgeline UI</b>: colour ramps where every swatch is a paint style, exported through a slice</sub></p>
+  <p align="center"><sub><b>Ridgeline palette</b>: colour styles shown as reusable swatches</sub></p>
 </td>
 </tr>
 </table>
 
 ## Features
 
+The browser demo gives you a guided look at the editor. In the desktop app and web build, the current feature set includes:
+
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>Layouts that build themselves</h3>
-      Auto layout in both directions, with wrap and grid (fixed, hug and `fr` tracks, cells that span), padding, gaps, alignment including text baselines, Hug / Fill / Fixed sizing, min and max sizes, absolute positioning, drag handles for padding and spacing right on the canvas, and arrow keys that move children through the flow, grid cells and nested frames. Constraints and layout grids for everything else.
+      <h3>Layout and reusable design</h3>
+      Build with auto layout, wrapping and grids; adjust spacing, sizing and constraints on the canvas. Create components and variants, then share local styles and colour, number, string or boolean variables across a file.
     </td>
     <td width="50%" valign="top">
-      <h3>Components that scale</h3>
-      Main components, instances with overrides that survive edits, component sets with variants, properties, swap instance, detach, reset overrides and go to main component, and an Assets panel with live thumbnails, search and drag-to-canvas into frames and auto layout. Local styles and variables (colour, number, string, boolean) with modes, aliases and scopes, edited in a Variables table and bound to fills, strokes, effects, layout grids and instance properties. Fills, strokes, effects and layout grids reorder by dragging their rows.
+      <h3>Vector, paint and type</h3>
+      Draw and edit vector networks, combine editable shapes, and style them with gradients, images, blur, masks and other effects. Text supports mixed formatting, variable fonts, text styles, right-to-left scripts and system fonts.
     </td>
   </tr>
   <tr>
-    <td width="50%" valign="top">
-      <h3>Vectors without compromise</h3>
-      Real vector networks: the Pen and Pencil tools, vector edit mode with its own tools (pen that extends and branches paths, bend, paint bucket fills for any closed area, lasso, cut), point panel with handle mirroring and per-point corner radius, join, split and heal-on-delete, the shape builder (click or drag across the regions of overlapping shapes, strokes and open paths to merge them, Alt to remove them), boolean groups (union, subtract, intersect, exclude) whose operands stay editable on the canvas with the result following every drag, an operation per operand, flatten, outline stroke, arrowheads, dashes, per-side strokes and variable width strokes (width profile presets, and a Variable width tool that drags width points along the path, one side at a time with Alt). Rectangles with smooth (squircle) corners, polygons, stars, and arcs and rings shaped with on-canvas sweep, start and ratio handles or the Design panel's Arc fields.
-    </td>
-    <td width="50%" valign="top">
-      <h3>Paints and effects</h3>
-      Solid, linear, radial, angular and diamond gradients with on-canvas handles, image fills (fill, fit, crop, tile) with adjustments and presets, multiple fills and strokes, every blend mode, drop and inner shadows (spread offsets the outline exactly), layer and background blur (uniform or progressive), noise (mono, duo, multi), texture and glass (refraction, dispersion, frost, light), masks. Files are sRGB or Display P3, with exports tagged with the file's colour profile.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Type that sets beautifully</h3>
-      Text edited in place on the canvas (with inline IME composition), mixed styles within a paragraph, auto width and auto height, line height, letter and paragraph spacing, decoration, case, lists, OpenType features, variable font axes and text styles, right-to-left and mixed-direction text (Arabic, Hebrew) with the Unicode bidi algorithm, shaped with HarfRust and the open fonts from craft-fonts plus your system fonts.
-    </td>
     <td width="50%" valign="top">
       <h3>Prototype and hand off</h3>
-      Connections, triggers, actions and Smart Animate-style transitions, variables with conditionals (if / else if / else built in the interaction editor, expressions like <code>count + 1</code>), flows, a presentation view with device frames, hotspot hints and an Inspect panel, and a live preview pane. Alt to measure distances and padding on the canvas, Inspect mode with measurements, annotations in colour-coded categories, a ready-for-dev list with a focus view and Compare changes (before / after with property-level diffs since a frame was marked ready), and code (CSS, HTML, React, Leptos, SwiftUI, Compose) where components take their properties as parameters, comment threads pinned to frames (replies, @mentions, reactions, read state) and named version history. Export any layer at any scale to PNG, JPG, WebP, SVG or PDF.
+      Connect screens with triggers and transitions, use variables in interactions, preview flows, inspect measurements and annotations, and export layers as PNG, JPG, WebP, SVG or PDF. Handoff tools include a ready-for-dev list, change comparison and code views for CSS, HTML, React, Leptos, SwiftUI and Compose.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Motion</h3>
+      Arrange position, scale, rotation, opacity and size tracks on a shared timeline. Set keyframes, adjust timing and preview playback on the canvas. This is an early feature slice; a graph editor and video export are not included yet.
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>Motion</h3>
-      Compositions with their own size, frame rate and length; property tracks for position, scale, rotation, opacity and size, with keyframes that hold, move linearly or ease; a timeline docked under the canvas with a shared ruler and playhead, zoom, keyframe dragging with snapping and Delete; playback that previews on the canvas without changing the design. An early slice: no graph editor or video export yet.
+      <h3>Optional AI Agent</h3>
+      Connect your own OpenAI-compatible endpoint or Anthropic Messages API; its key stays in memory for the session. The Agent reads the current page and suggests edits, sends no request until you press Send, and applies nothing until you approve the proposal. There is no shared or default provider.
     </td>
     <td width="50%" valign="top">
-      <h3>Agent, with your own provider</h3>
-      An optional assistant tab that talks only to the provider you connect: an OpenAI-compatible endpoint or the Anthropic Messages API, with your key held in memory for the session. It reads the current page, proposes Design or Motion changes through the same commands as the menus, and nothing changes until you approve; the whole proposal is one undo step. No shared or default provider, and no request before you press Send.
+      <h3>Use your preferred workflow</h3>
+      The same commands power the graphical interface, command-line tools, scripts and JSON control channel. Local design work does not require an account or a network connection.
     </td>
   </tr>
 </table>
@@ -216,102 +207,80 @@ and exported at 2x by Undesign's own renderer. The source files are in
 
 ## Scriptable to the core
 
-Every menu item, tool and gesture runs a command from one registry of 400+ commands. The UI, the CLI and the JSON control channel all call the same commands, so anything you can click, a script can do too.
+Undesign routes interface actions through a shared command registry of 400+ operations. That lets the desktop UI, CLI and JSON control channel work against the same document model.
 
 ```sh
-# Headless: render and export
+# Render a document without opening the editor
 undesign-cli render landing.undesign -o landing.png --scale 2
 undesign-cli export landing.undesign -o out/ --format svg
 
-# Run a script of commands without a window
+# Apply a command script and save the result
 undesign-cli run build-card.json --out card.undesign
 
-# Every command, with its parameters
+# Find commands and their parameters
 undesign-cli commands --filter autoLayout
 ```
 
-The desktop app also offers a loopback-only control channel (`undesign --control <port>`) for inspecting UI state, driving tools with pointer and key events, and taking screenshots. See [`docs/control-protocol.md`](docs/control-protocol.md) and [`docs/cli.md`](docs/cli.md).
+The desktop build also has a loopback-only control channel for reading UI state, sending pointer or key events, and capturing screenshots. See [`docs/control-protocol.md`](docs/control-protocol.md) and [`docs/cli.md`](docs/cli.md).
 
 ## Under the hood
 
-- **Engine first:** a pure-data document model and a command engine, with a thin, swappable egui UI on top. Layering is checked at build time across the workspace crates (`cargo xtask layers`).
-- **Persistent data:** the document lives in an immutable ordered map, so undo snapshots are cheap and layout, component sync and text measurement only revisit what changed.
-- **Its own renderer:** tiny-skia on every core for the canvas and exports, with layer blending, effects and masks; booleans from linesweeper, geometry from kurbo, text from skrifa and HarfRust.
-- **Runs in the browser:** the whole engine and UI compile to WebAssembly.
-- **Accessible:** screen readers get names, roles, values and states for the tools, layer rows, fields, dropdowns, tabs and menus (AccessKit on desktop), F6 moves the keyboard between the toolbar, layers, canvas and properties (Tab within them, Escape back to the canvas), the system's reduce-motion setting is honoured, and panel text meets WCAG AA contrast in both themes.
-- **Languages:** English, Russian and Turkish (reviewed by native speakers), and Spanish, French, German, Brazilian Portuguese, Japanese, Korean, Simplified Chinese, Czech, Indonesian and Georgian drafts, picked in Preferences or taken from the system or browser and switched live; adding a language is one catalog file ([`docs/translating.md`](docs/translating.md)).
-- **Plugins:** sandboxed WebAssembly plugins (a metered, pure-Rust interpreter with a memory cap and no file or network access, in the browser too) that act through the same commands, each run one undo step, within the permissions their manifest asks for. A Rust SDK and three example plugins are in [`plugins/`](plugins); see [`docs/plugins.md`](docs/plugins.md).
-- **Live sessions (preview):** share the open file from the app (Share ▸ Start sharing: online through a server, or on your local network), give the others the short join code it shows (or the invite link), and edit it together: everyone's changes sync live, with cursors, selections, avatars and follow, and undo takes back only your own changes. Others join from the desktop app (invite links open it) or from the browser build. See [`docs/collab-protocol.md`](docs/collab-protocol.md).
-- **Never crashes:** no `unwrap`, `expect` or `panic` in shipped code, enforced by clippy; commands run behind a guard so a bug fails one action, not your session.
-- **Clean-room:** implemented from public documentation and observed behaviour only. No proprietary code, file formats, icons or images.
+- **Document engine:** a data-focused model and command layer sit beneath a replaceable egui interface; workspace layering is checked by `cargo xtask layers`.
+- **Incremental updates:** an immutable ordered map makes undo snapshots inexpensive and limits layout, component sync and text measurement to changed data.
+- **Rendering and text:** tiny-skia draws the canvas and exports; geometry, booleans and text use Rust libraries including kurbo, linesweeper, skrifa and HarfRust.
+- **Browser build:** the engine and interface compile to WebAssembly.
+- **Accessibility:** tools and controls expose names, roles and states to assistive technology; keyboard navigation, reduced-motion preferences and contrast are supported.
+- **Localization:** English, Russian and Turkish have native-speaker review; additional language drafts include Indonesian. Translation catalogs are documented in [`docs/translating.md`](docs/translating.md).
+- **Plugins:** sandboxed WebAssembly extensions run through the command layer with manifest permissions. The SDK and examples are in [`plugins/`](plugins); see [`docs/plugins.md`](docs/plugins.md).
+- **Live collaboration (preview):** invite collaborators to edit a shared file with synchronized changes, cursors and per-person undo. Review the connection and storage details in [`docs/collab-protocol.md`](docs/collab-protocol.md).
+- **Clean-room implementation:** the project is based on public documentation and observed behaviour, not copied proprietary source or file formats.
 
 ## Get started
+
+Build and test the desktop app with Rust:
 
 ```sh
 git clone https://github.com/palcchi/undesign
 cd undesign
-cargo run --release -p undesign            # the desktop app
-cargo test --workspace                     # the test suite
-cargo xtask ci                             # fmt, clippy, tests, layering and asset checks
+cargo run --release -p undesign            # launch the desktop editor
+cargo test --workspace                     # run the test suite
+cargo xtask ci                             # formatting, lint, tests and checks
 ```
 
-Fonts for the UI and the Text tool come from [craft-fonts](https://github.com/storytold/craft-fonts), cloned next to this repository (`../craft-fonts`); without it Undesign falls back to your system fonts.
+The UI and Text tool use fonts from [craft-fonts](https://github.com/storytold/craft-fonts), expected beside this repository at `../craft-fonts`. If they are absent, system fonts are used instead.
 
 ```sh
 git clone https://github.com/storytold/craft-fonts ../craft-fonts
 ```
 
-If you clone it after a first build, run `cargo clean -p undesign-text` once so the next build embeds the fonts.
+After adding the fonts to an already-built checkout, run `cargo clean -p undesign-text` before rebuilding so they are embedded.
 
-**Start from a template.** Eight starter files are built in code from original, synthetic content (a mobile app, a landing page, a dashboard, a design system starter, a wireframe kit, a launch announcement, presentation slides and an icon set starter): scripts open them with `template.list` and `file.newFromTemplate {template}`.
+Eight starter templates are generated by the app from synthetic content, including mobile, landing-page, dashboard, design-system, wireframe, announcement, presentation and icon-set starters. The web target can be built with [trunk](https://trunkrs.dev/) and `cargo xtask wasm`.
 
-For the web build, install [trunk](https://trunkrs.dev/) and run `cargo xtask wasm`.
-
-New contributors: start with [`AGENTS.md`](AGENTS.md), then [`docs/`](docs/).
-
-Installers for macOS (universal, signed and notarized), Windows (x64, x86 and arm64), Linux (AppImage, `.deb`, `.rpm`, Flatpak and tarball), FreeBSD and the web are attached to each [GitHub release](https://github.com/palcchi/undesign/releases). Maintainers: [`docs/releasing.md`](docs/releasing.md) explains how releases are built, signed and published.
+If you plan to contribute, read [`AGENTS.md`](AGENTS.md) and the material in [`docs/`](docs/) first. Installers for macOS, Windows, Linux, FreeBSD and web builds are attached to each [GitHub release](https://github.com/palcchi/undesign/releases); release steps are in [`docs/releasing.md`](docs/releasing.md).
 
 > [!IMPORTANT]
-> **Status:** Undesign is in **alpha**: about 49% of the way to replacing proprietary tools for real work, by our own estimate. Nearly all tracked interface design actions in the menu checklist are wired ([`docs/parity-checklist.md`](docs/parity-checklist.md)) and the core editor works end to end, but Undesign opens `.fig` files only best effort, has only a first preview of multiplayer (live sessions hosted from the app (the self-hosted server was removed 2026-10-30) with per-person undo and share links to edit or to view; no accounts, teams or cloud yet), runs its own WebAssembly plugins, and hasn't been checked against real design documents. The honest, area-by-area picture is in the [roadmap](ROADMAP.md) and [`docs/target-app-parity.md`](docs/target-app-parity.md). Expect rough edges and please file issues.
+> **Project status:** Undesign is an early alpha. Core editing workflows are implemented, but the browser links on this page are demonstrations built around sample files, not a guarantee of production readiness. `.fig` import is best-effort; live collaboration is a preview, with no accounts, teams or hosted cloud workspace; and the project has not been validated against real-world design documents. Check the [roadmap](ROADMAP.md), [`docs/parity-checklist.md`](docs/parity-checklist.md) and [`docs/target-app-parity.md`](docs/target-app-parity.md) for the current scope, and expect rough edges.
 
 ## Privacy and online sharing
 
-Undesign works offline: it has no account and no telemetry, and it contacts no server until you
-share or join a file. Live sessions are a **preview**. Before you share anything that matters,
-know what sharing does:
+The app can be used offline without an account or telemetry. It makes network requests when you join or share a file. Live collaboration is experimental, so understand the trade-offs before using it for anything sensitive:
 
-- **Share ▸ Online uploads the file to a server.** There is no built-in server (Undesign ships none
-  of its own): you enter a compatible server's address in Preferences. The file stays on
-  the server after you stop sharing, until you remove it (Share ▸ Advanced ▸ Remove from server…).
-- **It is not end-to-end encrypted.** The connection to the server is encrypted (TLS), but the
-  server stores the file unencrypted and whoever runs the server can read it. Don't share
-  confidential work through a server you don't trust; share on the local network instead.
-- **The code or link is the access.** There are no accounts: anyone who has an edit code or link
-  can open and change the file, anyone with a view code or link can open it. Stop sharing revokes
-  them and disconnects everyone else.
-- **Share ▸ Local network involves no server**, but it is not encrypted either: your app hosts
-  the session and others connect to it directly, so use it on networks you trust.
-- **No guarantees.** Keep your own saved copy of anything you share.
+- **Online sharing sends the document to a server.** Undesign does not ship its own hosted server; you configure a compatible server in Preferences. The file remains there after a session ends until it is removed with Share ▸ Advanced ▸ Remove from server…
+- **Server-side files are not end-to-end encrypted.** TLS protects the connection, but the server stores readable file contents. Use a server you trust, or choose local-network sharing instead.
+- **Invite codes grant access.** There are no accounts. Anyone holding an edit code or link can edit; a view code or link allows viewing. Stopping the session revokes access and disconnects others.
+- **Local-network sharing avoids a server but is not encrypted.** The host app serves the session directly, so only use it on networks you trust.
+- **Keep a separate copy.** The project makes no guarantee against loss; save your own copy before sharing.
 
 ---
 
 ## License and credits
 
-Undesign is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
-Required notices are in [NOTICE](NOTICE).
+You may use Undesign under either the [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE) license. See [NOTICE](NOTICE) for required notices.
 
-Undesign is a modification of the open-source FigCraft editor
-([brydanforge/figcraft](https://github.com/brydanforge/figcraft), MIT OR Apache-2.0,
-© 2026 ArtCraft Team and the FigCraft contributors). Every local change against the imported
-upstream revision is recorded in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
+Undesign builds on the open-source FigCraft editor ([brydanforge/figcraft](https://github.com/brydanforge/figcraft), MIT OR Apache-2.0, © 2026 ArtCraft Team and FigCraft contributors). Changes made locally against the imported upstream revision are listed in [`UNDESIGN-CHANGES.md`](UNDESIGN-CHANGES.md).
 
-The inherited UI glyph set is code-drawn and adapted from FigCraft; Undesign's U logo and app icon
-are original project artwork. By explicit project-owner approval, the code also includes monochrome
-copies of eight common Figma editor toolbar glyphs from the public Help Center toolbar reference.
-The licence for those specific glyphs is unconfirmed; no CC BY 4.0 claim is made. The screenshot is
-not included. See [ATTRIBUTION.md](ATTRIBUTION.md) for the scope and source caveat. Bundled fonts,
-images and other assets keep their applicable open licenses, with their authors and sources listed
-there.
+The inherited UI glyph set is code-drawn and adapted from FigCraft. The U logo and app icon are original project artwork. With project-owner approval, the code also includes monochrome copies of eight common Figma editor toolbar glyphs based on the public Help Center toolbar reference; their licence is unconfirmed, so no CC BY 4.0 claim is made. The screenshot is not included. See [ATTRIBUTION.md](ATTRIBUTION.md) for details. Bundled fonts, images and other assets retain their applicable licences, authors and source notes.
 
 ## Star history
 
