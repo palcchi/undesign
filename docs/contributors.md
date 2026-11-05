@@ -5,8 +5,8 @@ the AI models named in `Co-Authored-By` trailers. This follows the shared craftr
 [`standards/contributors.md`](https://github.com/storytold/craftrules/blob/main/standards/contributors.md);
 this page is the local copy of the decision.
 
-> Current state: the per-author table is empty (human-contributor data was removed 2026-10-30 and
-> not yet regenerated), and the Models credit is hand-maintained until the next script refresh.
+> Current state: both tables are empty (all contributor and model data was removed 2026-11-05).
+> About shows its empty-data notes until the next script refresh regenerates them.
 
 ## Decision
 
