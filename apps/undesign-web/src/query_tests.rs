@@ -32,7 +32,7 @@ fn an_overlong_link_is_ignored() {
 fn example_names_a_built_in_demo() {
     assert_eq!(example("?example=undesign-intro"), Some("undesign-intro"));
     assert_eq!(example("example=daybreak-motion-study"), Some("daybreak-motion-study"), "no leading ?");
-    assert_eq!(example("?webgl&example=ridgeline-app"), Some("ridgeline-app"), "after other entries");
+    assert_eq!(example("?webgl&example=profile-card-design"), Some("profile-card-design"), "after other entries");
     assert_eq!(example(""), None);
     assert_eq!(example("?example="), None);
     assert_eq!(example("?example=../secret"), None, "plain names only");

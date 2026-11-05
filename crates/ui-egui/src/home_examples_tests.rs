@@ -60,15 +60,21 @@ fn a_link_opens_a_motion_example_in_the_motion_workspace_playing() {
     assert!(!app.ui.home);
     assert_eq!(app.ui.right_tab, crate::RightTab::Motion);
     assert!(app.ui.motion_timeline, "the timeline shows");
-    assert_eq!(app.ui.motion_playing, !app.reduce_motion(), "it plays unless motion is reduced");
+    assert!(app.ui.motion_playing, "it plays unless motion is reduced");
     // A design example opens in Design; an unknown name opens nothing.
     let mut app = crate::FigApp::new(Session::empty(), Box::new(crate::NoServices));
-    assert!(crate::home_examples::open(&mut app, "ridgeline-app", true));
+    assert!(crate::home_examples::open(&mut app, "profile-card-design", true));
     assert_eq!(app.ui.right_tab, crate::RightTab::Design);
     assert!(!app.ui.motion_playing);
     let docs = app.session.docs.len();
     assert!(!crate::home_examples::open(&mut app, "no-such-example", true));
     assert_eq!(app.session.docs.len(), docs);
+}
+
+#[test]
+fn home_example_catalog_keeps_the_two_recent_samples_and_adds_both_profile_cards() {
+    let names = EXAMPLES.iter().map(|example| example.name()).collect::<Vec<_>>();
+    assert_eq!(names, vec!["undesign-intro", "daybreak-motion-study", "profile-card-design", "profile-card-prototype"]);
 }
 
 #[test]

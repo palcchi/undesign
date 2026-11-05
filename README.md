@@ -20,17 +20,19 @@
 <br>
 
 <p align="center">
-  <img src="docs/images/ui-editor.png" alt="Undesign in its dark theme with the Ridgeline app example: three phone screens on the canvas (Home in light mode with a Ready for dev badge, a trail detail page and Home in dark mode), the Featured trail card instance selected, the file name and layers on the left, and on the right the Share and zoom controls above the Design panel with the instance's properties, position, auto layout and appearance" width="100%">
-  <br><sub><b>Editor preview</b>: a sample Ridgeline file open in the browser showcase, with its layers and design controls visible · <code>examples/ridgeline-app.undesign</code></sub>
+  <img src="docs/images/profile-card-design.png" alt="Two creator profile cards side by side on a pale gray canvas: a white card with a green header and a full green card, both showing an illustrated avatar, profile name, rating, post and follower counts, Follow and save controls, and a Get in Touch button" width="100%">
+  <br><sub><b>Profile card design</b>: two editable treatments based on the supplied reference · <code>examples/profile-card-design.undesign</code></sub>
 </p>
 
 <p align="center">
   <b>Open a ready-to-explore sample in your browser:</b><br>
   <a href="https://palcchi.github.io/undesign/?example=undesign-intro"><b>▶ Motion demo</b></a> (plays the Undesign intro sample) ·
-  <a href="https://palcchi.github.io/undesign/?example=ridgeline-app"><b>Design demo</b></a> ·
-  <a href="https://palcchi.github.io/undesign/?example=ridgeline-onboarding"><b>Prototype demo</b></a> ·
+  <a href="https://palcchi.github.io/undesign/?example=profile-card-design"><b>Design demo</b></a> ·
+  <a href="https://palcchi.github.io/undesign/?example=profile-card-prototype"><b>Prototype demo</b></a> ·
+  <a href="prototype/profile-card/"><b>Standalone web prototype source</b></a> ·
   <a href="https://palcchi.github.io/undesign/">open the app</a> (choose any sample from Home ▸ Examples)
 </p>
+<p align="center"><sub>The profile-card browser links work once this branch is included in the published web build; the source files are available above and in <code>examples/</code>.</sub></p>
 
 <br>
 
@@ -46,7 +48,7 @@
 
 <br>
 
-<p>The images in this README are original project visuals. They show Undesign's interface and example designs; they are showcase material, while the linked browser sessions let you try the sample files yourself.</p>
+<p>The profile-card sample is an editable interpretation of the supplied reference; its name and statistics are illustrative sample content. The standalone HTML version is a separate, responsive page with working Follow and save controls and an on-page contact preview.</p>
 
 <table>
   <tr>
@@ -73,7 +75,7 @@
 
 ## A look around
 
-<p>These screenshots pair the editor with sample documents, so you can see what the browser examples are meant to demonstrate.</p>
+<p>The retained motion sample and the new three-state profile prototype show two of the workflows available in the app.</p>
 
 <table>
 <tr>
@@ -82,89 +84,28 @@
   <p align="center"><sub><b>Motion workspace</b>: preview an animated intro with property tracks and keyframes · <code>examples/undesign-intro.undesign</code></sub></p>
 </td>
 <td width="50%" valign="top">
-  <img src="docs/images/ui-home.png" alt="The Home screen: New design, New board, Import file and Join team buttons, a join-with-a-code field, the Getting started tips, and an Examples section with picture cards for Undesign intro, Daybreak motion study, Ridgeline app, Ridgeline onboarding, Ridgeline design system, Ridgeline Studio dashboard and Glass and vectors" width="100%">
-  <p align="center"><sub><b>Home screen</b>: start a file, import one, or make a copy of a built-in example</sub></p>
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/images/ui-prototype.png" alt="Four onboarding phone screens in the Prototype tab joined by connection curves; the Continue button on the second screen is selected and the Prototype panel shows its On click, Navigate to 3 Location interaction and its scroll behaviour" width="100%">
-  <p align="center"><sub><b>Prototype view</b>: connect screens and test an interaction flow · <code>examples/ridgeline-onboarding.undesign</code></sub></p>
-</td>
-<td width="50%" valign="top">
-  <img src="docs/images/ui-devmode.png" alt="Developer Mode on the Ridgeline home screen: a Ready for dev badge, a Development annotation callout on the trail card, red measurement lines from a selected trail row to its frame, and the Inspect panel listing the row's layout, auto layout, fills and effects" width="100%">
-  <p align="center"><sub><b>Developer Mode</b>: inspect measurements, annotations and implementation details in the sample · <code>examples/ridgeline-app.undesign</code></sub></p>
-</td>
-</tr>
-<tr>
-<td colspan="2" valign="top">
-  <img src="docs/images/ui-agent.png" alt="The Agent tab beside the onboarding screens: Design and Motion skills, a Provider switch set to Anthropic with the fixed Messages endpoint, empty Model ID and API key fields, notes that the key stays in memory for the session and that no request is sent until Send, and a Connect button" width="100%">
-  <p align="center"><sub><b>Optional Agent tab</b>: connect your own OpenAI-compatible or Anthropic provider; review each proposed change before it is applied</sub></p>
+  <img src="docs/images/profile-card-native-prototype.png" alt="Three green profile-card screens connected as a prototype flow: the default Follow state, the Following state, and a saved profile state, each with rating, post and follower counts and a Get in Touch button" width="100%">
+  <p align="center"><sub><b>Prototype flow</b>: Follow and save transitions connect three profile states · <code>examples/profile-card-prototype.undesign</code></sub></p>
 </td>
 </tr>
 </table>
 
 ## Examples
 
-The browser links below load built-in sample documents directly into the web app. Use **Home ▸ Examples** to open a fresh copy on desktop or web; your edits to that copy do not replace the bundled original. Motion examples open in the Motion workspace and start playing. The files are also listed in [`examples/`](examples).
+Each built-in example opens as a fresh copy; edits do not replace the bundled original. Motion examples open in the Motion workspace and start playing. The files are also listed in [`examples/`](examples). The new profile-card browser links need a public web build that includes this branch.
 
 | Sample file | Demo focus | Open in browser |
 |---|---|---|
 | [Undesign intro](examples/undesign-intro.undesign) | Animated logo and feature labels, arranged on a three-second timeline with 16 eased tracks | [Try the motion demo](https://palcchi.github.io/undesign/?example=undesign-intro) |
 | [Daybreak motion study](examples/daybreak-motion-study.undesign) | Weather-screen composition with translucent panels, a sun and forecast animation | [Try the motion demo](https://palcchi.github.io/undesign/?example=daybreak-motion-study) |
-| [Ridgeline app](examples/ridgeline-app.undesign) | Component-based mobile screens, light/dark colour variables and Dev Mode notes | [Try the design demo](https://palcchi.github.io/undesign/?example=ridgeline-app) |
-| [Ridgeline onboarding](examples/ridgeline-onboarding.undesign) | Linked screens, transitions, back actions and a navigable prototype flow | [Try the prototype demo](https://palcchi.github.io/undesign/?example=ridgeline-onboarding) |
-| [Ridgeline design system](examples/ridgeline-design-system.undesign) | Reusable component sets, variants and the Assets panel | [Open sample](https://palcchi.github.io/undesign/?example=ridgeline-design-system) |
-| [Ridgeline Studio dashboard](examples/ridgeline-studio-dashboard.undesign) | A 12-column dashboard layout with styles and charts drawn from shapes | [Open sample](https://palcchi.github.io/undesign/?example=ridgeline-studio-dashboard) |
-| [Glass and vectors](examples/glass-and-vectors.undesign) | Glass effects, editable boolean shapes and variable-width strokes | [Open sample](https://palcchi.github.io/undesign/?example=glass-and-vectors) |
+| [Profile card design](examples/profile-card-design.undesign) | Two editable creator-profile treatments, with white and green surfaces based on the supplied reference | [Try the Design demo](https://palcchi.github.io/undesign/?example=profile-card-design) |
+| [Profile card prototype](examples/profile-card-prototype.undesign) | Three linked profile states; Follow and save actions move between them | [Try the Prototype demo](https://palcchi.github.io/undesign/?example=profile-card-prototype) |
+
+The separate responsive website prototype is in [`prototype/profile-card/`](prototype/profile-card/). Its Follow and save controls toggle state; Get in Touch opens a local preview rather than sending a message.
 
 ## Made in Undesign
 
-The compositions below are sample outputs made with Undesign's command API and exported at 2× with its renderer. Their editable source files are in [`examples/`](examples).
-
-<p align="center">
-  <img src="docs/images/made-undesign-intro.png" alt="The Undesign intro frame: the green U mark beside the white Undesign wordmark on a near-black background, the line Design, prototype and animate interfaces. Open source, written in Rust., and four outlined chips reading Auto layout, Components, Motion timeline and Dev Mode" width="100%">
-  <br><sub><b>Undesign intro</b>: a still from the animated sample's final frame · <code>examples/undesign-intro.undesign</code></sub>
-</p>
-
-<table>
-<tr>
-<td width="33%" valign="top">
-  <img src="docs/images/art-app-home.png" alt="Ridgeline home screen in light mode: a greeting, a search field, filter chips, a featured trail card with an illustrated mountain landscape, a list of nearby trails and a translucent tab bar" width="100%">
-  <p align="center"><sub><b>Ridgeline home</b>: light theme</sub></p>
-</td>
-<td width="33%" valign="top">
-  <img src="docs/images/art-app-trail.png" alt="Ridgeline trail detail screen: a dusk mountain illustration with glass buttons, a sheet with difficulty tags, the trail name, distance, elevation and duration stats, an elevation profile chart and a Start hike button" width="100%">
-  <p align="center"><sub><b>Trail detail</b>: route information and elevation profile</sub></p>
-</td>
-<td width="33%" valign="top">
-  <img src="docs/images/art-app-home-dark.png" alt="The same Ridgeline home screen in dark mode, its colours switched by the Theme variable collection's Dark mode" width="100%">
-  <p align="center"><sub><b>Ridgeline home</b>: dark theme via a variable mode</sub></p>
-</td>
-</tr>
-<tr>
-<td colspan="3" valign="top">
-  <img src="docs/images/art-dashboard.png" alt="Ridgeline Studio dashboard: a dark navy sidebar with navigation, KPI cards for active hikers, check-ins, average rating and open incidents with sparklines, a hikes-per-day grouped bar chart with a tooltip, a difficulty donut chart, a top trails table with condition badges and a visitors area chart" width="100%">
-  <p align="center"><sub><b>Ridgeline Studio</b>: a dashboard assembled on a 12-column grid</sub></p>
-</td>
-</tr>
-<tr>
-<td colspan="2" valign="top">
-  <img src="docs/images/art-glass-weather.png" alt="A glass weather widget over blurred teal, violet, rose and orange colour fields: a frosted card for Lake Louise showing 14 degrees and partly cloudy with a gradient sun behind a boolean-union cloud, an hourly forecast row, and smaller glass cards for air quality, wind and humidity" width="100%">
-  <p align="center"><sub><b>Glass weather</b>: layered blur, frosted surfaces and vector shapes</sub></p>
-</td>
-<td width="33%" valign="top">
-  <img src="docs/images/art-vector-marks.png" alt="Three tiles on a cream background: a gradient mountain mark made by unioning two peaks and subtracting a sun, a knot of three excluded rings with an angular gradient, and a tapered gradient wave with a leaf and a glowing four-point star" width="100%">
-  <p align="center"><sub><b>Vector marks</b>: boolean operations, gradients and variable-width strokes</sub></p>
-</td>
-</tr>
-<tr>
-<td colspan="3" valign="top">
-  <img src="docs/images/art-ds-colour.png" alt="Ridgeline UI colour ramps: six swatches each of Pine greens, Sunset oranges and Slate greys, each labelled with its name and hex value" width="100%">
-  <p align="center"><sub><b>Ridgeline palette</b>: colour styles shown as reusable swatches</sub></p>
-</td>
-</tr>
-</table>
+The Profile card Design file is built from editable frames, text and vector shapes. The Prototype file connects three states through Follow and save interactions. Both use illustrative sample content and are available as `.undesign` files in [`examples/`](examples); the static website version is in [`prototype/profile-card/`](prototype/profile-card/).
 
 ## Features
 
