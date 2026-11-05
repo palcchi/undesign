@@ -135,11 +135,17 @@ The browser demo gives you a guided look at the editor. In the desktop app and w
   <tr>
     <td width="50%" valign="top">
       <h3>Optional AI Agent</h3>
-      Connect your own OpenAI-compatible endpoint or Anthropic Messages API; its key stays in memory for the session. The Agent reads the current page and suggests edits, sends no request until you press Send, and applies nothing until you approve the proposal. There is no shared or default provider.
+      On desktop, connect your own OpenAI-compatible endpoint or Anthropic Messages API; its key stays in memory for the session and no request is sent until you press Send. The browser demo instead connects to a shared relay, so no key is needed. The Agent reads the current page and applies nothing until you approve the proposal.
     </td>
     <td width="50%" valign="top">
       <h3>Use your preferred workflow</h3>
       The same commands power the graphical interface, command-line tools, scripts and JSON control channel. Local design work does not require an account or a network connection.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" valign="top">
+      <h3>Comment, chat and share</h3>
+      Pin comments to any layer and jump to their target from the thread. Keep a group chat in the file itself, with mentions and a composer in the Chat history; ask the Agent from chat with /agent and its answer lands as an anchored thread. Invite collaborators to a live session with shared cursors and per-person undo.
     </td>
   </tr>
 </table>
@@ -211,6 +217,7 @@ The app can be used offline without an account or telemetry. It makes network re
 - **Server-side files are not end-to-end encrypted.** TLS protects the connection, but the server stores readable file contents. Use a server you trust, or choose local-network sharing instead.
 - **Invite codes grant access.** There are no accounts. Anyone holding an edit code or link can edit; a view code or link allows viewing. Stopping the session revokes access and disconnects others.
 - **Local-network sharing avoids a server but is not encrypted.** The host app serves the session directly, so only use it on networks you trust.
+- **Agent requests send data to a provider.** A turn sends your prompt plus the current page context. On desktop the provider is yours; the browser demo uses a shared relay within fixed quotas, which forwards requests and keeps only quota counters — prompts, documents and comments are never stored.
 - **Keep a separate copy.** The project makes no guarantee against loss; save your own copy before sharing.
 
 ---
