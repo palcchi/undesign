@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { isIP } from 'node:net';
 import { requestHeader, sendError, sendJson, type Environment } from './http.js';
-import { createMetaAdapter, type MetaAdapter, type MetaPayload } from './meta.js';
+import { createMetaAdapter, META_MODEL_ID, type MetaAdapter, type MetaPayload } from './meta.js';
 import { createSupabaseUsageStore } from './supabase-usage-store.js';
 import { createIpHasher, createMemoryUsageStore, type UsageStore } from './usage-store.js';
 import { isDurableQuotaConfigured, relayConfigurationReady, requestHasSessionAndCsrf, requestHasOrigin } from './security.js';
@@ -11,7 +11,6 @@ const DEFAULT_RATE_LIMIT = 6;
 const DEFAULT_DAILY_BUDGET = 100;
 const MAX_BODY_BYTES = 128 * 1024;
 const MAX_MESSAGE_CHARS = 48_000;
-const MAX_USER_KEY_CHARS = 4_096;
 const MAX_UPSTREAM_BYTES = 1_000_000;
 const UPSTREAM_TIMEOUT_MS = 20_000;
 
@@ -23,13 +22,6 @@ class RequestProblem extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function envPositiveInt(value: string | undefined, fallback: number, max = 1_000_000): number {
-  if (!value || !/^\d+$/.test(value.trim())) return fallback;
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < 1) return fallback;
-  return Math.min(parsed, max);
 }
 
 function boundedString(value: unknown, max: number): value is string {
@@ -110,7 +102,7 @@ function validateMessages(value: unknown): void {
   }
 }
 
-function validatePayload(body: unknown, env: Environment): MetaPayload {
+function validatePayload(body: unknown): MetaPayload {
   if (!isRecord(body)) throw new RequestProblem(400, 'INVALID_BODY', 'Request body must be a JSON object.');
   const allowedFields = new Set([
     'model', 'messages', 'tools', 'tool_choice', 'stream', 'response_format',
@@ -119,8 +111,8 @@ function validatePayload(body: unknown, env: Environment): MetaPayload {
   if (Object.keys(body).some((field) => !allowedFields.has(field))) {
     throw new RequestProblem(400, 'UNSUPPORTED_FIELD', 'Request contains an unsupported field.');
   }
-  if (!boundedString(body.model, 200) || body.model.trim().length === 0) {
-    throw new RequestProblem(400, 'INVALID_MODEL', 'model must be a nonempty user-selected model ID.');
+  if (body.model !== META_MODEL_ID) {
+    throw new RequestProblem(400, 'MODEL_NOT_ALLOWED', 'This relay uses its configured Muse model.');
   }
   validateMessages(body.messages);
   if (body.stream !== undefined && body.stream !== false) {
@@ -136,8 +128,10 @@ function validatePayload(body: unknown, env: Environment): MetaPayload {
   }
   if (body.response_format !== undefined) validateResponseFormat(body.response_format);
 
-  const payload: MetaPayload = { ...body };
-  const maxCap = envPositiveInt(env.MAX_COMPLETION_TOKENS, DEFAULT_MAX_TOKENS, 131_072);
+  const payload: MetaPayload = { ...body, model: META_MODEL_ID };
+  const maxCap = DEFAULT_MAX_TOKENS;
+  if (body.max_tokens === undefined && body.max_completion_tokens === undefined) payload.max_tokens = DEFAULT_MAX_TOKENS;
+  payload.n = 1;
   for (const tokenField of ['max_tokens', 'max_completion_tokens']) {
     const value = body[tokenField];
     if (value !== undefined) {
@@ -154,8 +148,8 @@ function validatePayload(body: unknown, env: Environment): MetaPayload {
       payload[field] = Math.min(high, Math.max(low, value));
     }
   }
-  if (body.n !== undefined && (typeof body.n !== 'number' || !Number.isSafeInteger(body.n) || body.n < 1 || body.n > 4)) {
-    throw new RequestProblem(400, 'INVALID_N', 'n must be an integer from 1 to 4.');
+  if (body.n !== undefined && body.n !== 1) {
+    throw new RequestProblem(400, 'INVALID_N', 'n must be 1 so the output-token limit applies per request.');
   }
   const stopValid = boundedString(body.stop, 512)
     || (Array.isArray(body.stop) && body.stop.length <= 4 && body.stop.every((item) => boundedString(item, 512)));
@@ -173,11 +167,8 @@ function clientIp(req: IncomingMessage): string {
   return req.socket.remoteAddress ?? 'unknown';
 }
 
-function usageLimits(env: Environment): { perIpPerMinute: number; globalPerDay: number } {
-  return {
-    perIpPerMinute: envPositiveInt(env.RATE_LIMIT_PER_MIN, DEFAULT_RATE_LIMIT),
-    globalPerDay: envPositiveInt(env.DAILY_BUDGET_REQUESTS, DEFAULT_DAILY_BUDGET),
-  };
+function usageLimits(): { perIpPerMinute: number; globalPerDay: number } {
+  return { perIpPerMinute: DEFAULT_RATE_LIMIT, globalPerDay: DEFAULT_DAILY_BUDGET };
 }
 
 function errorForQuota(reason: 'RATE_LIMITED' | 'DAILY_BUDGET_EXCEEDED'): { retryAfter: string; message: string } {
@@ -223,11 +214,6 @@ export function createAgentHandler(options: AgentHandlerOptions = {}) {
       return;
     }
 
-    const suppliedKey = requestHeader(req, 'x-user-key');
-    if (!suppliedKey || suppliedKey.trim().length === 0 || suppliedKey.length > MAX_USER_KEY_CHARS) {
-      sendError(res, 401, 'USER_KEY_REQUIRED', 'Provide a nonempty X-User-Key for this request.');
-      return;
-    }
     if (!requestHasSessionAndCsrf(req, env)) {
       sendError(res, 403, 'SESSION_OR_CSRF_INVALID', 'A valid browser session and CSRF token are required.');
       return;
@@ -236,7 +222,7 @@ export function createAgentHandler(options: AgentHandlerOptions = {}) {
     try {
       let quota;
       try {
-        quota = await usageStore.reserveRequest(hashIp(clientIp(req)), Date.now(), usageLimits(env));
+        quota = await usageStore.reserveRequest(hashIp(clientIp(req)), Date.now(), usageLimits());
       } catch {
         sendError(res, 503, 'QUOTA_STORE_UNAVAILABLE', 'The request quota service is temporarily unavailable.');
         return;
@@ -257,11 +243,12 @@ export function createAgentHandler(options: AgentHandlerOptions = {}) {
       let parsed: unknown;
       try { parsed = JSON.parse(rawBody); }
       catch { throw new RequestProblem(400, 'INVALID_JSON', 'Request body must contain valid JSON.'); }
-      const payload = validatePayload(parsed, env);
+      const payload = validatePayload(parsed);
 
       let upstream: Response;
       try {
-        upstream = await adapter(payload, suppliedKey.trim(), AbortSignal.timeout(timeoutMs));
+        if (!adapter) throw new Error('server provider key is unavailable');
+        upstream = await adapter(payload, AbortSignal.timeout(timeoutMs));
       } catch {
         sendError(res, 503, 'UPSTREAM_ERROR', 'The model service is temporarily unavailable.');
         return;
@@ -275,6 +262,9 @@ export function createAgentHandler(options: AgentHandlerOptions = {}) {
         const text = await readResponseWithLimit(upstream, MAX_UPSTREAM_BYTES);
         const responseBody: unknown = JSON.parse(text);
         if (!isRecord(responseBody)) throw new Error('invalid response');
+        if (Array.isArray(responseBody.choices) && responseBody.choices.length > 1) throw new Error('provider returned multiple completions');
+        if (isRecord(responseBody.usage) && typeof responseBody.usage.completion_tokens === 'number'
+          && responseBody.usage.completion_tokens > DEFAULT_MAX_TOKENS) throw new Error('provider exceeded output-token limit');
         sendJson(res, 200, responseBody);
       } catch {
         sendError(res, 503, 'UPSTREAM_ERROR', 'The model service is temporarily unavailable.');

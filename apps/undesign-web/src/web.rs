@@ -224,7 +224,9 @@ impl Services for WebServices {
         if config.endpoint() != undesign_ui_egui::agent_provider::META_RELAY_ENDPOINT {
             return Err("The browser relay uses a fixed Meta API endpoint.".to_string());
         }
-        undesign_ui_egui::agent_provider::validate_model_id(config.model())?;
+        if config.model() != undesign_ui_egui::agent_provider::META_RELAY_MODEL_ID {
+            return Err("The browser relay uses its configured Muse model.".to_string());
+        }
         self.agent_provider = Some(config);
         Ok(())
     }
@@ -236,7 +238,7 @@ impl Services for WebServices {
     fn request_agent_completion(&mut self, request: Value) -> Result<undesign_ui_egui::agent_provider::AgentProviderTask, String> {
         use undesign_ui_egui::agent_provider::{AgentProviderTask, MAX_PROVIDER_REQUEST_BYTES};
 
-        let config = self.agent_provider.as_ref().ok_or_else(|| "Connect your own Meta API key before sending.".to_string())?;
+        let config = self.agent_provider.as_ref().ok_or_else(|| "Connect the server-hosted Muse relay before sending.".to_string())?;
         if request.get("model").and_then(Value::as_str) != Some(config.model()) {
             return Err("The request model does not match the connected Meta model ID.".to_string());
         }
@@ -244,10 +246,9 @@ impl Services for WebServices {
         if body.len() > MAX_PROVIDER_REQUEST_BYTES {
             return Err("The chat and current-page context exceed the relay request limit.".to_string());
         }
-        let secret = config.duplicate_secret_for_request();
         let (sender, receiver) = std::sync::mpsc::channel();
         wasm_bindgen_futures::spawn_local(async move {
-            let result = browser_relay_completion(body, secret).await;
+            let result = browser_relay_completion(body).await;
             let _ = sender.send(result);
         });
         Ok(AgentProviderTask::new(receiver))
@@ -255,13 +256,9 @@ impl Services for WebServices {
 }
 
 #[cfg(feature = "agent-relay")]
-async fn browser_relay_completion(
-    body: String,
-    secret: undesign_ui_egui::agent_provider::AgentSecret,
-) -> Result<undesign_ui_egui::agent_provider::AgentProviderReply, String> {
+async fn browser_relay_completion(body: String) -> Result<undesign_ui_egui::agent_provider::AgentProviderReply, String> {
     use undesign_ui_egui::agent_provider::{MAX_PROVIDER_RESPONSE_BYTES, parse_openai_response};
     use wasm_bindgen_futures::JsFuture;
-    use zeroize::Zeroizing;
 
     let window = web_sys::window().ok_or_else(|| "The browser relay is unavailable.".to_string())?;
     let session_init = web_sys::RequestInit::new();
@@ -293,12 +290,10 @@ async fn browser_relay_completion(
         .filter(|token| !token.is_empty() && token.len() <= 4096)
         .ok_or_else(|| "The secure relay returned an invalid session token.".to_string())?;
 
-    let key = Zeroizing::new(String::from_utf8(secret.expose_bytes().to_vec()).map_err(|_| "The API key is invalid.".to_string())?);
     let headers = web_sys::Headers::new().map_err(|_| "Could not prepare the secure relay request.".to_string())?;
     headers
         .set("Content-Type", "application/json")
         .and_then(|_| headers.set("X-CSRF-Token", csrf_token))
-        .and_then(|_| headers.set("X-User-Key", key.as_str()))
         .map_err(|_| "Could not prepare the secure relay request.".to_string())?;
     let agent_init = web_sys::RequestInit::new();
     agent_init.set_method("POST");
@@ -309,18 +304,14 @@ async fn browser_relay_completion(
     let agent_request = match web_sys::Request::new_with_str_and_init("/api/agent", &agent_init) {
         Ok(request) => request,
         Err(_) => {
-            let _ = headers.delete("X-User-Key");
             let _ = headers.delete("X-CSRF-Token");
             return Err("Could not prepare the secure relay request.".to_string());
         }
     };
     let response_result = JsFuture::from(window.fetch_with_request(&agent_request)).await;
     // Headers are copied into Request by the web platform; clear both JS header maps promptly.
-    let _ = headers.delete("X-User-Key");
-    let _ = agent_request.headers().delete("X-User-Key");
     let _ = headers.delete("X-CSRF-Token");
     let _ = agent_request.headers().delete("X-CSRF-Token");
-    drop(key);
     let response = response_result
         .map_err(|_| "The secure relay request failed.".to_string())?
         .dyn_into::<web_sys::Response>()

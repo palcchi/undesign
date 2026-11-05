@@ -2,15 +2,14 @@
 
 Satu proyek showcase untuk situs, API Agent, dan bundle WebAssembly Undesign. Halaman situs berbahasa Inggris untuk juri internasional; panduan ini berbahasa Indonesia. Client browser berada di `apps/undesign-web` pada repo Undesign dan memakai relay hanya jika feature opt-in diaktifkan.
 
-## Isi dan perilaku
+## Perilaku demo Agent
 
-- `/` adalah halaman showcase responsif dengan demo video opsional (`public/demo.mp4`), fitur Design/Motion/Agent, panduan juri, privasi, dan kredit FigCraft.
-- `/app/` adalah shell aplikasi yang memuat runtime WebAssembly jika bundle Trunk yang asli telah dipasang. Tanpa bundle, halaman menampilkan shell uji statis yang diberi label jelas—bukan aplikasi Rust. Di layar kecil, halaman menyarankan penggunaan desktop.
-- `POST /api/session` menerbitkan atau memperbarui sesi browser anonim bertanda tangan tanpa database sesi, identitas akun, atau penyimpanan browser. Cookie sesi bersifat `HttpOnly` dan `SameSite=Strict`; token CSRF berumur pendek dikembalikan di respons.
-- `POST /api/agent` hanya menerima permintaan dengan sesi, token CSRF, origin yang persis cocok, dan `X-User-Key` BYO nonkosong. Tidak ada kunci provider bersama atau default di server. Semua pemanggilan, termasuk BYO, melewati kuota.
-- Relay hanya mendukung Meta pada endpoint tetap `https://api.meta.ai/v1/chat/completions`. Model dikirim sesuai ID yang dipilih pengguna. Payload Chat Completions mendukung riwayat pesan `system`/`user`/`assistant`/`tool`, `tool_calls`, `tools`, `tool_choice`, serta `stream: false`; `response_format` bersifat opsional.
-- `GET /api/health` hanya mengembalikan boolean kesiapan, tanpa nilai rahasia, model, atau key.
-- Konten dan tautan situs dipusatkan di `showcase/content.json`. Tes berada di `tests/` dan tidak dimasukkan ke bundle produksi.
+- Pengunjung dapat mencoba demo tanpa login dan tanpa memasukkan API key. Browser mengirim prompt/percakapan serta konteks halaman aktif hanya ketika pengguna menjalankan aksi Agent.
+- Relay menggunakan satu provider key server-side dari `META_API_KEY`, dan mengunci endpoint ke `https://api.meta.ai/v1/chat/completions` serta model **Muse Spark 1.3 Contributor** (`muse-spark-1.3`). Provider key tidak dikirim ke browser, request body, Supabase, log, atau source code.
+- Batas relay ditetapkan di kode: **6 request per IP per menit**, **100 request global per hari UTC**, dan **maksimum 2.000 output token per request**. Setiap request hanya menghasilkan satu completion.
+- Relay meneruskan request ke provider dan tidak menyimpan prompt, percakapan, snapshot dokumen, atau komentar. Supabase hanya menerima HMAC IP dan counter kuota agregat per-IP/global; tidak ada cloud-project/comment storage atau sharing.
+- Sesi anonim bertanda tangan dan token CSRF melindungi endpoint same-origin. Keduanya bukan akun/login dan tidak membuat identitas per-user.
+- Native builds tetap memakai konfigurasi provider/key milik pengguna. Perubahan key server-side ini hanya untuk relay web Showcase.
 
 ## Jalankan dan uji lokal
 
@@ -24,61 +23,46 @@ npm run build
 npm run preview
 ```
 
-Buka `http://127.0.0.1:4173/` setelah build untuk memeriksa hasil produksi frontend. `npm test` hanya menggunakan upstream, DNS, sesi, dan kuota tiruan lokal; tes tidak membuat panggilan jaringan ke Meta, Supabase, atau Vercel dan tidak memerlukan kredensial. Server Vite hanya menyajikan frontend, bukan fungsi API. Pengembangan lokal API dapat memakai server fungsi lokal yang sesuai, tetapi konfigurasi loopback lokal tidak boleh dipakai untuk produksi.
+Buka `http://127.0.0.1:4173/` setelah build untuk memeriksa hasil produksi frontend. `npm test` memakai upstream, DNS, sesi, dan kuota tiruan lokal; tes tidak membuat panggilan provider nyata dan tidak memerlukan kredensial. Server Vite hanya menyajikan frontend, bukan fungsi API. Jangan menaruh key provider nyata dalam file yang terlacak Git.
 
-**Relay ini belum dideploy. Tidak ada deployment, kredensial provider sungguhan, atau panggilan jaringan eksternal yang digunakan dalam tugas pengembangan ini.** Contoh environment hanya berisi placeholder.
+## Konfigurasi server
 
-## Keamanan dan konfigurasi server
-
-Salin nama variabel dari `.env.example` ke pengaturan environment server yang terlindungi. Semua nilainya adalah placeholder. Jangan commit rahasia, memasukkan key ke frontend atau `content.json`, atau menyediakan provider key di sisi server.
-
-Produksi harus menggunakan HTTPS dan mengisi semua hal berikut; bila tidak, endpoint sesi/agent gagal tertutup:
+Salin nama variabel dari `.env.example` ke pengaturan environment server yang terlindungi. Nilai contoh hanya placeholder. Jangan commit rahasia atau memberi prefix `VITE_` pada provider key.
 
 | Variabel | Fungsi dan syarat |
 | --- | --- |
-| `PUBLIC_ORIGIN` | Satu origin kanonis HTTPS, misalnya `https://showcase.example`; origin permintaan harus sama persis. Tidak ada allow-list CORS atau refleksi origin. |
-| `SESSION_SECRET` | Rahasia acak kuat minimal 32 byte untuk tanda tangan sesi dan CSRF. |
-| `IP_HASH_SECRET` | Rahasia acak minimal 32 byte yang **berbeda** dari `SESSION_SECRET`; hanya HMAC IP yang dipakai pada kuota, bukan IP mentah. |
-| `SUPABASE_URL` dan `SUPABASE_SECRET_KEY` | URL proyek dan Supabase Secret API Key berformat `sb_secret_...` untuk kuota persisten. Simpan key hanya di environment server. Kuota memori lokal tidak pernah menjadi fallback produksi. |
-| `RATE_LIMIT_PER_MIN` | Batas permintaan per IP-hash per menit; default 6. Berlaku sama untuk setiap key BYO. |
-| `DAILY_BUDGET_REQUESTS` | Batas global per hari UTC; default 100 dan berlaku untuk semua panggilan. |
-| `MAX_COMPLETION_TOKENS` | Batas atas token keluaran jika payload memilikinya; default 2000. Model tidak ditetapkan oleh server. |
+| `PUBLIC_ORIGIN` | Satu origin kanonis HTTPS; origin permintaan harus sama persis. |
+| `SESSION_SECRET` | Rahasia acak kuat minimal 32 byte untuk sesi anonim dan CSRF. |
+| `IP_HASH_SECRET` | Rahasia acak minimal 32 byte yang berbeda dari `SESSION_SECRET`; hanya HMAC IP yang disimpan. |
+| `META_API_KEY` | Provider key untuk relay. Simpan hanya di environment server; jangan expose ke browser, database, log, atau source code. |
+| `SUPABASE_URL` | URL HTTPS proyek Supabase yang menyimpan counter kuota. |
+| `SUPABASE_SECRET_KEY` | Secret API Key `sb_secret_...` untuk RPC kuota dari server. Simpan hanya di environment server. |
 
-Di Supabase, buka **Settings > API Keys** dan salin Secret API Key yang diawali `sb_secret_`. Isi `SUPABASE_URL` dan `SUPABASE_SECRET_KEY` di environment server. Kode mengirim Secret API Key hanya melalui header `apikey`, bukan `Authorization: Bearer`, karena key baru bukan JWT. Key ini memberi akses backend dengan role Postgres `service_role`, jadi grant pada migrasi tetap berlaku. Supabase menjadwalkan deprecasi key legacy `service_role` pada akhir 2026; aplikasi ini hanya membaca `SUPABASE_SECRET_KEY` dan tidak beralih ke key legacy ([panduan API keys](https://supabase.com/docs/guides/api/api-keys), [panduan migrasi](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys)).
+Kode menetapkan model dan semua batas di atas; tidak ada environment setting untuk menaikkan limit. Produksi gagal tertutup bila key provider, konfigurasi sesi, origin, atau penyimpanan kuota durable tidak tersedia.
 
-Cookie sesi produksi memakai atribut `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, dan masa berlaku terbatas. CSRF dikaitkan secara kriptografis dengan sesi dan memiliki masa berlaku lebih pendek. Klien harus mengirim token respons sesi pada header `X-CSRF-Token` di setiap panggilan agent. Cookie bukan identitas akun dan tidak disimpan dalam local/session storage.
+Di Supabase, migrasi `supabase/migrations/0001_usage_counters.sql` membuat counter IP per menit dan global per hari serta RPC reservasi atomik. Jalankan migrasi tersebut pada proyek target jika belum pernah diterapkan. Tabel menolak akses publik lewat RLS; hanya fungsi server dengan Secret API Key mengakses RPC. Tidak diperlukan Supabase Auth atau tabel kuota per-user.
 
-Agent selalu memerlukan `X-User-Key` yang dikirim untuk permintaan saat itu. Key tidak dicatat atau dikembalikan dan tidak pernah jatuh kembali ke kredensial server. Pastikan log reverse proxy, APM, atau observability Anda juga tidak merekam header sensitif. Upstream dikunci ke host/path Meta, DNS harus menghasilkan alamat publik saja, koneksi HTTPS dipatok ke IP yang divalidasi sambil mempertahankan verifikasi sertifikat untuk nama host, redirect ditolak, serta waktu dan ukuran request/response dibatasi. Error provider dan detail internal disanitasi.
-
-Jalankan `supabase/migrations/0001_usage_counters.sql` pada proyek pilihan sebelum produksi. Tabel menyimpan hash IP ber-HMAC untuk bucket menit dan counter harian global; IP mentah tidak disimpan. Fungsi RPC mereservasi kuota secara atomik. RLS aktif dan akses publik ditolak. Validasi lokal boleh memakai store memori, tetapi konfigurasi produksi wajib memakai store persisten yang tersedia; jika kuota tak dapat direservasi, permintaan gagal tertutup.
-
-Health endpoint hanya mengungkap status kesiapan boolean. Status `ok: false` berarti konfigurasi belum memenuhi persyaratan; health tidak mengungkap rahasia atau nilai model/key.
+Relay memakai sesi `HttpOnly`, `SameSite=Strict`, CSRF, pemeriksaan origin persis, HMAC IP, validasi body, dan endpoint provider tetap. DNS hanya boleh menghasilkan alamat publik; koneksi HTTPS dipatok ke IP tervalidasi sambil memeriksa hostname TLS, redirect ditolak, dan waktu/ukuran request-response dibatasi. Error provider dan detail internal disanitasi. `GET /api/health` hanya mengungkap status kesiapan boolean.
 
 ## Pasang bundle WebAssembly Trunk
 
-Build WebAssembly dari checkout Undesign. Feature `agent-relay` mati secara default; tanpa feature itu, pengaturan provider browser tetap dinonaktifkan. Aktifkan feature hanya untuk Showcase yang API relay-nya telah dikonfigurasi dan memenuhi semua syarat produksi di atas. Di lingkungan yang memiliki Rust, target `wasm32-unknown-unknown`, dan Trunk:
+Build WebAssembly dari checkout Undesign. Feature `agent-relay` mati secara default; tanpa feature itu, pengaturan provider browser tetap dinonaktifkan. Aktifkan feature hanya untuk Showcase yang relay-nya dikonfigurasi:
 
 ```sh
 cd /path/to/undesign/apps/undesign-web
 trunk build --release --features agent-relay --public-url /app/
 ```
 
-Konfigurasi Trunk repo menulis hasil ke `/path/to/undesign/dist/web/`. Dari root paket showcase ini, pasang hasil build asli dengan installer agar entrypoint `/app/runtime.html` dan penanda runtime dibuat dengan benar:
+Konfigurasi Trunk repo menulis hasil ke `/path/to/undesign/dist/web/`. Dari root paket Showcase, pasang hasil build asli:
 
 ```sh
 npm run install:wasm -- /path/to/undesign/dist/web
 ```
 
-Installer menyalin aset hasil build ke `public/app/`. Jangan membuat sendiri `runtime.html` atau file Trunk tiruan. Setelah memasang bundle, jalankan ulang `npm run build`. Jika build Trunk gagal atau belum dilakukan, shell uji tetap diberi label dan bukan runtime Rust.
+Installer menyalin aset hasil build ke `public/app/`. Jangan membuat sendiri `runtime.html` atau file Trunk tiruan. Setelah bundle terpasang, jalankan ulang `npm run build`. Jika build Trunk belum dilakukan, shell uji tetap diberi label dan bukan runtime Rust.
 
 ## Vercel
 
-Paket ini dapat dijadikan proyek Vercel dengan **Root Directory = `showcase`**, Node.js 22, build command `npm run build`, dan output direktori `dist`. Fungsi Node berasal dari `api/`; `vercel.json` mengatur MIME `application/wasm`, cache aset ber-hash, SPA fallback, serta header keamanan/CSP. Di Vercel, tambahkan `SUPABASE_URL` dan `SUPABASE_SECRET_KEY` pada **Project Settings > Environment Variables** untuk Production, bersama variabel produksi lain pada tabel di atas. Ambil Secret API Key `sb_secret_...` dari pengaturan API Keys proyek Supabase; jangan isi `SUPABASE_SERVICE_ROLE_KEY` atau masukkan key ke source code. Setelah mengatur environment, deploy proyek. Paket/relay ini **belum dideploy** dan perilaku Vercel pada deployment nyata belum diverifikasi.
+Paket ini dapat dijadikan proyek Vercel dengan **Root Directory = `showcase`**, Node.js 22, build command `npm run build`, dan output direktori `dist`. Fungsi Node berasal dari `api/`; `vercel.json` mengatur MIME `application/wasm`, cache aset ber-hash, SPA fallback, serta header keamanan/CSP. Untuk Production, atur `META_API_KEY`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SESSION_SECRET`, `IP_HASH_SECRET`, dan `PUBLIC_ORIGIN` di Project Settings > Environment Variables. Pastikan migrasi kuota pertama sudah diterapkan; tidak ada login pengunjung yang diperlukan.
 
-Video demo bersifat opsional: letakkan file yang disediakan pemilik sebagai `public/demo.mp4`. Jika file belum ada, halaman menampilkan keadaan kosong yang dirancang tanpa menggagalkan build.
-
-## Batasan yang belum diverifikasi
-
-Feature browser `agent-relay` bersifat opt-in dan hanya mendukung endpoint Meta tetap; model dan API key harus diberikan pengguna. Native builds tetap memakai endpoint OpenAI-compatible yang pengguna konfigurasi sendiri. Client browser meminta sesi anonim same-origin dan baru mengirim prompt, konteks halaman aktif, serta key BYO saat pengguna menekan Send. Tidak ada koneksi provider pada Connect, dan key tidak disimpan di browser storage.
-
-Kode/tes lokal memverifikasi integrasi client/proxy dan batas keamanan, tetapi relay ini belum dideploy. Konfigurasi environment produksi, migrasi pada proyek Supabase nyata, konektivitas endpoint Meta, kuota akun provider, serta perilaku Vercel setelah deployment belum diverifikasi. Tidak ada layanan eksternal atau kredensial sungguhan yang dipakai dalam pengujian lokal.
+Video demo opsional berada di `public/demo.mp4`. Jika file belum ada, halaman menampilkan keadaan kosong tanpa menggagalkan build.

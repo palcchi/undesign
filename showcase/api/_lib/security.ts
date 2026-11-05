@@ -57,6 +57,7 @@ export function readiness(env: Environment, durableQuotaAvailable = isDurableQuo
   const secret = sessionSecret(env);
   const origin = configuredPublicOrigin(env);
   const hashSecret = env.IP_HASH_SECRET?.trim();
+  const providerKey = env.META_API_KEY?.trim();
   return {
     sessionReady: Boolean(secret && (!prod || strongSecret(env.SESSION_SECRET))),
     originReady: Boolean(origin && (!prod || origin.startsWith('https://')))
@@ -67,7 +68,7 @@ export function readiness(env: Environment, durableQuotaAvailable = isDurableQuo
       : (!hashSecret || (Buffer.byteLength(hashSecret, 'utf8') >= MIN_SECRET_BYTES
         && hashSecret !== env.SESSION_SECRET?.trim())),
     quotaReady: prod ? durableQuotaAvailable : true,
-    upstreamReady: true,
+    upstreamReady: Boolean(providerKey && providerKey.length <= 4_096 && !/\s/.test(providerKey)),
   };
 }
 

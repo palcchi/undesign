@@ -335,3 +335,13 @@ upstream revision so future syncs stay auditable.
   Chat history.
 - `crates/ui-egui/locales/en.toml`: seven new UI strings.
 - Docs: `ROADMAP.md`, `docs/collaboration-parity.md`.
+
+## 2026-11-05: Guest Agent relay adopted (change #23)
+
+- Relay and Agent files taken from `origin/work/agent-user-quota-2026-11-05` at `600cea7`
+  (unrelated history; content adoption, no merge): the public guest relay (server-side
+  `META_API_KEY`, fixed model `muse-spark-1.3`, 6 requests/IP/minute, 100/day globally,
+  2,000 output tokens, `n = 1`), one-click browser Connect with no client key, native BYOK
+  unchanged. `en.toml` keeps the seven group-chat strings on top. Tests: showcase 32/32.
+- `crates/ui-egui/src/windows_tests.rs`: the unsaved-changes test clears its last frame's
+  texture deltas (test-only fix for an intermittent epaint panic on drop).
