@@ -4,12 +4,13 @@ import { isIP } from 'node:net';
 import type { Environment } from './http.js';
 
 export const META_ENDPOINT = 'https://api.meta.ai/v1/chat/completions';
+export const META_MODEL_ID = 'muse-spark-1.3';
 const META_HOST = 'api.meta.ai';
 const MAX_UPSTREAM_BYTES = 1_000_000;
 const UPSTREAM_TIMEOUT_MS = 20_000;
 
 export type MetaPayload = Record<string, unknown>;
-export type MetaAdapter = (payload: MetaPayload, apiKey: string, signal: AbortSignal) => Promise<Response>;
+export type MetaAdapter = (payload: MetaPayload, signal: AbortSignal) => Promise<Response>;
 export type ResolvedAddress = { address: string; family: number };
 
 export interface MetaTransportDependencies {
@@ -117,10 +118,12 @@ function pinnedHttpsRequest(options: RequestOptions, body: string, signal: Abort
   });
 }
 
-export function createMetaAdapter(_env: Environment, dependencies: MetaTransportDependencies = {}): MetaAdapter {
+export function createMetaAdapter(env: Environment, dependencies: MetaTransportDependencies = {}): MetaAdapter | undefined {
+  const apiKey = env.META_API_KEY?.trim();
+  if (!apiKey || apiKey.length > 4_096 || /\s/.test(apiKey)) return undefined;
   const resolve = dependencies.resolve ?? resolvePublicAddresses;
   const send = dependencies.request ?? pinnedHttpsRequest;
-  return async (payload, apiKey, signal) => {
+  return async (payload, signal) => {
     const addresses = await resolve(META_HOST);
     if (addresses.length === 0 || addresses.some((entry) => !isPublicAddress(entry.address, entry.family))) {
       throw new Error('upstream DNS did not resolve exclusively to public addresses');

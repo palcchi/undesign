@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import { test } from 'node:test';
 import { createAgentHandler, type AgentHandlerOptions } from '../api/_lib/agent-handler.js';
-import { createMetaAdapter, isPublicAddress, META_ENDPOINT, type MetaTransportDependencies } from '../api/_lib/meta.js';
+import { createMetaAdapter, isPublicAddress, META_ENDPOINT, META_MODEL_ID, type MetaTransportDependencies } from '../api/_lib/meta.js';
 import { createSession, setSessionCookie, verifyCsrf, verifySession } from '../api/_lib/security.js';
 import type { UsageStore } from '../api/_lib/usage-store.js';
 import { createSessionHandler } from '../api/session.js';
 import { createHealthHandler } from '../api/health.js';
 
 const validBody = {
-  model: 'user-selected-meta-model-2026',
+  model: META_MODEL_ID,
   messages: [
     { role: 'system', content: 'Return a plan as JSON.' },
     { role: 'user', content: 'A bouncing ball logo\nCanvas: none open\nSelection: none\n' },
@@ -21,17 +21,15 @@ const upstreamOk = {
   id: 'chatcmpl-test',
   object: 'chat.completion',
   created: 1,
-  model: 'user-selected-meta-model-2026',
+  model: META_MODEL_ID,
   choices: [{ index: 0, message: { role: 'assistant', content: '{"commands":[]}' }, finish_reason: 'stop' }],
 };
 const defaultEnv: NodeJS.ProcessEnv = {
   NODE_ENV: 'test',
   SESSION_SECRET: 'test-session-secret-do-not-use-in-production-000001',
   IP_HASH_SECRET: 'test-ip-hash-secret-is-independent-000000001',
-  // A legacy/server credential must never be consulted by the relay.
-  META_API_KEY: 'fictional-server-key-must-never-be-used',
-  RATE_LIMIT_PER_MIN: '10',
-  DAILY_BUDGET_REQUESTS: '100',
+  // Fictional test credential only; the test suite makes no real provider call.
+  META_API_KEY: 'fictional-server-key-do-not-use-in-production',
 };
 
 function jsonResponse(value: unknown, status = 200): Response {
@@ -73,13 +71,12 @@ async function withServer(
   }
 }
 
-function authorizedHeaders(baseUrl: string, session: TestContext['session'], userKey = 'fictional-byo-key'): Record<string, string> {
+function authorizedHeaders(baseUrl: string, session: TestContext['session']): Record<string, string> {
   return {
     Origin: baseUrl,
     'Content-Type': 'application/json',
     Cookie: session.cookie,
     'X-CSRF-Token': session.csrf,
-    'X-User-Key': userKey,
   };
 }
 
@@ -91,9 +88,9 @@ async function post(baseUrl: string, session: TestContext['session'], body: unkn
   });
 }
 
-function successAdapter(seen?: Array<{ payload: Record<string, unknown>; key: string }>) {
-  return async (payload: Record<string, unknown>, key: string) => {
-    seen?.push({ payload, key });
+function successAdapter(seen?: Array<{ payload: Record<string, unknown> }>) {
+  return async (payload: Record<string, unknown>) => {
+    seen?.push({ payload });
     return jsonResponse(upstreamOk);
   };
 }
@@ -119,16 +116,19 @@ test('session cookie is signed, HttpOnly, SameSite=Strict, refreshable and CSRF 
   });
 });
 
-test('missing X-User-Key is rejected without quota use even when META_API_KEY exists in the environment', async () => {
+test('public guest request needs no provider key and is forwarded through the server adapter', async () => {
   let upstreamCalls = 0;
   let reservations = 0;
   const store: UsageStore = { async reserveRequest() { reservations += 1; return { allowed: true }; } };
-  await withServer({ env: { ...defaultEnv, META_API_KEY: 'legacy-secret-must-not-fallback' }, usageStore: store, adapter: async () => { upstreamCalls += 1; return jsonResponse(upstreamOk); } }, async ({ baseUrl, session }) => {
-    const response = await post(baseUrl, session, validBody, { 'X-User-Key': '' });
-    assert.equal(response.status, 401);
-    assert.equal((await response.json() as { error: { code: string } }).error.code, 'USER_KEY_REQUIRED');
-    assert.equal(upstreamCalls, 0);
-    assert.equal(reservations, 0);
+  await withServer({ env: { ...defaultEnv }, usageStore: store, adapter: async (payload) => {
+    upstreamCalls += 1;
+    assert.equal(payload.model, META_MODEL_ID);
+    return jsonResponse(upstreamOk);
+  } }, async ({ baseUrl, session }) => {
+    const response = await post(baseUrl, session, validBody);
+    assert.equal(response.status, 200);
+    assert.equal(upstreamCalls, 1);
+    assert.equal(reservations, 1);
   });
 });
 
@@ -147,20 +147,22 @@ test('session and CSRF are mandatory and exact origins are enforced', async () =
   });
 });
 
-test('every BYO call reserves quota and the same limit cannot be bypassed with another key', async () => {
+test('every public request uses fixed quota limits that client headers and env overrides cannot bypass', async () => {
   const hashes: string[] = [];
+  const limitsSeen: Array<{ perIpPerMinute: number; globalPerDay: number }> = [];
   let calls = 0;
   const store: UsageStore = {
-    async reserveRequest(ipHash) {
+    async reserveRequest(ipHash, _nowMs, limits) {
       hashes.push(ipHash);
+      limitsSeen.push(limits);
       calls += 1;
       return calls <= 1 ? { allowed: true } : { allowed: false, reason: 'RATE_LIMITED' };
     },
   };
   let upstreamCalls = 0;
-  await withServer({ env: { ...defaultEnv }, usageStore: store, adapter: async () => { upstreamCalls += 1; return jsonResponse(upstreamOk); } }, async ({ baseUrl, session }) => {
-    const first = await post(baseUrl, session, validBody, { 'X-Forwarded-For': '198.51.100.10', 'X-User-Key': 'first-byo-key' });
-    const second = await post(baseUrl, session, validBody, { 'X-Forwarded-For': '198.51.100.10', 'X-User-Key': 'second-byo-key' });
+  await withServer({ env: { ...defaultEnv, RATE_LIMIT_PER_MIN: '99', DAILY_BUDGET_REQUESTS: '999' }, usageStore: store, adapter: async () => { upstreamCalls += 1; return jsonResponse(upstreamOk); } }, async ({ baseUrl, session }) => {
+    const first = await post(baseUrl, session, validBody, { 'X-Forwarded-For': '198.51.100.10' });
+    const second = await post(baseUrl, session, validBody, { 'X-Forwarded-For': '198.51.100.10', 'X-User-Key': 'ignored-client-value' });
     assert.equal(first.status, 200);
     assert.equal(second.status, 429);
     assert.equal((await second.json() as { error: { code: string } }).error.code, 'RATE_LIMITED');
@@ -169,40 +171,29 @@ test('every BYO call reserves quota and the same limit cannot be bypassed with a
     assert.equal(hashes.length, 2);
     assert.ok(hashes.every((hash) => /^[a-f\d]{64}$/.test(hash)));
     assert.ok(hashes.every((hash) => !hash.includes('198.51.100.10')));
+    assert.deepEqual(limitsSeen, [
+      { perIpPerMinute: 6, globalPerDay: 100 },
+      { perIpPerMinute: 6, globalPerDay: 100 },
+    ]);
   });
 });
 
-test('BYO key is never logged or returned', async () => {
-  const secret = 'fictional-user-key-do-not-log-or-return';
-  const logged: string[] = [];
-  const original = { log: console.log, info: console.info, warn: console.warn, error: console.error };
-  console.log = (...args: unknown[]) => { logged.push(args.join(' ')); };
-  console.info = (...args: unknown[]) => { logged.push(args.join(' ')); };
-  console.warn = (...args: unknown[]) => { logged.push(args.join(' ')); };
-  console.error = (...args: unknown[]) => { logged.push(args.join(' ')); };
-  try {
-    const seen: Array<{ payload: Record<string, unknown>; key: string }> = [];
-    await withServer({ env: { ...defaultEnv }, adapter: successAdapter(seen) }, async ({ baseUrl, session }) => {
-      const response = await post(baseUrl, session, validBody, { 'X-User-Key': secret });
-      const text = await response.text();
-      assert.equal(response.status, 200);
-      assert.equal(text.includes(secret), false);
-      assert.equal(seen[0]?.key, secret);
-    });
-    assert.equal(logged.join('\n').includes(secret), false);
-    assert.deepEqual(logged, []);
-  } finally {
-    console.log = original.log;
-    console.info = original.info;
-    console.warn = original.warn;
-    console.error = original.error;
-  }
+test('server provider key never appears in the browser payload or relay response', async () => {
+  const secret = defaultEnv.META_API_KEY!;
+  const seen: Array<{ payload: Record<string, unknown> }> = [];
+  await withServer({ env: { ...defaultEnv }, adapter: successAdapter(seen) }, async ({ baseUrl, session }) => {
+    const response = await post(baseUrl, session, validBody);
+    const text = await response.text();
+    assert.equal(response.status, 200);
+    assert.equal(text.includes(secret), false);
+    assert.equal(JSON.stringify(seen[0]?.payload).includes(secret), false);
+  });
 });
 
-test('OpenAI tool-call history is preserved without requiring response_format or replacing the model', async () => {
-  const seen: Array<{ payload: Record<string, unknown>; key: string }> = [];
+test('OpenAI tool-call history is preserved with the fixed Muse model ID', async () => {
+  const seen: Array<{ payload: Record<string, unknown> }> = [];
   const payload = {
-    model: 'meta-model-selected-by-user',
+    model: META_MODEL_ID,
     messages: [
       { role: 'system', content: 'Use tools when appropriate.' },
       { role: 'user', content: 'What is 2 + 2?' },
@@ -213,6 +204,8 @@ test('OpenAI tool-call history is preserved without requiring response_format or
     tools: [{ type: 'function', function: { name: 'calculator', description: 'Evaluate arithmetic.', parameters: { type: 'object', properties: { expression: { type: 'string' } } } } }],
     tool_choice: 'auto',
     stream: false,
+    max_tokens: 2_000,
+    n: 1,
   };
   await withServer({ env: { ...defaultEnv }, adapter: successAdapter(seen) }, async ({ baseUrl, session }) => {
     const response = await post(baseUrl, session, payload);
@@ -225,11 +218,28 @@ test('OpenAI tool-call history is preserved without requiring response_format or
 test('invalid payloads and streaming are rejected while response_format remains optional', async () => {
   let upstreamCalls = 0;
   await withServer({ env: { ...defaultEnv }, adapter: async () => { upstreamCalls += 1; return jsonResponse(upstreamOk); } }, async ({ baseUrl, session }) => {
-    const noFormat = { model: 'custom-model', messages: [{ role: 'user', content: 'hello' }] };
+    const noFormat = { model: META_MODEL_ID, messages: [{ role: 'user', content: 'hello' }] };
     assert.equal((await post(baseUrl, session, noFormat)).status, 200);
+    assert.equal((await post(baseUrl, session, { ...noFormat, model: 'client-selected-model' })).status, 400);
     assert.equal((await post(baseUrl, session, { ...noFormat, stream: true })).status, 400);
     assert.equal((await post(baseUrl, session, { ...noFormat, messages: [{ role: 'tool', content: 'orphan' }] })).status, 400);
     assert.equal(upstreamCalls, 1);
+  });
+});
+
+test('output tokens are capped at 2,000 per request with exactly one completion', async () => {
+  const seen: Array<Record<string, unknown>> = [];
+  await withServer({ env: { ...defaultEnv }, adapter: async (payload) => { seen.push(payload); return jsonResponse(upstreamOk); } }, async ({ baseUrl, session }) => {
+    const base = { model: META_MODEL_ID, messages: [{ role: 'user', content: 'hello' }] };
+    assert.equal((await post(baseUrl, session, base)).status, 200);
+    assert.equal((await post(baseUrl, session, { ...base, max_tokens: 9_000, max_completion_tokens: 4_000, n: 1 })).status, 200);
+    assert.equal((await post(baseUrl, session, { ...base, max_tokens: 500, n: 2 })).status, 400);
+    assert.equal(seen.length, 2);
+    assert.equal(seen[0]?.max_tokens, 2_000);
+    assert.equal(seen[0]?.n, 1);
+    assert.equal(seen[1]?.max_tokens, 2_000);
+    assert.equal(seen[1]?.max_completion_tokens, 2_000);
+    assert.equal(seen[1]?.n, 1);
   });
 });
 
@@ -277,12 +287,14 @@ test('fixed endpoint DNS resolution is checked and the validated public IP is TL
     request: async (options, body) => { seen.push({ options, body }); return jsonResponse(upstreamOk); },
   };
   const adapter = createMetaAdapter(defaultEnv, deps);
-  await adapter({ model: 'selected', messages: [] }, 'fictional-key', new AbortController().signal);
+  assert.ok(adapter);
+  await adapter({ model: META_MODEL_ID, messages: [] }, new AbortController().signal);
   const options = seen[0]!.options;
   assert.equal(options.hostname, 'api.meta.ai');
   assert.equal(options.servername, 'api.meta.ai');
   assert.equal(options.protocol, 'https:');
   assert.equal(options.path, '/v1/chat/completions');
+  assert.equal((options.headers as Record<string, string>).Authorization, `Bearer ${defaultEnv.META_API_KEY}`);
   assert.equal(options.rejectUnauthorized, true);
   assert.equal(typeof options.lookup, 'function');
   const lookupFn = options.lookup as NonNullable<import('node:https').RequestOptions['lookup']>;
@@ -292,7 +304,7 @@ test('fixed endpoint DNS resolution is checked and the validated public IP is TL
     );
   });
   assert.equal(pinned, '8.8.8.8');
-  assert.equal(seen[0]!.body, JSON.stringify({ model: 'selected', messages: [] }));
+  assert.equal(seen[0]!.body, JSON.stringify({ model: META_MODEL_ID, messages: [] }));
 });
 
 test('fixed upstream rejects mixed public/private DNS answers before transport', async () => {
@@ -301,7 +313,8 @@ test('fixed upstream rejects mixed public/private DNS answers before transport',
     resolve: async () => [{ address: '8.8.8.8', family: 4 }, { address: '10.0.0.4', family: 4 }],
     request: async () => { requestCalls += 1; return jsonResponse(upstreamOk); },
   });
-  await assert.rejects(() => adapter({ model: 'm', messages: [] }, 'fictional-key', new AbortController().signal));
+  assert.ok(adapter);
+  await assert.rejects(() => adapter({ model: META_MODEL_ID, messages: [] }, new AbortController().signal));
   assert.equal(requestCalls, 0);
 });
 
@@ -315,7 +328,7 @@ test('production fails closed without HTTPS origin, independent strong secrets a
     const origin = `https://showcase.example.test`;
     const response = await fetch(`http://127.0.0.1:${address.port}/api/agent`, {
       method: 'POST',
-      headers: { Origin: origin, 'Content-Type': 'application/json', 'X-User-Key': 'fictional-key' },
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
       body: JSON.stringify(validBody),
     });
     assert.equal(response.status, 503);
@@ -339,6 +352,6 @@ test('production fails closed without HTTPS origin, independent strong secrets a
   }
   const { readiness } = await import('../api/_lib/security.js');
   assert.deepEqual(readiness(env, false), {
-    sessionReady: false, originReady: true, hashReady: false, quotaReady: false, upstreamReady: true,
+    sessionReady: false, originReady: true, hashReady: false, quotaReady: false, upstreamReady: false,
   });
 });

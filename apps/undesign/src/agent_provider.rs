@@ -55,7 +55,7 @@ pub fn start_request(config: &AgentProviderConfig, request: Value) -> Result<Age
     let endpoint = config.endpoint().to_string();
     let protocol = config.protocol();
     let beta = (protocol == AgentProviderProtocol::AnthropicMessages && request.get("fallbacks").is_some()).then_some(ANTHROPIC_FALLBACK_BETA);
-    let secret = config.duplicate_secret_for_request();
+    let secret = config.duplicate_secret_for_request().ok_or_else(|| "This provider configuration has no user key.".to_string())?;
     let (sender, receiver) = std::sync::mpsc::channel();
     std::thread::Builder::new()
         .name("undesign-agent-provider".to_string())

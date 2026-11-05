@@ -12,6 +12,7 @@ use crate::agent::{AgentBackend, AgentConversation, AgentMessage, AgentRole, Age
 pub const MAX_PROVIDER_REQUEST_BYTES: usize = 128 * 1024;
 pub const MAX_PROVIDER_RESPONSE_BYTES: usize = 1024 * 1024;
 pub const META_RELAY_ENDPOINT: &str = "https://api.meta.ai/v1/chat/completions";
+pub const META_RELAY_MODEL_ID: &str = "muse-spark-1.3";
 pub const ANTHROPIC_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
 pub const ANTHROPIC_API_VERSION: &str = "2026-10-21";
 /// Beta header for the scalar `fallbacks: "default"` form; sent only when the request carries it.
@@ -70,7 +71,7 @@ pub struct AgentProviderConfig {
     protocol: AgentProviderProtocol,
     endpoint: String,
     model: String,
-    secret: AgentSecret,
+    secret: Option<AgentSecret>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,11 +82,20 @@ pub enum AgentProviderProtocol {
 
 impl AgentProviderConfig {
     pub fn new(endpoint: String, model: String, secret: AgentSecret) -> Self {
-        Self { protocol: AgentProviderProtocol::OpenAiCompatible, endpoint, model, secret }
+        Self { protocol: AgentProviderProtocol::OpenAiCompatible, endpoint, model, secret: Some(secret) }
     }
 
     pub fn anthropic(model: String, secret: AgentSecret) -> Self {
-        Self { protocol: AgentProviderProtocol::AnthropicMessages, endpoint: ANTHROPIC_ENDPOINT.to_string(), model, secret }
+        Self { protocol: AgentProviderProtocol::AnthropicMessages, endpoint: ANTHROPIC_ENDPOINT.to_string(), model, secret: Some(secret) }
+    }
+
+    pub fn meta_relay() -> Self {
+        Self {
+            protocol: AgentProviderProtocol::OpenAiCompatible,
+            endpoint: META_RELAY_ENDPOINT.to_string(),
+            model: META_RELAY_MODEL_ID.to_string(),
+            secret: None,
+        }
     }
 
     pub fn protocol(&self) -> AgentProviderProtocol {
@@ -100,8 +110,8 @@ impl AgentProviderConfig {
         &self.model
     }
 
-    pub fn duplicate_secret_for_request(&self) -> AgentSecret {
-        self.secret.duplicate_for_request()
+    pub fn duplicate_secret_for_request(&self) -> Option<AgentSecret> {
+        self.secret.as_ref().map(AgentSecret::duplicate_for_request)
     }
 }
 
@@ -493,6 +503,20 @@ mod tests {
         assert!(request.get("api_key").is_none());
         assert_eq!(request["tool_choice"], "auto");
         assert_eq!(request["stream"], false);
+    }
+
+    #[test]
+    fn browser_relay_has_no_client_secret_while_native_config_keeps_byok() {
+        let relay = AgentProviderConfig::meta_relay();
+        assert_eq!(relay.endpoint(), META_RELAY_ENDPOINT);
+        assert_eq!(relay.model(), META_RELAY_MODEL_ID);
+        assert!(relay.duplicate_secret_for_request().is_none());
+
+        let secret = AgentSecret::from_input("native-test-key".to_string());
+        assert!(secret.is_ok());
+        let Ok(secret) = secret else { return };
+        let native = AgentProviderConfig::new("https://provider.example/v1/chat/completions".to_string(), "native-model".to_string(), secret);
+        assert!(native.duplicate_secret_for_request().is_some());
     }
 
     #[test]

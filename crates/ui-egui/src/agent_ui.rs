@@ -248,56 +248,18 @@ fn select_protocol(state: &mut AgentPanelState, protocol: AgentProviderProtocol)
 
 fn draw_browser_setup(app: &mut FigApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(tr("Meta AI through secure browser relay only")).font(semibold(10.5)).color(t.text));
-    ui.label(
-        RichText::new(tr("Enter your Meta model ID and your own API key. The browser sends requests only to the fixed Meta API through this site's same-origin relay."))
-            .size(10.5)
-            .color(t.text_secondary),
-    );
-    ui.label(
-        RichText::new(tr("No other provider or custom endpoint is available in the browser. No model is preselected."))
-            .size(10.5)
-            .color(t.text_secondary),
-    );
-    ui.add_space(7.0);
-
-    ui.label(RichText::new(tr("Meta model ID")).font(semibold(10.0)).color(t.text));
-    let model =
-        ui.add(egui::TextEdit::singleline(&mut app.agent_panel.model).hint_text(tr("Enter a Meta model ID")).desired_width(ui.available_width()));
-    a11y::text(&model, tr("Meta model ID"), &app.agent_panel.model);
-
-    ui.add_space(5.0);
-    ui.label(RichText::new(tr("API key")).font(semibold(10.0)).color(t.text));
-    let key = ui.add(
-        egui::TextEdit::singleline(&mut *app.agent_panel.api_key_draft)
-            .password(true)
-            .hint_text(tr("Paste your own Meta API key"))
-            .desired_width(ui.available_width()),
-    );
-    let accessible_key = if app.agent_panel.api_key_draft.is_empty() { "" } else { "••••••" };
-    a11y::text(&key, tr("API key"), accessible_key);
-
-    ui.add_space(5.0);
-    ui.label(
-        RichText::new(tr(
-            "The key is held in memory only, never stored in browser storage, and sent only after you press Send. Connecting sends no request.",
-        ))
-        .size(10.5)
-        .color(t.text_secondary),
-    );
-    ui.label(
-        RichText::new(tr(
-            "Send transmits your prompt, chat, and bounded current-page context to the fixed Meta API through this site's secure relay.",
-        ))
-        .size(10.5)
-        .color(t.text_secondary),
-    );
+    ui.label(RichText::new(tr("Muse Spark 1.3 Contributor")).font(semibold(10.5)).color(t.text));
+    ui.label(RichText::new(tr("Try the shared demo directly. No account or provider API key is required."))
+        .size(10.5).color(t.text_secondary));
+    ui.label(RichText::new(tr("Your provider key stays on the server. The relay allows 6 requests per IP per minute, 100 requests per day globally, and at most 2,000 output tokens per request."))
+        .size(10.5).color(t.text_secondary));
+    ui.label(RichText::new(tr("When you press Send, your prompt, chat, and active-page context may be sent to the provider. The relay does not store prompts or document snapshots."))
+        .size(10.5).color(t.text_secondary));
     ui.add_space(8.0);
 
-    let ready = !app.agent_panel.model.trim().is_empty() && !app.agent_panel.api_key_draft.is_empty();
-    let connect = widgets::button(ui, tr("Connect"), true, ready);
-    a11y::status(&connect, tr("Connect"), tr("Enter a Meta model ID and your own API key."));
-    if connect.clicked() && ready {
+    let connect = widgets::button(ui, tr("Connect"), true, true);
+    a11y::status(&connect, tr("Connect"), tr("Connect to the shared server-side Muse relay."));
+    if connect.clicked() {
         connect_provider(app, true);
     }
     draw_feedback(&app.agent_panel, ui);
@@ -318,9 +280,9 @@ fn draw_connected(app: &mut FigApp, ui: &mut Ui, browser_relay: bool) {
             .color(t.text_secondary),
     );
     if browser_relay {
-        ui.label(RichText::new(tr("The Meta API key stays in memory only and is not saved in browser storage.")).size(10.5).color(t.text_secondary));
+        ui.label(RichText::new(tr("The provider key stays on the server and is never sent to your browser.")).size(10.5).color(t.text_secondary));
         ui.label(
-            RichText::new(tr("Only Meta through this site's secure same-origin relay is available in the browser."))
+            RichText::new(tr("Only Muse Spark 1.3 through this site's secure same-origin relay is available in the browser."))
                 .size(10.5)
                 .color(t.text_secondary),
         );
@@ -445,6 +407,19 @@ fn draw_feedback(state: &AgentPanelState, ui: &mut Ui) {
 }
 
 fn connect_provider(app: &mut FigApp, browser_relay: bool) {
+    if browser_relay {
+        match app.services.connect_agent_provider(AgentProviderConfig::meta_relay()) {
+            Ok(()) => {
+                app.agent_panel.error = None;
+                app.agent_panel.status = Some(tr("Connected to Muse Spark 1.3. Press Send when you are ready.").to_string());
+            }
+            Err(error) => {
+                app.agent_panel.error = Some(error);
+                app.agent_panel.status = None;
+            }
+        }
+        return;
+    }
     let endpoint = if browser_relay { crate::agent_provider::META_RELAY_ENDPOINT.to_string() } else { app.agent_panel.endpoint.trim().to_string() };
     let model = app.agent_panel.model.trim().to_string();
     if !browser_relay && endpoint.is_empty() {
