@@ -91,12 +91,14 @@ fn tablet_tree() -> Vec<Node> {
     }
     ctx.enable_accesskit();
     frame(&ctx, &mut app, &mut time);
-    let out = {
+    let mut out = {
         time += 1.0 / 60.0;
         let input = RawInput { screen_rect: Some(screen), time: Some(time), ..Default::default() };
         ctx.run_ui(input, |ui| app.ui(ui))
     };
-    out.platform_output.accesskit_update.expect("an AccessKit update").nodes.into_iter().map(|(_, node)| node).collect()
+    let nodes = out.platform_output.accesskit_update.take().expect("an AccessKit update").nodes;
+    out.textures_delta.clear();
+    nodes.into_iter().map(|(_, node)| node).collect()
 }
 
 #[test]
