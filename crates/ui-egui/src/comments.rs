@@ -40,6 +40,8 @@ pub struct CommentUi {
     pub chat_draft: String,
     /// An agent turn answering the group, if one is in flight.
     pub agent: Option<crate::chat_agent::ChatAgentRun>,
+    /// An applied agent turn one Undo click still takes back (cleared once stale).
+    pub agent_undo: Option<crate::chat_agent::AgentUndo>,
     /// What the panel (and the pins) show, and in what order.
     pub filter: Filter,
     pub sort: Sort,
@@ -60,6 +62,7 @@ impl Default for CommentUi {
             reply: String::new(),
             chat_draft: String::new(),
             agent: None,
+            agent_undo: None,
             filter: Filter::Open,
             sort: Sort::Date,
             search: String::new(),
@@ -216,6 +219,11 @@ pub fn rich_text(text: &str, people: &[&str], color: Color32, mention_color: Col
 /// The user's name (comments are signed with it).
 fn me(app: &FigApp) -> String {
     cc::user_name(&app.session)
+}
+
+/// How an author reads in the conversation: yourself as "You", everyone else by name.
+fn shown_author(author: &str, me: &str) -> String {
+    if author == me { tr("You").to_string() } else { author.to_string() }
 }
 
 /// Pins are visible with the Comment tool, or when View › Comments is on (Shift+C).
@@ -665,7 +673,7 @@ fn message(
             let (r, _) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::hover());
             avatar(ui.painter(), r.center(), 12.0, &m.author);
             ui.add_space(4.0);
-            ui.label(egui::RichText::new(&m.author).font(semibold(12.0)).color(t.text));
+            ui.label(egui::RichText::new(shown_author(&m.author, cx.me)).font(semibold(12.0)).color(t.text));
             let when = if m.edited > 0 { trf("{when} · edited", &[("when", &ago(m.created))]) } else { ago(m.created) };
             ui.label(egui::RichText::new(when).font(regular(11.0)).color(t.text_tertiary));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1072,6 +1080,10 @@ pub fn chat_panel(app: &mut FigApp, ui: &mut Ui) {
         ui.add_space(4.0);
     }
     ui.add_space(8.0);
+    let undo_thread = crate::chat_agent::undoable_thread(app);
+    if undo_thread.is_none() {
+        app.ui.comments.agent_undo = None;
+    }
 
     let search = app.ui.comments.search.clone();
     let query = Query { page: None, frame: None, filter: Filter::All, sort: Sort::Date, text: &search, chat: None };
@@ -1132,6 +1144,22 @@ pub fn chat_panel(app: &mut FigApp, ui: &mut Ui) {
                     ui.add_space(4.0);
                     ui.label(egui::RichText::new(tr("Unread")).font(semibold(10.5)).color(t.accent_text));
                 }
+                if undo_thread == Some(c.id) {
+                    ui.add_space(4.0);
+                    let undo = ui.add(
+                        egui::Button::new(egui::RichText::new(tr("Undo")).font(semibold(10.5)).color(t.text_secondary))
+                            .fill(t.field)
+                            .stroke(Stroke::new(1.0, t.border))
+                            .corner_radius(CornerRadius::same(6)),
+                    );
+                    crate::a11y::button(&undo, tr("Undo"));
+                    if undo.clicked() {
+                        // The reply first, then the batch it announced.
+                        app.run("edit.undo", json!({}));
+                        app.run("edit.undo", json!({}));
+                        app.ui.comments.agent_undo = None;
+                    }
+                }
             });
             for (index, message) in c.messages().enumerate() {
                 let width = ui.available_width();
@@ -1143,7 +1171,8 @@ pub fn chat_panel(app: &mut FigApp, ui: &mut Ui) {
                 let (row, _) = ui.allocate_exact_size(vec2(width, bubble_h + 4.0), Sense::hover());
                 let response =
                     ui.interact(row, Id::new(("chat_comment_message", c.id, index)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                let label = format!("{}: {}", message.author, message.text);
+                let shown = shown_author(&message.author, &me);
+                let label = format!("{shown}: {}", message.text);
                 crate::a11y::button(&response, &label);
                 let own = message.author == me;
                 let bubble_left = if own { row.max.x - bubble_w - 34.0 } else { row.min.x + 34.0 };
@@ -1158,7 +1187,7 @@ pub fn chat_panel(app: &mut FigApp, ui: &mut Ui) {
                 ui.painter().rect_filled(bubble, CornerRadius::same(10), fill);
                 let avatar_at = if own { pos2(row.max.x - 16.0, bubble.min.y + 18.0) } else { pos2(row.min.x + 16.0, bubble.min.y + 18.0) };
                 avatar(ui.painter(), avatar_at, 12.0, &message.author);
-                ui.painter().text(pos2(bubble.min.x + 12.0, bubble.min.y + 13.0), Align2::LEFT_CENTER, &message.author, semibold(11.0), t.text);
+                ui.painter().text(pos2(bubble.min.x + 12.0, bubble.min.y + 13.0), Align2::LEFT_CENTER, &shown, semibold(11.0), t.text);
                 ui.painter().text(
                     pos2(bubble.max.x - 12.0, bubble.min.y + 13.0),
                     Align2::RIGHT_CENTER,

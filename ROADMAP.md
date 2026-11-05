@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~26 points and ~162–292 h away (one developer; ~33–67 h wall-clock with 5 developers)
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-11-05 · **Change:** minor (design-critique example with comments and chat; demo links move to undesign.valliant.works; earlier changes are in the revision history below) · **Target:** Figma Design (desktop app 126.10.7)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-11-05 · **Change:** minor (chat identity and agent Undo; earlier changes are in the revision history below) · **Target:** Figma Design (desktop app 126.10.7)
 
 Undesign is a clean-room, open-source, pure-Rust reimplementation of the Figma design workflow,
 native on macOS, Windows, Linux and FreeBSD and in the browser, fully drivable by scripts through
@@ -134,6 +134,7 @@ Ranked; detail and milestones in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Progress log
 
+- **2026-11-05** · Chat identity and agent Undo (M9): own messages read as "You"; applied agent turns get a header Undo button while exactly on the undo top. Numbers unchanged.
 - **2026-11-05** · Design critique example (M9 showcase): a landing hero with pinned comments and a group chat thread, registered in Home ▸ Examples with a 2× README render; demo links move to `https://undesign.valliant.works/`. Numbers unchanged.
 - **2026-11-05** · Guest Agent relay adopted from `work/agent-user-quota-2026-11-05` (600cea7, unrelated history, content adoption): the relay uses the server Production key with fixed model `muse-spark-1.3`, 6 requests/IP/minute, 100/day globally and 2,000 output tokens; one-click browser Connect with no client key, native BYOK unchanged; showcase 32/32, production build, health 200 with all readiness passing, no model calls in tests, no relay persistence of prompts or documents, no Supabase schema change. Numbers unchanged (hosting, not a Figma feature).
 - **2026-11-05** · Group chat in the document (M9): `comment.add {chat}` posts unpinned threads that sync like any thread and show in the Chat history with a composer (pins and the Comment tool panel skip them; opening one never pans to a meaningless spot); `/agent <prompt>` runs one plan turn through the connected provider and posts the outcome as a chat thread anchored to the first layer it made (one undo step, one retry, failures answered in chat). Numbers unchanged.
@@ -346,6 +347,7 @@ Ranked; detail and milestones in [`docs/roadmap.md`](docs/roadmap.md).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-05 | minor | Chat identity and agent Undo (M9): own messages read as "You"; applied agent turns get a header Undo button while exactly on the undo top. Numbers unchanged |
 | 2026-11-05 | minor | Design critique example (M9 showcase): a landing hero with pinned comments and a group chat thread, registered in Home ▸ Examples with a 2× README render; demo links move to undesign.valliant.works. Numbers unchanged |
 | 2026-11-05 | minor | Guest Agent relay adopted from work/agent-user-quota-2026-11-05 (600cea7, unrelated history, content adoption): server Production key, fixed model muse-spark-1.3, 6 requests/IP/minute, 100/day globally, 2,000 output tokens; showcase 32/32, production build, health 200 with all readiness passing, no model calls in tests, no Supabase schema change. Numbers unchanged (hosting) |
 | 2026-11-05 | minor | Group chat in the document (M9): `comment.add {chat}` posts unpinned threads that sync like any thread and show in the Chat history with a composer; `/agent <prompt>` runs one plan turn through the connected provider and posts the outcome as a chat thread anchored to the first layer it made (one undo step, one retry, failures answered in chat). Numbers unchanged |

@@ -115,6 +115,28 @@ fn the_chat_composer_posts_a_group_message() {
 }
 
 #[test]
+fn own_messages_read_as_you() {
+    let mut s = Session::new();
+    s.prefs.user_name = "Sam".into();
+    s.execute("comment.add", &json!({"chat": true, "text": "From Jo", "author": "Jo"})).unwrap();
+    let mut u = Ui::new(s);
+    u.app.ui.chat_open = true;
+    u.app.ui.right_tab = crate::RightTab::Design;
+    u.frames(20, Vec::new);
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(crate::live_tests::has_text(&shapes, "Jo"));
+    assert!(!crate::live_tests::has_text(&shapes, "Sam"), "nobody is me yet");
+    u.run("comment.add", json!({"chat": true, "text": "From me"}));
+    u.frames(5, Vec::new);
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(crate::live_tests::has_text(&shapes, "You"));
+    assert!(!crate::live_tests::has_text(&shapes, "Sam"), "my own name reads as You");
+    assert!(crate::live_tests::has_text(&shapes, "Jo"), "others keep their names");
+}
+
+#[test]
 fn control_channel_toggles_the_chat_history() {
     let mut u = Ui::new(Session::new());
     let ctx = egui::Context::default();

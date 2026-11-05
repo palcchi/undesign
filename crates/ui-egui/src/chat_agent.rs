@@ -131,7 +131,12 @@ fn handle_reply(app: &mut FigApp, ctx: &egui::Context, mut run: ChatAgentRun, te
                 let id = NodeId(*id);
                 app.session.doc().ok()?.node(id).map(|_| id)
             });
-            post(app, anchor, trf("Agent applied: {commands}. Undo reverts them together.", &[("commands", &report.applied.join(", "))]));
+            if let Some(thread) =
+                post_thread(app, anchor, trf("Agent applied: {commands}. Undo reverts them together.", &[("commands", &report.applied.join(", "))]))
+            {
+                let depth = app.session.undo_depth().0;
+                app.ui.comments.agent_undo = Some(AgentUndo { thread, depth });
+            }
         }
         // The batch already rolled back; retrying the same plan cannot help.
         Err(undesign_agent::Error::Engine(error)) => post(app, None, failed(&error.to_string())),
@@ -180,6 +185,11 @@ fn build_plan_request(protocol: AgentProviderProtocol, model: &str, system: &str
 
 /// Post `text` as the agent's chat message, about `anchor` when it names a layer.
 fn post(app: &mut FigApp, anchor: Option<NodeId>, text: String) {
+    let _ = post_thread(app, anchor, text);
+}
+
+/// Post the message and hand back its thread, so a turn that applied edits stays undoable.
+fn post_thread(app: &mut FigApp, anchor: Option<NodeId>, text: String) -> Option<u64> {
     let mut params = json!({"chat": true, "text": text, "author": AGENT_NAME});
     if let Some(id) = anchor {
         let (x, y) = app.session.doc().ok().and_then(|doc| doc.world_bounds(id)).map(|b| (b.center().x, b.center().y)).unwrap_or((0.0, 0.0));
@@ -189,7 +199,29 @@ fn post(app: &mut FigApp, anchor: Option<NodeId>, text: String) {
     }
     // The text is never empty and the anchor was just read from the document, so the only
     // failures left are a missing document, which the composer already rules out.
-    let _ = app.run("comment.add", params);
+    app.run("comment.add", params)?.get("id")?.as_u64()
+}
+
+/// An applied turn whose reply still sits on the undo top: one Undo click takes back both.
+pub struct AgentUndo {
+    thread: u64,
+    depth: usize,
+}
+
+/// Undo labels right after an agent turn: its reply, then its batch. Kept beside the
+/// `comment.add` spec label and the agent core's batch label; the chat tests pin the pair.
+const REPLY_LABEL: &str = "Add comment";
+const BATCH_LABEL: &str = "Agent";
+
+/// The agent thread one Undo click still takes back, if any: its reply on the undo top with
+/// its batch directly below, at the recorded depth. Anything else hides the button.
+pub fn undoable_thread(app: &FigApp) -> Option<u64> {
+    let marker = app.ui.comments.agent_undo.as_ref()?;
+    let labels = app.session.undo_labels(2);
+    (app.session.undo_depth().0 == marker.depth
+        && labels.first().is_some_and(|top| top == REPLY_LABEL)
+        && labels.get(1).is_some_and(|next| next == BATCH_LABEL))
+    .then_some(marker.thread)
 }
 
 /// A failed run, with the provider's or the engine's own reason.

@@ -184,3 +184,36 @@ fn switching_page_abandons_the_run() {
     assert!(agent_threads(&u)[0].first.text.contains("Nothing was applied"), "{}", agent_threads(&u)[0].first.text);
     assert_eq!(shared.borrow().requests.len(), 1, "no retry after the scope changed");
 }
+
+#[test]
+fn agent_undo_takes_back_the_reply_and_the_turn() {
+    let (mut u, _) = harness(vec![Ok(RECT.to_string())], true);
+    say(&mut u, "/agent a square");
+    u.frame(vec![]);
+    assert_eq!(agent_threads(&u).len(), 1);
+    let target = agent_threads(&u)[0].anchor.expect("an anchored reply");
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(crate::live_tests::has_text(&shapes, "Undo"));
+    let undo = crate::live_tests::text_center(&shapes, "Undo");
+    click(&mut u, undo);
+    u.frames(3, Vec::new);
+    assert!(u.app.session.doc().unwrap().node(target).is_none(), "the made layer is gone");
+    assert!(agent_threads(&u).is_empty(), "the reply is gone too");
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(!crate::live_tests::has_text(&shapes, "Undo"), "nothing left to take back");
+}
+
+#[test]
+fn agent_undo_hides_once_something_else_runs() {
+    let (mut u, _) = harness(vec![Ok(RECT.to_string())], true);
+    say(&mut u, "/agent a square");
+    u.frame(vec![]);
+    say(&mut u, "noted");
+    u.frame(vec![]);
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(!crate::live_tests::has_text(&shapes, "Undo"));
+    assert_eq!(agent_threads(&u).len(), 1, "the turn itself is untouched");
+}

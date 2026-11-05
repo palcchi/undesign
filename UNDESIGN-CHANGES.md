@@ -356,3 +356,10 @@ upstream revision so future syncs stay auditable.
   `undesign-cli render` (row in `ATTRIBUTION.md`); shown in `README.md` "Made in Undesign".
 - `README.md`: demo links move to `https://undesign.valliant.works/`; the Examples table gains
   the Design critique row.
+
+## 2026-11-05: Chat identity and agent Undo (change #25)
+
+- Own chat messages read as "You" (history bubbles and thread popover); others keep their names.
+- An applied `/agent` turn gets an Undo button in its thread header while its reply and batch
+  sit exactly on the undo top (depth plus labels); one click takes back both. Tests: the "You"
+  label, Undo taking back reply and turn, Undo hiding after another edit.
