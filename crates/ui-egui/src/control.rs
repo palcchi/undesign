@@ -531,6 +531,9 @@ pub fn handle(app: &mut FigApp, ctx: &Context, method: &str, p: &Value) -> Resul
                     _ => app.ui.comments.draft = None,
                 }
             }
+            if let Some(open) = p.get("chatOpen").and_then(Value::as_bool) {
+                app.ui.chat_open = open;
+            }
             if let Some(v) = p.get("showResolvedComments").and_then(Value::as_bool) {
                 app.ui.comments.filter = if v { Filter::All } else { Filter::Open };
             }

@@ -15,7 +15,18 @@ fn style(id: String, name: &str) -> Style {
 
 fn comment(id: u64, doc: &Document) -> Comment {
     let page = doc.first_page().unwrap();
-    Comment { id, page, x: 1.0, y: 2.0, anchor: None, first: Message::new("A", "hi", 0), resolved: false, replies: Vec::new(), read_by: None }
+    Comment {
+        id,
+        page,
+        x: 1.0,
+        y: 2.0,
+        anchor: None,
+        chat: false,
+        first: Message::new("A", "hi", 0),
+        resolved: false,
+        replies: Vec::new(),
+        read_by: None,
+    }
 }
 
 fn join(server: &mut Server) -> Client {

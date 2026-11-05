@@ -128,11 +128,13 @@ pub struct Query<'a> {
     pub sort: Sort,
     /// Search text (messages, names, the frame's name), any case.
     pub text: &'a str,
+    /// Only group chat (true) or only pinned comments (false); None: both.
+    pub chat: Option<bool>,
 }
 
 impl Default for Query<'_> {
     fn default() -> Self {
-        Self { page: None, frame: None, filter: Filter::All, sort: Sort::Date, text: "" }
+        Self { page: None, frame: None, filter: Filter::All, sort: Sort::Date, text: "", chat: None }
     }
 }
 
@@ -144,6 +146,7 @@ pub fn query<'a>(doc: &'a Document, q: &Query, user: &str) -> Vec<&'a Comment> {
         .iter()
         .filter(|c| doc.pages.contains(&c.page))
         .filter(|c| q.page.is_none_or(|p| c.page == p))
+        .filter(|c| q.chat.is_none_or(|want| c.chat == want))
         .filter(|c| q.filter.keeps(c, user))
         .filter(|c| q.frame.is_none_or(|f| frame_of(doc, c) == Some(f)))
         .filter(|c| needle.is_empty() || matches_text(doc, c, &needle))
@@ -165,6 +168,9 @@ fn matches_text(doc: &Document, c: &Comment, needle: &str) -> bool {
 pub fn frame_of(doc: &Document, c: &Comment) -> Option<NodeId> {
     if let Some(a) = c.anchor.filter(|a| doc.contains(*a)) {
         return top_level_of(doc, a).filter(|t| is_frame_or_section(doc, *t));
+    }
+    if c.chat {
+        return None;
     }
     let (x, y) = c.position(doc);
     let page = doc.node(c.page)?;
@@ -303,7 +309,7 @@ pub fn comment_json(doc: &Document, c: &Comment, user: &str) -> Value {
     let mut v = message_json(&c.first);
     let extra = json!({
         "id": c.id, "page": c.page, "pageName": doc.node(c.page).map(|n| n.name.as_str()),
-        "x": x, "y": y, "anchor": c.anchor,
+        "x": x, "y": y, "anchor": c.anchor, "chat": c.chat,
         "frame": frame, "frameName": frame.and_then(|f| doc.node(f)).map(|n| n.name.as_str()),
         "resolved": c.resolved, "unread": c.is_unread(user), "link": link(c.id),
         "replies": c.replies.iter().map(message_json).collect::<Vec<_>>(),
@@ -324,6 +330,8 @@ fn reveal(s: &mut Session, id: u64, how: &str) -> crate::Result<()> {
     let (x, y) = c.position(doc);
     let frame = frame_of(doc, c).and_then(|f| doc.world_bounds(f));
     let page = c.page;
+    // An anchorless chat message sits nowhere on the canvas: never pan to its stored point.
+    let pin = !c.chat || c.anchor.is_some();
     let ds = s.ds_mut()?;
     let switched = ds.page != page;
     if switched {
@@ -336,10 +344,13 @@ fn reveal(s: &mut Session, id: u64, how: &str) -> crate::Result<()> {
         ("fit", Some(b)) => ds.view.fit(b.union_pt(geom::Point::new(x, y)), 1.0),
         ("fit", None) => {
             ds.view.set_zoom_at(ds.view.zoom.max(1.0), (ds.view.cx, ds.view.cy));
-            (ds.view.cx, ds.view.cy) = (x, y);
+            if pin {
+                (ds.view.cx, ds.view.cy) = (x, y);
+            }
         }
-        ("center", _) => (ds.view.cx, ds.view.cy) = (x, y),
-        _ if switched => (ds.view.cx, ds.view.cy) = (x, y),
+        ("center", _) if pin => (ds.view.cx, ds.view.cy) = (x, y),
+        ("center", _) => {}
+        _ if switched && pin => (ds.view.cx, ds.view.cy) = (x, y),
         _ => {}
     }
     Ok(())
@@ -379,11 +390,12 @@ pub fn specs() -> Vec<CommandSpec> {
         spec!(
             "comment.add",
             "Add comment",
-            "{x, y, text, page?, author?, anchor? (node id to pin to; true = innermost frame under the point)}",
+            "{x?, y? (required unless chat), text, page?, author?, anchor? (node id to pin to; true = innermost frame under the point), chat? (a group chat message: no canvas pin)}",
             true,
             |s, p| {
-                let x = req_num("comment.add", p, "x")?;
-                let y = req_num("comment.add", p, "y")?;
+                let chat = boolean(p, "chat").unwrap_or(false);
+                let x = if chat { num(p, "x").unwrap_or(0.0) } else { req_num("comment.add", p, "x")? };
+                let y = if chat { num(p, "y").unwrap_or(0.0) } else { req_num("comment.add", p, "y")? };
                 let text = text("comment.add", p)?;
                 let who = author(s, p);
                 let page = id(p, "page").unwrap_or(s.page()?);
@@ -399,6 +411,7 @@ pub fn specs() -> Vec<CommandSpec> {
                     x: lx,
                     y: ly,
                     anchor,
+                    chat,
                     first: Message::new(who.clone(), text, now_secs()),
                     resolved: false,
                     replies: Vec::new(),
@@ -553,7 +566,7 @@ pub fn specs() -> Vec<CommandSpec> {
                 let who = author(s, p);
                 let (page, filter, sort, text) = list_params("comment.next", s, p)?;
                 let ids: Vec<u64> =
-                    query(doc, &Query { page, frame: id(p, "frame"), filter, sort, text: &text }, &who).iter().map(|c| c.id).collect();
+                    query(doc, &Query { page, frame: id(p, "frame"), filter, sort, text: &text, chat: None }, &who).iter().map(|c| c.id).collect();
                 let at = id(p, "id").and_then(|i| ids.iter().position(|x| *x == i.0));
                 let next = match at {
                     Some(i) if dir < 0.0 => ids.get(i.saturating_sub(1)),
@@ -590,13 +603,13 @@ pub fn specs() -> Vec<CommandSpec> {
         spec!(
             "comment.list",
             "List comments",
-            "{page? (default: current; \"all\" for every page), filter? (all|open|resolved|mine|unread; default all), sort? (date|page; default date), query? (search text), frame? (a top-level frame id), resolved? (false hides resolved ones), author? (whose threads and read state)}",
+            "{page? (default: current; \"all\" for every page), filter? (all|open|resolved|mine|unread; default all), sort? (date|page; default date), query? (search text), frame? (a top-level frame id), resolved? (false hides resolved ones), chat? (true: group chat only; false: pinned comments only), author? (whose threads and read state)}",
             false,
             |s, p| {
                 let doc = s.doc()?;
                 let (page, filter, sort, text) = list_params("comment.list", s, p)?;
                 let who = author(s, p);
-                let q = Query { page, frame: id(p, "frame"), filter, sort, text: &text };
+                let q = Query { page, frame: id(p, "frame"), filter, sort, text: &text, chat: boolean(p, "chat") };
                 let list: Vec<Value> = query(doc, &q, &who).into_iter().map(|c| comment_json(doc, c, &who)).collect();
                 Ok(json!({"comments": list}))
             }

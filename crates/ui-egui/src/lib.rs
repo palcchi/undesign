@@ -16,6 +16,7 @@ pub mod bidi;
 pub mod board_bar;
 pub mod branch_ui;
 pub mod canvas;
+pub mod chat_agent;
 pub mod cjk;
 pub mod colorpicker;
 pub mod comments;
@@ -96,6 +97,8 @@ mod canvas_drag_tests;
 mod canvas_fixes_tests;
 #[cfg(test)]
 mod canvas_image_rect_tests;
+#[cfg(test)]
+mod chat_agent_tests;
 #[cfg(test)]
 mod colorpicker_eyedropper_tests;
 #[cfg(test)]
@@ -1699,6 +1702,7 @@ impl FigApp {
         if self.worker.is_none() {
             self.worker = Some(render_worker::Worker::new(ctx.clone()));
         }
+        chat_agent::poll(self, ctx);
     }
 
     /// Every [`AUTOSAVE_SECS`], each open document with unsaved changes since its last version

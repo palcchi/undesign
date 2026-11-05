@@ -256,7 +256,7 @@ separate calls. Returns `{queued}`.
 
 Invoke a menu item exactly like clicking it (this may open a dialog). Returns `{ok, lastError}`.
 
-### `ui.set {rightTab?, leftTab?, theme?, home?, homeSection?, homeSearch?, homeRecentsView?, homeRecentsSort?, homeRecentsOrder?, palette?, mainMenu?, focusRegion?, colorPicker?, variables?, layerFilter?, collapseLayers?, exportPreview?, preview?, presentScroll?, colorProfileDialog?, stylePicker?, stylePickerEdit?, stylePickerView?, iconGallery?, protoEditor?, contextMenu?, contextSelectLayer?, commentOpen?, commentDraft?, commentFilter?, commentSort?, commentSearch?, commentReply?, commentEdit?, presentComments?, devCompare?, devCompareMode?, devCompareSplit?, annotationFilter?, resetFrameStats?, pluginsWindow?, pluginsTab?, pluginConfirm?, pluginForm?, devCompareVersion?, windowSize?, motionZoom?}`
+### `ui.set {rightTab?, leftTab?, theme?, home?, homeSection?, homeSearch?, homeRecentsView?, homeRecentsSort?, homeRecentsOrder?, palette?, mainMenu?, focusRegion?, colorPicker?, variables?, layerFilter?, collapseLayers?, exportPreview?, preview?, presentScroll?, colorProfileDialog?, stylePicker?, stylePickerEdit?, stylePickerView?, iconGallery?, protoEditor?, contextMenu?, contextSelectLayer?, commentOpen?, commentDraft?, chatOpen?, commentFilter?, commentSort?, commentSearch?, commentReply?, commentEdit?, presentComments?, devCompare?, devCompareMode?, devCompareSplit?, annotationFilter?, resetFrameStats?, pluginsWindow?, pluginsTab?, pluginConfirm?, pluginForm?, devCompareVersion?, windowSize?, motionZoom?}`
 
 Switch panels and modes: `rightTab` `design|prototype|inspect|motion`, `leftTab` `file|assets`, `theme`,
 `home` (bool), `homeSection` (`recents` or `online`: which section the home screen shows, as `ui.inspect` reports it; opening
@@ -287,7 +287,8 @@ Prototype panel; `null` closes it), `contextMenu` (`[sx, sy]`: right-click the c
 point, selecting what is under it (with `cmd: true`, the nested layer) and opening the context menu;
 `null` closes it), `contextSelectLayer` (bool: open the context menu's Select layer submenu, which
 lists every layer under the click). Comments: `commentOpen` (a thread id opens its popover, `null`
-closes it), `commentDraft` (`{x, y}`: start a new comment there), `commentFilter`
+closes it), `commentDraft` (`{x, y}`: start a new comment there), `chatOpen` (bool: the Chat
+history in the right panel), `commentFilter`
 (`open|resolved|mine|unread|all`: what the Comments panel and the pins show), `commentSort`
 (`date|page`), `commentSearch` (the panel's search text), `commentReply` (the open thread's reply
 text, focused with the cursor at its end: an `@` there shows the mention picker), `commentEdit` (a

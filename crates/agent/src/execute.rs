@@ -21,6 +21,8 @@ pub const MAX_SPINS: u32 = 10_000;
 pub struct ApplyReport {
     /// The applied command ids in order.
     pub applied: Vec<String>,
+    /// Layers the plan created, in step order (steps returning an `id`).
+    pub created: Vec<u64>,
 }
 
 /// What one turn did.
@@ -28,6 +30,8 @@ pub struct ApplyReport {
 pub struct TurnReport {
     /// The applied command ids in order.
     pub applied: Vec<String>,
+    /// Layers the plan created, in step order (steps returning an `id`).
+    pub created: Vec<u64>,
     /// Provider attempts used (1, or 2 after the automatic retry).
     pub attempts: u32,
 }
@@ -55,8 +59,9 @@ pub fn build_system_prompt() -> Result<String> {
 /// the document is untouched.
 pub fn apply(session: &mut undesign_engine::Session, plan: &Plan) -> Result<ApplyReport> {
     let commands: Vec<Value> = plan.steps.iter().map(|Step { command, params }| json!({"command": command, "params": params})).collect();
-    session.execute("command.batch", &json!({"label": "Agent", "commands": commands}))?;
-    Ok(ApplyReport { applied: plan.steps.iter().map(|s| s.command.clone()).collect() })
+    let out = session.execute("command.batch", &json!({"label": "Agent", "commands": commands}))?;
+    let created = out.as_array().map(|steps| steps.iter().filter_map(|r| r.get("id").and_then(Value::as_u64)).collect()).unwrap_or_default();
+    Ok(ApplyReport { applied: plan.steps.iter().map(|s| s.command.clone()).collect(), created })
 }
 
 /// Pump one request to an answer. Blocking callers (tests, a native worker) loop on
@@ -84,7 +89,7 @@ pub fn run_turn(session: &mut undesign_engine::Session, provider: &mut impl Prov
         let id = provider.start(ChatRequest { system: system.clone(), user: user.clone(), max_tokens })?;
         let reply = pump(provider, id, MAX_SPINS)?;
         match parse_plan(&reply.text).and_then(validate).and_then(|plan| apply(session, &plan)) {
-            Ok(report) => return Ok(TurnReport { applied: report.applied, attempts }),
+            Ok(report) => return Ok(TurnReport { applied: report.applied, created: report.created, attempts }),
             // The batch already rolled back; retrying the same plan cannot help.
             Err(Error::Engine(e)) => return Err(Error::Engine(e)),
             Err(other) if attempts < 2 => {
@@ -117,6 +122,15 @@ mod tests {
         assert_eq!(node_count(&session), before + 1);
         assert!(session.undo().unwrap());
         assert_eq!(node_count(&session), before);
+    }
+
+    #[test]
+    fn turn_report_lists_created_layers() {
+        let mut session = undesign_engine::Session::new();
+        let mut provider = FakeProvider::replies(&[RECT]);
+        let report = run_turn(&mut session, &mut provider, "a rectangle", 500).unwrap();
+        assert_eq!(report.created.len(), 1);
+        assert!(session.doc().unwrap().node(undesign_doc::NodeId(report.created[0])).is_some());
     }
 
     #[test]

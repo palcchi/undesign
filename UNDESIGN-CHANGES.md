@@ -316,3 +316,22 @@ upstream revision so future syncs stay auditable.
 - `README.md`: new screenshots `docs/images/ui-*.png` and `made-undesign-intro.png` (rows in
   `ATTRIBUTION.md`), an Examples table, Motion and Agent feature cells, the browser link; the
   local-branch preview section removed.
+
+## 2026-11-05: Group chat and chat agent (change #22)
+
+- `crates/doc/src/comments.rs`: `Comment.chat` marks group chat threads (unpinned,
+  serde-defaulted so older files read back as pinned comments).
+- `crates/engine/src/cmd/comment.rs`: `comment.add {chat}` (x/y optional), `comment.list {chat?}`,
+  `comment_json` carries `chat`, anchorless chat has no frame and `comment.open` never pans to
+  its stored point. Tests: `comment_chat_tests.rs`; the collab fuzz sometimes posts chat.
+- `crates/agent/src/execute.rs`: turn and apply reports list created layers for anchoring.
+- `crates/ui-egui/src/comments.rs`: the Chat history gains a composer posting `comment.add {chat}`;
+  pins and the Comment tool panel skip chat threads.
+- `crates/ui-egui/src/chat_agent.rs` (new): `/agent <prompt>` runs one plan turn through the
+  connected provider, pumped per frame, and posts the outcome as a chat thread anchored to the
+  first layer it made (one undo step, one retry, failures answered in chat). Tests:
+  `chat_agent_tests.rs` with a scripted provider.
+- `crates/ui-egui/src/control.rs`, `docs/control-protocol.md`: `ui.set {chatOpen}` drives the
+  Chat history.
+- `crates/ui-egui/locales/en.toml`: seven new UI strings.
+- Docs: `ROADMAP.md`, `docs/collaboration-parity.md`.

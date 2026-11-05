@@ -81,6 +81,9 @@ pub struct Comment {
     pub y: f64,
     #[serde(default)]
     pub anchor: Option<NodeId>,
+    /// A group chat message: shown in the Chat history, never as a canvas pin.
+    #[serde(default)]
+    pub chat: bool,
     /// The message that starts the thread (its fields sit on the comment itself in the file).
     #[serde(flatten)]
     pub first: Message,

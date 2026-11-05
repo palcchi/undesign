@@ -74,7 +74,7 @@ pub(crate) fn random_command(doc: &Document, rng: &mut Rng, with_undo: bool) -> 
             _ => ("page.move", json!({"id": one(&doc.pages, rng), "index": rng.below(3)})),
         },
         23 => ("object.moveToPage", json!({"ids": [one(&layers, rng)], "page": one(&doc.pages, rng)})),
-        24 => ("comment.add", json!({"x": x, "y": y, "text": "Looks good", "page": one(&doc.pages, rng)})),
+        24 => ("comment.add", json!({"x": x, "y": y, "text": "Looks good", "page": one(&doc.pages, rng), "chat": rng.below(2) == 0})),
         25 => match rng.below(3) {
             0 => ("variable.createCollection", json!({"name": "Tokens"})),
             1 => ("variable.create", json!({"collection": "Tokens", "name": format!("v{}", rng.below(4)), "type": "color", "value": color(rng)})),

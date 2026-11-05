@@ -73,6 +73,58 @@ fn chat_history_shows_threads_and_selects_the_exact_anchor_across_pages() {
 }
 
 #[test]
+fn chat_messages_draw_no_pins_but_join_the_history() {
+    let mut s = Session::new();
+    let pinned = add(&mut s, 100.0, 100.0, "On the canvas", "Sam");
+    s.execute("comment.add", &json!({"chat": true, "text": "In the group", "author": "Sam"})).unwrap();
+    let mut u = Ui::new(s);
+    u.run("view.set", json!({"zoom": 1, "cx": 100, "cy": 100}));
+    click_pin(&mut u, 0.0, 0.0);
+    assert_eq!(comments(&u)["open"], Value::Null, "a chat message's meaningless spot takes no clicks");
+    click_pin(&mut u, 100.0, 100.0);
+    assert_eq!(comments(&u)["open"], pinned);
+    u.app.ui.chat_open = true;
+    u.app.ui.right_tab = crate::RightTab::Design;
+    u.frames(20, Vec::new);
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(crate::live_tests::has_text(&shapes, "On the canvas"));
+    assert!(crate::live_tests::has_text(&shapes, "In the group"));
+}
+
+#[test]
+fn the_chat_composer_posts_a_group_message() {
+    let mut u = Ui::new(Session::new());
+    u.app.ui.chat_open = true;
+    u.app.ui.right_tab = crate::RightTab::Design;
+    u.frames(20, Vec::new);
+    let out = u.frame_output(vec![]);
+    let shapes: Vec<_> = out.shapes.into_iter().map(|s| s.shape).collect();
+    assert!(crate::live_tests::has_text(&shapes, "Message the group"));
+    let field = crate::live_tests::text_center(&shapes, "Message the group");
+    click(&mut u, field);
+    key(&mut u, Key::Enter, Modifiers::NONE);
+    assert!(u.app.session.doc().unwrap().comments.is_empty(), "an empty draft posts nothing");
+    u.frame(vec![Event::Text("Hello group".into())]);
+    key(&mut u, Key::Enter, Modifiers::NONE);
+    let doc = u.app.session.doc().unwrap();
+    let chats: Vec<_> = doc.comments.iter().filter(|c| c.chat).collect();
+    assert_eq!(chats.len(), 1);
+    assert_eq!(chats[0].first.text, "Hello group");
+    assert!(u.app.ui.comments.chat_draft.is_empty());
+}
+
+#[test]
+fn control_channel_toggles_the_chat_history() {
+    let mut u = Ui::new(Session::new());
+    let ctx = egui::Context::default();
+    crate::control::handle(&mut u.app, &ctx, "ui.set", &json!({"chatOpen": true})).unwrap();
+    assert!(u.app.ui.chat_open);
+    crate::control::handle(&mut u.app, &ctx, "ui.set", &json!({"chatOpen": false})).unwrap();
+    assert!(!u.app.ui.chat_open);
+}
+
+#[test]
 fn switching_from_comment_to_move_closes_the_unposted_composer() {
     let mut u = Ui::new(Session::new());
     u.app.run("tool.set", json!({"tool": "comment"}));

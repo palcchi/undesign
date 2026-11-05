@@ -17,7 +17,18 @@ fn style(id: &str) -> Style {
 }
 
 fn comment(id: u64, page: NodeId) -> Comment {
-    Comment { id, page, x: 0.0, y: 0.0, anchor: None, first: Message::new("A", "hi", 0), resolved: false, replies: Vec::new(), read_by: None }
+    Comment {
+        id,
+        page,
+        x: 0.0,
+        y: 0.0,
+        anchor: None,
+        chat: false,
+        first: Message::new("A", "hi", 0),
+        resolved: false,
+        replies: Vec::new(),
+        read_by: None,
+    }
 }
 
 fn collection(id: &str, modes: &[&str]) -> Collection {

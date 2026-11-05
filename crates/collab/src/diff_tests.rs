@@ -131,6 +131,7 @@ fn document_level_data_round_trips() {
         x: 1.0,
         y: 2.0,
         anchor: None,
+        chat: false,
         first: Message { author: "Ada".into(), text: "Hi".into(), created: 1, edited: 0, reactions: vec![] },
         resolved: false,
         replies: vec![],

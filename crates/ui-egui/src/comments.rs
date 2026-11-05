@@ -36,6 +36,10 @@ pub struct CommentUi {
     /// A new comment being written at a page point.
     pub draft: Option<(f64, f64, String)>,
     pub reply: String,
+    /// A group chat message being written in the Chat history.
+    pub chat_draft: String,
+    /// An agent turn answering the group, if one is in flight.
+    pub agent: Option<crate::chat_agent::ChatAgentRun>,
     /// What the panel (and the pins) show, and in what order.
     pub filter: Filter,
     pub sort: Sort,
@@ -54,6 +58,8 @@ impl Default for CommentUi {
             open: None,
             draft: None,
             reply: String::new(),
+            chat_draft: String::new(),
+            agent: None,
             filter: Filter::Open,
             sort: Sort::Date,
             search: String::new(),
@@ -243,7 +249,7 @@ fn pins(app: &FigApp) -> Vec<Pin> {
     let Ok(ds) = app.session.ds() else { return Vec::new() };
     let me = me(app);
     let cu = &app.ui.comments;
-    let q = Query { page: Some(ds.page), filter: cu.filter, ..Query::default() };
+    let q = Query { page: Some(ds.page), filter: cu.filter, chat: Some(false), ..Query::default() };
     let mut list = cc::query(&ds.doc, &q, &me);
     list.reverse();
     if let Some(c) = cu.open.and_then(|o| ds.doc.comment(o)).filter(|c| c.page == ds.page && !list.iter().any(|x| x.id == c.id)) {
@@ -1030,9 +1036,45 @@ pub fn chat_panel(app: &mut FigApp, ui: &mut Ui) {
         }
     });
     ui.add_space(8.0);
+    let people = doc.comment_people();
+    let mut post: Option<String> = None;
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        ui.scope(|ui| {
+            ui.set_width(ui.available_width() - 16.0);
+            if composer(
+                ui,
+                Id::new("chat_composer"),
+                &mut app.ui.comments.chat_draft,
+                tr("Message the group"),
+                &people,
+                &me,
+                &mut app.ui.comments.mention,
+            ) {
+                post = Some(app.ui.comments.chat_draft.trim().to_string());
+            }
+        });
+    });
+    if let Some(text) = post.filter(|t| !t.is_empty()) {
+        let posted = app.run("comment.add", json!({"chat": true, "text": text.clone()})).is_some();
+        if posted {
+            app.ui.comments.chat_draft.clear();
+            let ctx = ui.ctx().clone();
+            crate::chat_agent::maybe_run(app, &ctx, &text);
+        }
+    }
+    if app.ui.comments.agent.is_some() {
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.add_space(16.0);
+            ui.label(egui::RichText::new(tr("Agent is thinking...")).font(regular(11.0)).color(t.text_secondary));
+        });
+        ui.add_space(4.0);
+    }
+    ui.add_space(8.0);
 
     let search = app.ui.comments.search.clone();
-    let query = Query { page: None, frame: None, filter: Filter::All, sort: Sort::Date, text: &search };
+    let query = Query { page: None, frame: None, filter: Filter::All, sort: Sort::Date, text: &search, chat: None };
     let mut threads = cc::query(&doc, &query, &me);
     threads.reverse();
     if threads.is_empty() {
@@ -1207,10 +1249,10 @@ pub fn panel(app: &mut FigApp, ui: &mut Ui) {
     }
     ui.add_space(8.0);
     let search = app.ui.comments.search.clone();
-    let q = Query { page: None, frame: None, filter: app.ui.comments.filter, sort: app.ui.comments.sort, text: &search };
+    let q = Query { page: None, frame: None, filter: app.ui.comments.filter, sort: app.ui.comments.sort, text: &search, chat: Some(false) };
     let list = cc::query(&doc, &q, &me);
     if list.is_empty() {
-        let (title, sub) = if doc.comments.iter().any(|c| doc.pages.contains(&c.page)) {
+        let (title, sub) = if doc.comments.iter().any(|c| !c.chat && doc.pages.contains(&c.page)) {
             (tr("No matching comments"), tr("Try another search or filter."))
         } else {
             (tr("No comments yet"), tr("Click anywhere on the canvas to leave one."))
