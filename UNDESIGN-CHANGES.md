@@ -345,3 +345,14 @@ upstream revision so future syncs stay auditable.
   unchanged. `en.toml` keeps the seven group-chat strings on top. Tests: showcase 32/32.
 - `crates/ui-egui/src/windows_tests.rs`: the unsaved-changes test clears its last frame's
   texture deltas (test-only fix for an intermittent epaint panic on drop).
+
+## 2026-11-05: Design critique example and demo domain (change #24)
+
+- `examples/design-critique.undesign` (new): a landing hero under review with two pinned
+  comments and a group chat thread with a reply, built through `undesign-cli run`; registered
+  in `crates/ui-egui/src/home_examples.rs` with English title/about strings. Tests: the
+  example catalog pins the new list; every example opens.
+- `docs/images/made-design-critique.png` (new): the example rendered at 2× with
+  `undesign-cli render` (row in `ATTRIBUTION.md`); shown in `README.md` "Made in Undesign".
+- `README.md`: demo links move to `https://undesign.valliant.works/`; the Examples table gains
+  the Design critique row.

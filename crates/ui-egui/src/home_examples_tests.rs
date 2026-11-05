@@ -72,9 +72,9 @@ fn a_link_opens_a_motion_example_in_the_motion_workspace_playing() {
 }
 
 #[test]
-fn home_example_catalog_keeps_the_two_recent_samples_and_adds_both_profile_cards() {
+fn home_example_catalog_keeps_the_recent_samples_and_adds_the_design_critique() {
     let names = EXAMPLES.iter().map(|example| example.name()).collect::<Vec<_>>();
-    assert_eq!(names, vec!["undesign-intro", "daybreak-motion-study", "profile-card-design", "profile-card-prototype"]);
+    assert_eq!(names, vec!["undesign-intro", "daybreak-motion-study", "profile-card-design", "profile-card-prototype", "design-critique"]);
 }
 
 #[test]

@@ -84,6 +84,13 @@ pub const EXAMPLES: &[Example] = &[
         motion: false,
         bytes: include_bytes!("../../../examples/profile-card-prototype.undesign"),
     },
+    Example {
+        file: "design-critique.undesign",
+        title: tr_noop("Design critique"),
+        about: tr_noop("A landing hero under review: pinned comments and group chat"),
+        motion: false,
+        bytes: include_bytes!("../../../examples/design-critique.undesign"),
+    },
 ];
 
 /// The pictures, read one per frame so opening Home never stalls on decoding them all.

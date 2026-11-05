@@ -26,11 +26,11 @@
 
 <p align="center">
   <b>Open a ready-to-explore sample in your browser:</b><br>
-  <a href="https://palcchi.github.io/undesign/?example=undesign-intro"><b>▶ Motion demo</b></a> (plays the Undesign intro sample) ·
-  <a href="https://palcchi.github.io/undesign/?example=profile-card-design"><b>Design demo</b></a> ·
-  <a href="https://palcchi.github.io/undesign/?example=profile-card-prototype"><b>Prototype demo</b></a> ·
+  <a href="https://undesign.valliant.works/?example=undesign-intro"><b>▶ Motion demo</b></a> (plays the Undesign intro sample) ·
+  <a href="https://undesign.valliant.works/?example=profile-card-design"><b>Design demo</b></a> ·
+  <a href="https://undesign.valliant.works/?example=profile-card-prototype"><b>Prototype demo</b></a> ·
   <a href="prototype/profile-card/"><b>Standalone web prototype source</b></a> ·
-  <a href="https://palcchi.github.io/undesign/">open the app</a> (choose any sample from Home ▸ Examples)
+  <a href="https://undesign.valliant.works/">open the app</a> (choose any sample from Home ▸ Examples)
 </p>
 <p align="center"><sub>The profile-card browser links work once this branch is included in the published web build; the source files are available above and in <code>examples/</code>.</sub></p>
 
@@ -96,16 +96,24 @@ Each built-in example opens as a fresh copy; edits do not replace the bundled or
 
 | Sample file | Demo focus | Open in browser |
 |---|---|---|
-| [Undesign intro](examples/undesign-intro.undesign) | Animated logo and feature labels, arranged on a three-second timeline with 16 eased tracks | [Try the motion demo](https://palcchi.github.io/undesign/?example=undesign-intro) |
-| [Daybreak motion study](examples/daybreak-motion-study.undesign) | Weather-screen composition with translucent panels, a sun and forecast animation | [Try the motion demo](https://palcchi.github.io/undesign/?example=daybreak-motion-study) |
-| [Profile card design](examples/profile-card-design.undesign) | Two editable creator-profile treatments, with white and green surfaces based on the supplied reference | [Try the Design demo](https://palcchi.github.io/undesign/?example=profile-card-design) |
-| [Profile card prototype](examples/profile-card-prototype.undesign) | Three linked profile states; Follow and save actions move between them | [Try the Prototype demo](https://palcchi.github.io/undesign/?example=profile-card-prototype) |
+| [Undesign intro](examples/undesign-intro.undesign) | Animated logo and feature labels, arranged on a three-second timeline with 16 eased tracks | [Try the motion demo](https://undesign.valliant.works/?example=undesign-intro) |
+| [Daybreak motion study](examples/daybreak-motion-study.undesign) | Weather-screen composition with translucent panels, a sun and forecast animation | [Try the motion demo](https://undesign.valliant.works/?example=daybreak-motion-study) |
+| [Profile card design](examples/profile-card-design.undesign) | Two editable creator-profile treatments, with white and green surfaces based on the supplied reference | [Try the Design demo](https://undesign.valliant.works/?example=profile-card-design) |
+| [Profile card prototype](examples/profile-card-prototype.undesign) | Three linked profile states; Follow and save actions move between them | [Try the Prototype demo](https://undesign.valliant.works/?example=profile-card-prototype) |
+| [Design critique](examples/design-critique.undesign) | A landing hero under review, with pinned comments and a group chat thread | [Try the Design demo](https://undesign.valliant.works/?example=design-critique) |
 
 The separate responsive website prototype is in [`prototype/profile-card/`](prototype/profile-card/). Its Follow and save controls toggle state; Get in Touch opens a local preview rather than sending a message.
 
 ## Made in Undesign
 
 The Profile card Design file is built from editable frames, text and vector shapes. The Prototype file connects three states through Follow and save interactions. Both use illustrative sample content and are available as `.undesign` files in [`examples/`](examples); the static website version is in [`prototype/profile-card/`](prototype/profile-card/).
+
+The Design critique file adds a landing hero under review: two pinned comments and a group chat thread with a reply, all stored in the file. Its render below is exported at 2× with the Undesign renderer.
+
+<p align="center">
+  <img src="docs/images/made-design-critique.png" alt="A dark landing hero for fictional Northwind Analytics: an eyebrow line, the headline Every trail your data takes, supporting copy, a green Start free trial button, a stats line, and a card titled Signups this week with four ascending green bars" width="100%">
+  <br><sub><b>Design critique</b>: a landing hero with a signup chart card · <code>examples/design-critique.undesign</code></sub>
+</p>
 
 ## Features
 
